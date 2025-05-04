@@ -202,16 +202,19 @@ const MenuSets = () => {
           </Card>
         ))}
         
+        {/* This is the "Add New Menu Set" card that was causing the issue */}
         <Card className="hr-card border-dashed flex flex-col items-center justify-center h-[240px] cursor-pointer hover:border-accent hover:bg-accent/5">
-          <DialogTrigger asChild>
-            <Button variant="ghost" className="h-full w-full flex flex-col items-center justify-center gap-2" onClick={() => setIsNewMenuDialogOpen(true)}>
-              <div className="rounded-full bg-muted p-3">
-                <Plus className="h-6 w-6" />
-              </div>
-              <span className="font-medium">Add New Menu Set</span>
-              <p className="text-xs text-muted-foreground">Create a new navigation menu</p>
-            </Button>
-          </DialogTrigger>
+          <Button 
+            variant="ghost" 
+            className="h-full w-full flex flex-col items-center justify-center gap-2" 
+            onClick={() => setIsNewMenuDialogOpen(true)}
+          >
+            <div className="rounded-full bg-muted p-3">
+              <Plus className="h-6 w-6" />
+            </div>
+            <span className="font-medium">Add New Menu Set</span>
+            <p className="text-xs text-muted-foreground">Create a new navigation menu</p>
+          </Button>
         </Card>
       </div>
     </div>
