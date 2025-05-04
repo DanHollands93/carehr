@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +26,7 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, FileText, FormInput, List, Plus, Search, Settings } from "lucide-react";
+import { ChevronDown, FileText, FormInput, List, Pencil, Plus, Search, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
@@ -87,11 +86,13 @@ const Processes = () => {
   ]);
 
   const [isNewProcessDialogOpen, setIsNewProcessDialogOpen] = useState(false);
+  const [isEditProcessDialogOpen, setIsEditProcessDialogOpen] = useState(false);
   const [newProcessName, setNewProcessName] = useState("");
   const [newProcessDescription, setNewProcessDescription] = useState("");
   const [newProcessType, setNewProcessType] = useState<ProcessType>("form");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [editingProcess, setEditingProcess] = useState<Process | null>(null);
 
   // Filter processes based on search term and active tab
   const filteredProcesses = processes.filter(process => {
@@ -128,6 +129,50 @@ const Processes = () => {
     toast({
       title: "Success",
       description: "Process created successfully"
+    });
+  };
+
+  // Function to handle opening the edit dialog
+  const handleEditProcess = (process: Process) => {
+    setEditingProcess(process);
+    setNewProcessName(process.name);
+    setNewProcessDescription(process.description);
+    setNewProcessType(process.type);
+    setIsEditProcessDialogOpen(true);
+  };
+
+  // Function to save edited process
+  const handleSaveEditedProcess = () => {
+    if (!editingProcess) return;
+    
+    if (!newProcessName.trim()) {
+      toast({
+        title: "Error",
+        description: "Process name is required",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const updatedProcesses = processes.map(process => {
+      if (process.id === editingProcess.id) {
+        return {
+          ...process,
+          name: newProcessName,
+          description: newProcessDescription,
+          type: newProcessType
+        };
+      }
+      return process;
+    });
+    
+    setProcesses(updatedProcesses);
+    setIsEditProcessDialogOpen(false);
+    setEditingProcess(null);
+    
+    toast({
+      title: "Success",
+      description: "Process updated successfully"
     });
   };
 
@@ -222,6 +267,58 @@ const Processes = () => {
         </Dialog>
       </div>
 
+      {/* Edit Process Dialog */}
+      <Dialog open={isEditProcessDialogOpen} onOpenChange={setIsEditProcessDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Process</DialogTitle>
+            <DialogDescription>
+              Modify the details of this process
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-process-type">Process Type</Label>
+              <Select
+                value={newProcessType}
+                onValueChange={(value) => setNewProcessType(value as ProcessType)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="form">Form</SelectItem>
+                  <SelectItem value="list">List</SelectItem>
+                  <SelectItem value="dashboard">Dashboard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-process-name">Name</Label>
+              <Input
+                id="edit-process-name"
+                value={newProcessName}
+                onChange={(e) => setNewProcessName(e.target.value)}
+                placeholder="e.g. Employee Information Form"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-process-description">Description</Label>
+              <Input
+                id="edit-process-description"
+                value={newProcessDescription}
+                onChange={(e) => setNewProcessDescription(e.target.value)}
+                placeholder="e.g. Collect employee personal information"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditProcessDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveEditedProcess}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-col md:flex-row md:items-center gap-4 md:justify-between">
         <Tabs 
           value={activeTab} 
@@ -262,7 +359,9 @@ const Processes = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Edit Process</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleEditProcess(process)}>
+                      Edit Process
+                    </DropdownMenuItem>
                     <DropdownMenuItem>Clone Process</DropdownMenuItem>
                     <DropdownMenuItem className="text-destructive">
                       Delete Process
@@ -282,7 +381,12 @@ const Processes = () => {
                   <span className="text-muted-foreground">Created: {process.createdAt}</span>
                 </div>
                 <div className="flex justify-between mt-2">
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleEditProcess(process)}
+                  >
+                    <Pencil className="h-3.5 w-3.5 mr-1" />
                     Edit
                   </Button>
                   {process.menuSetId ? (
