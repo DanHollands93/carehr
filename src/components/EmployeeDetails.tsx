@@ -1,11 +1,10 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit, Plus, MapPin, Phone, Mail, Calendar, Briefcase, Pound } from "lucide-react";
+import { ArrowLeft, Edit, Plus, MapPin, Phone, Mail, Calendar, Briefcase, PoundSterling } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import CareerHistoryForm from "@/components/CareerHistoryForm";
 
@@ -183,7 +182,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-3">
-                  <Pound className="w-4 h-4 text-gray-500" />
+                  <PoundSterling className="w-4 h-4 text-gray-500" />
                   <span className="text-lg font-semibold">
                     {formatCurrency(employee.pay_rate, employee.pay_type || 'salary')}
                   </span>
