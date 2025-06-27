@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +6,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, Save, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, Users, Trash2 } from "lucide-react";
 import RosterCategoryManager from "@/components/RosterCategoryManager";
 import StaffAssignmentManager from "@/components/StaffAssignmentManager";
 import { useRosterCategories } from "@/hooks/useRosterCategories";
@@ -60,6 +59,7 @@ const TemplateRosterBuilder = ({
   const [templateShifts, setTemplateShifts] = useState<TemplateShift[]>([]);
   const [currentWeek, setCurrentWeek] = useState(0);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [showDeleteBin, setShowDeleteBin] = useState(false);
   
   const { categories, getAssignedEmployees } = useRosterCategories();
 
@@ -196,11 +196,13 @@ const TemplateRosterBuilder = ({
   const handleDragStart = (template: ShiftTemplate) => {
     setDraggedTemplate(template);
     setDraggedShift(null);
+    setShowDeleteBin(false);
   };
 
   const handleShiftDragStart = (shift: TemplateShift) => {
     setDraggedShift(shift);
     setDraggedTemplate(null);
+    setShowDeleteBin(true);
   };
 
   const handleDrop = (employeeId: string, dayIndex: number) => {
@@ -223,10 +225,22 @@ const TemplateRosterBuilder = ({
       );
       setDraggedShift(null);
     }
+    setShowDeleteBin(false);
+  };
+
+  const handleDeleteDrop = () => {
+    if (draggedShift) {
+      removeShift(draggedShift);
+    }
+    setShowDeleteBin(false);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+  };
+
+  const handleDragEnd = () => {
+    setShowDeleteBin(false);
   };
 
   const removeShift = (shiftToRemove: TemplateShift) => {
@@ -262,6 +276,20 @@ const TemplateRosterBuilder = ({
 
   return (
     <div className="space-y-6">
+      {/* Delete Bin - appears when dragging a shift */}
+      {showDeleteBin && (
+        <div className="fixed top-20 right-8 z-50">
+          <div
+            className="p-4 bg-red-100 border-2 border-dashed border-red-400 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+            onDrop={handleDeleteDrop}
+            onDragOver={handleDragOver}
+          >
+            <Trash2 className="w-8 h-8 text-red-600" />
+            <p className="text-sm text-red-600 mt-2">Drop to delete</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-gray-900">{templateName}</h2>
@@ -430,13 +458,14 @@ const TemplateRosterBuilder = ({
                                     <div 
                                       draggable
                                       onDragStart={() => handleShiftDragStart(shift)}
+                                      onDragEnd={handleDragEnd}
                                       className="p-2 rounded text-xs cursor-move hover:shadow-md transition-shadow"
                                       style={{ 
                                         backgroundColor: template.color + '20',
                                         borderColor: template.color
                                       }}
                                       onDoubleClick={() => removeShift(shift)}
-                                      title="Drag to move, double-click to remove"
+                                      title="Drag to move or delete, double-click to remove"
                                     >
                                       <div className="font-medium">{template.position}</div>
                                       <div>{template.start_time} - {template.end_time}</div>

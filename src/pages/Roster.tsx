@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronLeft, ChevronRight, CalendarIcon, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -52,6 +51,7 @@ const Roster = () => {
   const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [showDeleteBin, setShowDeleteBin] = useState(false);
   
   const { categories, getAssignedEmployees } = useRosterCategories();
 
@@ -201,11 +201,13 @@ const Roster = () => {
   const handleDragStart = (template: ShiftTemplate) => {
     setDraggedTemplate(template);
     setDraggedShift(null);
+    setShowDeleteBin(false);
   };
 
   const handleShiftDragStart = (shift: Shift) => {
     setDraggedShift(shift);
     setDraggedTemplate(null);
+    setShowDeleteBin(true);
   };
 
   const handleDrop = (employeeId: string, date: string) => {
@@ -224,10 +226,23 @@ const Roster = () => {
       });
       setDraggedShift(null);
     }
+    setShowDeleteBin(false);
+  };
+
+  const handleDeleteDrop = () => {
+    if (draggedShift) {
+      deleteShiftMutation.mutate(draggedShift.id);
+      setDraggedShift(null);
+    }
+    setShowDeleteBin(false);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+  };
+
+  const handleDragEnd = () => {
+    setShowDeleteBin(false);
   };
 
   const getShiftForEmployeeAndDate = (employeeId: string, date: string) => {
@@ -273,6 +288,20 @@ const Roster = () => {
 
   return (
     <div className="space-y-6">
+      {/* Delete Bin - appears when dragging a shift */}
+      {showDeleteBin && (
+        <div className="fixed top-20 right-8 z-50">
+          <div
+            className="p-4 bg-red-100 border-2 border-dashed border-red-400 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+            onDrop={handleDeleteDrop}
+            onDragOver={handleDragOver}
+          >
+            <Trash2 className="w-8 h-8 text-red-600" />
+            <p className="text-sm text-red-600 mt-2">Drop to delete</p>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Weekly Roster</h1>
         <p className="text-gray-600">Drag and drop shifts to assign staff or move shifts between staff and days</p>
@@ -433,13 +462,14 @@ const Roster = () => {
                                     <div 
                                       draggable
                                       onDragStart={() => handleShiftDragStart(shift)}
+                                      onDragEnd={handleDragEnd}
                                       className="p-2 rounded text-xs cursor-move hover:shadow-md transition-shadow"
                                       style={{ 
                                         backgroundColor: template?.color + '20' || '#3B82F6' + '20',
                                         borderColor: template?.color || '#3B82F6'
                                       }}
                                       onDoubleClick={() => deleteShiftMutation.mutate(shift.id)}
-                                      title="Drag to move, double-click to delete"
+                                      title="Drag to move or delete, double-click to delete"
                                     >
                                       <div className="font-medium">{shift.position}</div>
                                       <div>{shift.start_time} - {shift.end_time}</div>
