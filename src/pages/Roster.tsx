@@ -161,6 +161,10 @@ const Roster = () => {
     }
   });
 
+  // Permission checks
+  const canViewRoster = hasPermission('view_roster') || hasPermission('edit_roster');
+  const canEditRoster = hasPermission('edit_roster');
+
   const createShiftMutation = useMutation({
     mutationFn: async ({ employeeId, date, shiftData }: {
       employeeId: string;
@@ -252,18 +256,21 @@ const Roster = () => {
   });
 
   const handleDragStart = (template: ShiftTemplate) => {
+    if (!canEditRoster) return;
     setDraggedTemplate(template);
     setDraggedShift(null);
     setShowDeleteBin(false);
   };
 
   const handleShiftDragStart = (shift: Shift) => {
+    if (!canEditRoster) return;
     setDraggedShift(shift);
     setDraggedTemplate(null);
     setShowDeleteBin(true);
   };
 
   const handleDrop = (employeeId: string, date: string) => {
+    if (!canEditRoster) return;
     if (draggedTemplate) {
       createShiftMutation.mutate({
         employeeId,
@@ -289,6 +296,7 @@ const Roster = () => {
   };
 
   const handleDeleteDrop = () => {
+    if (!canEditRoster) return;
     if (draggedShift) {
       deleteShiftMutation.mutate(draggedShift.id);
       setDraggedShift(null);
@@ -325,8 +333,6 @@ const Roster = () => {
     return acc;
   }, {} as Record<string, ShiftTemplate[]>) || {};
 
-  const canManageRoster = hasPermission('view_roster') || hasPermission('edit_roster');
-
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       setCurrentWeek(date);
@@ -335,6 +341,7 @@ const Roster = () => {
   };
 
   const handleCellClick = (employeeId: string, employeeName: string, date: string) => {
+    if (!canEditRoster) return;
     // Don't open popup if there's already a shift for this employee and date
     const existingShift = getShiftForEmployeeAndDate(employeeId, date);
     if (existingShift) return;
@@ -354,6 +361,7 @@ const Roster = () => {
     pay_value?: number;
     color?: string;
   }) => {
+    if (!canEditRoster) return;
     createShiftMutation.mutate({
       employeeId: shiftPopup.employeeId,
       date: format(new Date(shiftPopup.date), 'yyyy-MM-dd'),
@@ -407,7 +415,7 @@ const Roster = () => {
     };
   }, []);
 
-  if (!canManageRoster) {
+  if (!canViewRoster) {
     return (
       <div className="text-center py-8">
         <h2 className="text-xl font-semibold text-gray-600">Access Denied</h2>
@@ -420,8 +428,8 @@ const Roster = () => {
 
   return (
     <div className="space-y-6" style={{ overscrollBehavior: 'none' }}>
-      {/* Delete Bin - appears when dragging a shift */}
-      {showDeleteBin && (
+      {/* Delete Bin - only show if user can edit and is dragging a shift */}
+      {showDeleteBin && canEditRoster && (
         <div className="fixed top-20 right-8 z-50">
           <div
             className="p-4 bg-red-100 border-2 border-dashed border-red-400 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
@@ -434,27 +442,38 @@ const Roster = () => {
         </div>
       )}
 
-      {/* Shift Creation Popup */}
-      <ShiftCreationPopup
-        isOpen={shiftPopup.isOpen}
-        onClose={() => setShiftPopup(prev => ({ ...prev, isOpen: false }))}
-        onCreateShift={handleCreateShiftFromPopup}
-        shiftTemplates={shiftTemplates || []}
-        employeeName={shiftPopup.employeeName}
-        date={shiftPopup.date}
-      />
+      {/* Shift Creation Popup - only show if user can edit */}
+      {canEditRoster && (
+        <ShiftCreationPopup
+          isOpen={shiftPopup.isOpen}
+          onClose={() => setShiftPopup(prev => ({ ...prev, isOpen: false }))}
+          onCreateShift={handleCreateShiftFromPopup}
+          shiftTemplates={shiftTemplates || []}
+          employeeName={shiftPopup.employeeName}
+          date={shiftPopup.date}
+        />
+      )}
 
-      {/* Staff Sorting Dialog */}
-      <StaffSortingDialog
-        isOpen={showSortDialog}
-        onClose={() => setShowSortDialog(false)}
-        employees={employees}
-        onSave={handleCustomSort}
-      />
+      {/* Staff Sorting Dialog - only show if user can edit */}
+      {canEditRoster && (
+        <StaffSortingDialog
+          isOpen={showSortDialog}
+          onClose={() => setShowSortDialog(false)}
+          employees={employees}
+          onSave={handleCustomSort}
+        />
+      )}
 
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Weekly Roster</h1>
-        <p className="text-gray-600">Drag and drop shifts to assign staff or move shifts between staff and days, or click on empty cells to add shifts</p>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Weekly Roster {!canEditRoster && <span className="text-sm font-normal text-gray-500">(View Only)</span>}
+        </h1>
+        <p className="text-gray-600">
+          {canEditRoster 
+            ? "Drag and drop shifts to assign staff or move shifts between staff and days, or click on empty cells to add shifts"
+            : "View-only access - shifts cannot be modified"
+          }
+        </p>
         
         {/* Date Navigation */}
         <div className="flex items-center justify-center space-x-4 mt-4">
@@ -497,14 +516,14 @@ const Roster = () => {
         </div>
       </div>
 
-      {/* Category Selection */}
+      {/* Category Selection - only allow editing if user has edit permissions */}
       <RosterCategoryManager
         selectedCategoryId={selectedCategoryId}
         onCategorySelect={setSelectedCategoryId}
       />
 
-      {/* Staff Assignment for Selected Category */}
-      {selectedCategory && (
+      {/* Staff Assignment for Selected Category - only show if user can edit */}
+      {selectedCategory && canEditRoster && (
         <StaffAssignmentManager
           categoryId={selectedCategory.id}
           categoryName={selectedCategory.name}
@@ -513,47 +532,52 @@ const Roster = () => {
 
       {selectedCategoryId && (
         <div className="space-y-6">
-          {/* Shift Templates Panel */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Shift Templates</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Accordion type="multiple" className="w-full">
-                {Object.entries(groupedTemplates).map(([position, templates]) => (
-                  <AccordionItem value={position} key={position}>
-                    <AccordionTrigger className="text-sm font-medium">
-                      {position}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="grid grid-cols-2 gap-2">
-                        {templates.map((template) => (
-                          <div
-                            key={template.id}
-                            draggable
-                            onDragStart={() => handleDragStart(template)}
-                            className="p-2 rounded border cursor-move hover:shadow-md transition-shadow text-xs"
-                            style={{ 
-                              backgroundColor: template.color + '20',
-                              borderColor: template.color 
-                            }}
-                          >
-                            <div className="font-medium truncate">{template.name}</div>
-                            <div className="text-xs text-gray-600 truncate">
-                              {template.start_time} - {template.end_time}
+          {/* Shift Templates Panel - only show if user can edit */}
+          {canEditRoster && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Shift Templates</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Accordion type="multiple" className="w-full">
+                  {Object.entries(groupedTemplates).map(([position, templates]) => (
+                    <AccordionItem value={position} key={position}>
+                      <AccordionTrigger className="text-sm font-medium">
+                        {position}
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid grid-cols-2 gap-2">
+                          {templates.map((template) => (
+                            <div
+                              key={template.id}
+                              draggable={canEditRoster}
+                              onDragStart={() => handleDragStart(template)}
+                              className={cn(
+                                "p-2 rounded border text-xs transition-shadow",
+                                canEditRoster ? "cursor-move hover:shadow-md" : "cursor-default"
+                              )}
+                              style={{ 
+                                backgroundColor: template.color + '20',
+                                borderColor: template.color 
+                              }}
+                            >
+                              <div className="font-medium truncate">{template.name}</div>
+                              <div className="text-xs text-gray-600 truncate">
+                                {template.start_time} - {template.end_time}
+                              </div>
+                              <div className="text-xs text-gray-600 truncate">
+                                {template.pay_value} hrs
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-600 truncate">
-                              {template.pay_value} hrs
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </CardContent>
-          </Card>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Roster Grid */}
           <Card>
@@ -562,27 +586,29 @@ const Roster = () => {
                 <CardTitle>
                   {selectedCategory?.name} Roster
                 </CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Sort by..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="first_name">First Name</SelectItem>
-                      <SelectItem value="last_name">Last Name</SelectItem>
-                      <SelectItem value="department">Job Title</SelectItem>
-                      <SelectItem value="custom">Custom Order</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowSortDialog(true)}
-                  >
-                    <ArrowUpDown className="w-4 h-4 mr-2" />
-                    Custom Sort
-                  </Button>
-                </div>
+                {canEditRoster && (
+                  <div className="flex items-center space-x-2">
+                    <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Sort by..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="first_name">First Name</SelectItem>
+                        <SelectItem value="last_name">Last Name</SelectItem>
+                        <SelectItem value="department">Job Title</SelectItem>
+                        <SelectItem value="custom">Custom Order</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSortDialog(true)}
+                    >
+                      <ArrowUpDown className="w-4 h-4 mr-2" />
+                      Custom Sort
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -623,40 +649,49 @@ const Roster = () => {
                                 <td
                                   key={day.toISOString()}
                                   className="p-2 border-r border-l min-w-32"
-                                  onDrop={() => handleDrop(employee.id, day.toISOString())}
-                                  onDragOver={handleDragOver}
+                                  onDrop={canEditRoster ? () => handleDrop(employee.id, day.toISOString()) : undefined}
+                                  onDragOver={canEditRoster ? handleDragOver : undefined}
                                 >
                                   <div 
-                                    className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors relative group cursor-pointer"
+                                    className={cn(
+                                      "min-h-16 border-2 border-dashed border-gray-200 rounded p-2 transition-colors relative group",
+                                      canEditRoster && !shift && "cursor-pointer hover:border-gray-300",
+                                      !canEditRoster && "cursor-default"
+                                    )}
                                     style={{
-                                      backgroundColor: (draggedTemplate || draggedShift) ? '#f0f9ff' : 'transparent'
+                                      backgroundColor: (canEditRoster && (draggedTemplate || draggedShift)) ? '#f0f9ff' : 'transparent'
                                     }}
-                                    onClick={() => !shift && handleCellClick(
+                                    onClick={canEditRoster ? () => !shift && handleCellClick(
                                       employee.id, 
                                       `${employee.first_name} ${employee.last_name}`, 
                                       day.toISOString()
-                                    )}
+                                    ) : undefined}
                                   >
                                     {shift ? (
                                       <div 
-                                        draggable
-                                        onDragStart={() => handleShiftDragStart(shift)}
-                                        onDragEnd={handleDragEnd}
-                                        className="p-2 rounded text-xs cursor-move hover:shadow-md transition-shadow"
+                                        draggable={canEditRoster}
+                                        onDragStart={canEditRoster ? () => handleShiftDragStart(shift) : undefined}
+                                        onDragEnd={canEditRoster ? handleDragEnd : undefined}
+                                        className={cn(
+                                          "p-2 rounded text-xs transition-shadow",
+                                          canEditRoster ? "cursor-move hover:shadow-md" : "cursor-default"
+                                        )}
                                         style={{ 
                                           backgroundColor: template?.color + '20' || '#3B82F6' + '20',
                                           borderColor: template?.color || '#3B82F6'
                                         }}
-                                        onDoubleClick={() => deleteShiftMutation.mutate(shift.id)}
-                                        title="Drag to move or delete, double-click to delete"
+                                        onDoubleClick={canEditRoster ? () => deleteShiftMutation.mutate(shift.id) : undefined}
+                                        title={canEditRoster ? "Drag to move or delete, double-click to delete" : "View only"}
                                       >
                                         <div className="font-medium">{shift.position}</div>
                                         <div>{shift.start_time} - {shift.end_time}</div>
                                       </div>
                                     ) : (
-                                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center h-full">
-                                        <Plus className="w-4 h-4 text-gray-400" />
-                                      </div>
+                                      canEditRoster && (
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center h-full">
+                                          <Plus className="w-4 h-4 text-gray-400" />
+                                        </div>
+                                      )
                                     )}
                                   </div>
                                 </td>
@@ -673,7 +708,10 @@ const Roster = () => {
                 <div className="text-center py-8">
                   <p className="text-gray-500">
                     {selectedCategory ? 
-                      `No staff assigned to ${selectedCategory.name}. Add staff using the button above.` :
+                      (canEditRoster 
+                        ? `No staff assigned to ${selectedCategory.name}. Add staff using the button above.`
+                        : `No staff assigned to ${selectedCategory.name}.`
+                      ) :
                       'Select a category to view and manage rosters.'
                     }
                   </p>
@@ -687,7 +725,7 @@ const Roster = () => {
       {!selectedCategoryId && (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-gray-500">Select a roster category above to begin managing shifts and staff assignments.</p>
+            <p className="text-gray-500">Select a roster category above to begin {canEditRoster ? 'managing' : 'viewing'} shifts and staff assignments.</p>
           </CardContent>
         </Card>
       )}
