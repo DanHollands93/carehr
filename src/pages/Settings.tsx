@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import LookupListsManager from "@/components/LookupListsManager";
+import PermissionsManager from "@/components/PermissionsManager";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -141,70 +142,7 @@ const Settings = () => {
         </TabsContent>
 
         <TabsContent value="permissions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Permission Settings</CardTitle>
-              <CardDescription>
-                Configure who can access and modify the HR builder
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">HR Administrators</h4>
-                      <p className="text-sm text-muted-foreground">Full access to all features</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                        Your Role
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">HR Managers</h4>
-                      <p className="text-sm text-muted-foreground">Can edit processes and menu sets</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch id="hr-managers" defaultChecked />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Department Managers</h4>
-                      <p className="text-sm text-muted-foreground">Can view and use processes</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch id="dept-managers" />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Employees</h4>
-                      <p className="text-sm text-muted-foreground">Can only access assigned menus</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch id="employees" defaultChecked />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6">
-                <Button onClick={handleSaveSettings}>Save Changes</Button>
-              </div>
-            </CardContent>
-          </Card>
+          <PermissionsManager />
         </TabsContent>
 
         <TabsContent value="integration">
