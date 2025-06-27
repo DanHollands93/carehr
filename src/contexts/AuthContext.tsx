@@ -31,19 +31,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchUserRole = async (userId: string) => {
     try {
       console.log('Fetching user role for userId:', userId);
+      
+      // Simple query without complex error handling
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
-        .single();
+        .limit(1);
       
       if (error) {
         console.error('Error fetching user role:', error);
         return null;
       }
       
-      console.log('User role data fetched successfully:', data);
-      return data?.role || null;
+      const role = data?.[0]?.role || null;
+      console.log('User role fetched:', role);
+      return role;
     } catch (error) {
       console.error('Exception in fetchUserRole:', error);
       return null;
@@ -52,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     console.log('Setting up auth state listener');
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
@@ -61,21 +65,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (session?.user) {
           console.log('User authenticated, fetching role...');
-          try {
-            const role = await fetchUserRole(session.user.id);
+          
+          // Fetch role in a non-blocking way
+          fetchUserRole(session.user.id).then(role => {
             console.log('Setting user role:', role);
             setUserRole(role);
-          } catch (error) {
-            console.error('Error in role fetching:', error);
+            setLoading(false);
+            console.log('Authentication process completed');
+          }).catch(error => {
+            console.error('Role fetch failed:', error);
             setUserRole(null);
-          }
+            setLoading(false);
+          });
         } else {
           console.log('No session user, clearing role');
           setUserRole(null);
+          setLoading(false);
         }
-        
-        setLoading(false);
-        console.log('Authentication process completed');
       }
     );
 
@@ -88,18 +94,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (session?.user) {
         console.log('Initial session: fetching user role...');
-        try {
-          const role = await fetchUserRole(session.user.id);
+        
+        fetchUserRole(session.user.id).then(role => {
           console.log('Initial session user role:', role);
           setUserRole(role);
-        } catch (error) {
-          console.error('Error in initial session role fetching:', error);
+          setLoading(false);
+        }).catch(error => {
+          console.error('Initial role fetch failed:', error);
           setUserRole(null);
-        }
+          setLoading(false);
+        });
+      } else {
+        setLoading(false);
       }
-      
-      setLoading(false);
-      console.log('Initial session check completed');
     });
 
     return () => subscription.unsubscribe();
