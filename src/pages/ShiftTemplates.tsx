@@ -241,13 +241,14 @@ const ShiftTemplates = () => {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="pay_value">Pay Rate (per hour)</Label>
+                  <Label htmlFor="pay_value">Hours</Label>
                   <Input
                     id="pay_value"
                     type="number"
-                    step="0.01"
+                    step="0.5"
                     value={formData.pay_value}
                     onChange={(e) => setFormData({ ...formData, pay_value: parseFloat(e.target.value) || 0 })}
+                    placeholder="e.g., 8"
                     required
                   />
                 </div>
@@ -292,7 +293,7 @@ const ShiftTemplates = () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead>Position</TableHead>
-                  <TableHead>Pay Rate</TableHead>
+                  <TableHead>Hours</TableHead>
                   <TableHead>Color</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -303,7 +304,7 @@ const ShiftTemplates = () => {
                     <TableCell className="font-medium">{template.name}</TableCell>
                     <TableCell>{template.start_time} - {template.end_time}</TableCell>
                     <TableCell>{template.position}</TableCell>
-                    <TableCell>£{template.pay_value}/hr</TableCell>
+                    <TableCell>{template.pay_value} hrs</TableCell>
                     <TableCell>
                       <div 
                         className="w-6 h-6 rounded border"
