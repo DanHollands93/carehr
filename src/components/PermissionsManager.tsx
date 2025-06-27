@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -121,14 +120,27 @@ const PermissionsManager = () => {
         user_id,
         permission_id,
         location,
-        permission:permissions(*)
+        permissions!inner(
+          id,
+          name,
+          description,
+          category
+        )
       `)
       .eq('user_id', selectedUserId);
     
     if (error) {
       console.error('Error loading user permissions:', error);
     } else {
-      setUserPermissions(data || []);
+      // Transform the data to match our interface
+      const transformedData = data?.map(item => ({
+        id: item.id,
+        user_id: item.user_id,
+        permission_id: item.permission_id,
+        location: item.location,
+        permission: item.permissions
+      })) || [];
+      setUserPermissions(transformedData);
     }
   };
 

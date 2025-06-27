@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,14 +46,27 @@ export const usePermissions = () => {
         user_id,
         permission_id,
         location,
-        permission:permissions(*)
+        permissions!inner(
+          id,
+          name,
+          description,
+          category
+        )
       `)
       .eq('user_id', user.id);
 
     if (error) {
       console.error('Error loading user permissions:', error);
     } else {
-      setPermissions(data || []);
+      // Transform the data to match our interface
+      const transformedData = data?.map(item => ({
+        id: item.id,
+        user_id: item.user_id,
+        permission_id: item.permission_id,
+        location: item.location,
+        permission: item.permissions
+      })) || [];
+      setPermissions(transformedData);
     }
     setLoading(false);
   };
