@@ -3,12 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, Save, Users, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, Users, Trash2, ArrowUpDown } from "lucide-react";
 import RosterCategoryManager from "@/components/RosterCategoryManager";
 import StaffAssignmentManager from "@/components/StaffAssignmentManager";
+import StaffSortingDialog from "@/components/StaffSortingDialog";
 import { useRosterCategories } from "@/hooks/useRosterCategories";
 
 interface Employee {
@@ -60,6 +62,9 @@ const TemplateRosterBuilder = ({
   const [currentWeek, setCurrentWeek] = useState(0);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [showDeleteBin, setShowDeleteBin] = useState(false);
+  const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'department' | 'custom'>('first_name');
+  const [customOrder, setCustomOrder] = useState<string[]>([]);
+  const [showSortDialog, setShowSortDialog] = useState(false);
   
   const { categories, getAssignedEmployees } = useRosterCategories();
 
@@ -98,10 +103,36 @@ const TemplateRosterBuilder = ({
     }
   });
 
-  // Filter employees based on category selection
-  const employees = selectedCategoryId 
-    ? allEmployees?.filter(emp => assignedEmployeeIds.includes(emp.id))
-    : allEmployees;
+  // Filter and sort employees based on category selection and sorting preference
+  const employees = (() => {
+    let filteredEmployees = selectedCategoryId 
+      ? allEmployees?.filter(emp => assignedEmployeeIds.includes(emp.id))
+      : allEmployees;
+
+    if (!filteredEmployees) return [];
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'first_name':
+        return [...filteredEmployees].sort((a, b) => a.first_name.localeCompare(b.first_name));
+      case 'last_name':
+        return [...filteredEmployees].sort((a, b) => a.last_name.localeCompare(b.last_name));
+      case 'department':
+        return [...filteredEmployees].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
+      case 'custom':
+        if (customOrder.length === 0) return filteredEmployees;
+        return [...filteredEmployees].sort((a, b) => {
+          const indexA = customOrder.indexOf(a.id);
+          const indexB = customOrder.indexOf(b.id);
+          if (indexA === -1 && indexB === -1) return 0;
+          if (indexA === -1) return 1;
+          if (indexB === -1) return -1;
+          return indexA - indexB;
+        });
+      default:
+        return filteredEmployees;
+    }
+  })();
 
   const { data: shiftTemplates } = useQuery({
     queryKey: ['shift-templates'],
@@ -274,6 +305,12 @@ const TemplateRosterBuilder = ({
 
   const selectedCategory = categories?.find(cat => cat.id === selectedCategoryId);
 
+  const handleCustomSort = (newOrder: string[]) => {
+    setCustomOrder(newOrder);
+    setSortBy('custom');
+    setShowSortDialog(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Delete Bin - appears when dragging a shift */}
@@ -289,6 +326,14 @@ const TemplateRosterBuilder = ({
           </div>
         </div>
       )}
+
+      {/* Staff Sorting Dialog */}
+      <StaffSortingDialog
+        isOpen={showSortDialog}
+        onClose={() => setShowSortDialog(false)}
+        employees={employees}
+        onSave={handleCustomSort}
+      />
 
       <div className="flex justify-between items-center">
         <div>
@@ -364,9 +409,9 @@ const TemplateRosterBuilder = ({
       )}
 
       {selectedCategoryId && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="space-y-6">
           {/* Shift Templates Panel */}
-          <Card className="lg:col-span-1">
+          <Card>
             <CardHeader>
               <CardTitle>Shift Templates</CardTitle>
             </CardHeader>
@@ -405,11 +450,34 @@ const TemplateRosterBuilder = ({
           </Card>
 
           {/* Current Week Roster Grid */}
-          <Card className="lg:col-span-3">
+          <Card>
             <CardHeader>
-              <CardTitle>
-                {totalWeeks > 1 ? `Week ${currentWeek + 1} - ${selectedCategory?.name} Template` : `${selectedCategory?.name} Template`}
-              </CardTitle>
+              <div className="flex justify-between items-center">
+                <CardTitle>
+                  {totalWeeks > 1 ? `Week ${currentWeek + 1} - ${selectedCategory?.name} Template` : `${selectedCategory?.name} Template`}
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Sort by..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="first_name">First Name</SelectItem>
+                      <SelectItem value="last_name">Last Name</SelectItem>
+                      <SelectItem value="department">Job Title</SelectItem>
+                      <SelectItem value="custom">Custom Order</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSortDialog(true)}
+                  >
+                    <ArrowUpDown className="w-4 h-4 mr-2" />
+                    Custom Sort
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {employees && employees.length > 0 ? (

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,15 +6,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
 import RosterCategoryManager from "@/components/RosterCategoryManager";
 import StaffAssignmentManager from "@/components/StaffAssignmentManager";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
+import StaffSortingDialog from "@/components/StaffSortingDialog";
 import { useRosterCategories } from "@/hooks/useRosterCategories";
 
 interface Employee {
@@ -55,6 +56,9 @@ const Roster = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [showDeleteBin, setShowDeleteBin] = useState(false);
+  const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'department' | 'custom'>('first_name');
+  const [customOrder, setCustomOrder] = useState<string[]>([]);
+  const [showSortDialog, setShowSortDialog] = useState(false);
   const [shiftPopup, setShiftPopup] = useState<{
     isOpen: boolean;
     employeeId: string;
@@ -70,7 +74,7 @@ const Roster = () => {
   const { categories, getAssignedEmployees } = useRosterCategories();
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
-  const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon-Fri
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun (7 days)
 
   // Get assigned employees for selected category
   const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
@@ -88,10 +92,36 @@ const Roster = () => {
     }
   });
 
-  // Filter employees based on category selection
-  const employees = selectedCategoryId 
-    ? allEmployees?.filter(emp => assignedEmployeeIds.includes(emp.id))
-    : allEmployees;
+  // Filter and sort employees based on category selection and sorting preference
+  const employees = (() => {
+    let filteredEmployees = selectedCategoryId 
+      ? allEmployees?.filter(emp => assignedEmployeeIds.includes(emp.id))
+      : allEmployees;
+
+    if (!filteredEmployees) return [];
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'first_name':
+        return [...filteredEmployees].sort((a, b) => a.first_name.localeCompare(b.first_name));
+      case 'last_name':
+        return [...filteredEmployees].sort((a, b) => a.last_name.localeCompare(b.last_name));
+      case 'department':
+        return [...filteredEmployees].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
+      case 'custom':
+        if (customOrder.length === 0) return filteredEmployees;
+        return [...filteredEmployees].sort((a, b) => {
+          const indexA = customOrder.indexOf(a.id);
+          const indexB = customOrder.indexOf(b.id);
+          if (indexA === -1 && indexB === -1) return 0;
+          if (indexA === -1) return 1;
+          if (indexB === -1) return -1;
+          return indexA - indexB;
+        });
+      default:
+        return filteredEmployees;
+    }
+  })();
 
   const { data: shiftTemplates } = useQuery({
     queryKey: ['shift-templates'],
@@ -106,11 +136,12 @@ const Roster = () => {
     }
   });
 
+  // Update the shifts query to include weekends
   const { data: shifts } = useQuery({
     queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedCategoryId],
     queryFn: async () => {
       const startDate = format(weekStart, 'yyyy-MM-dd');
-      const endDate = format(addDays(weekStart, 4), 'yyyy-MM-dd');
+      const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd'); // Changed from 4 to 6 for full week
       
       let query = supabase
         .from('shifts')
@@ -328,18 +359,12 @@ const Roster = () => {
     });
   };
 
-  if (!canManageRoster) {
-    return (
-      <div className="text-center py-8">
-        <h2 className="text-xl font-semibold text-gray-600">Access Denied</h2>
-        <p className="text-gray-500 mt-2">You don't have permission to manage rosters.</p>
-      </div>
-    );
-  }
+  const handleCustomSort = (newOrder: string[]) => {
+    setCustomOrder(newOrder);
+    setSortBy('custom');
+    setShowSortDialog(false);
+  };
 
-  const selectedCategory = categories?.find(cat => cat.id === selectedCategoryId);
-
-  // Prevent horizontal scroll navigation
   useEffect(() => {
     const preventHorizontalNavigation = (e: WheelEvent) => {
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
@@ -380,6 +405,17 @@ const Roster = () => {
     };
   }, []);
 
+  if (!canManageRoster) {
+    return (
+      <div className="text-center py-8">
+        <h2 className="text-xl font-semibold text-gray-600">Access Denied</h2>
+        <p className="text-gray-500 mt-2">You don't have permission to manage rosters.</p>
+      </div>
+    );
+  }
+
+  const selectedCategory = categories?.find(cat => cat.id === selectedCategoryId);
+
   return (
     <div className="space-y-6" style={{ overscrollBehavior: 'none' }}>
       {/* Delete Bin - appears when dragging a shift */}
@@ -404,6 +440,14 @@ const Roster = () => {
         shiftTemplates={shiftTemplates || []}
         employeeName={shiftPopup.employeeName}
         date={shiftPopup.date}
+      />
+
+      {/* Staff Sorting Dialog */}
+      <StaffSortingDialog
+        isOpen={showSortDialog}
+        onClose={() => setShowSortDialog(false)}
+        employees={employees}
+        onSave={handleCustomSort}
       />
 
       <div>
@@ -512,9 +556,32 @@ const Roster = () => {
           {/* Roster Grid */}
           <Card>
             <CardHeader>
-              <CardTitle>
-                {selectedCategory?.name} Roster
-              </CardTitle>
+              <div className="flex justify-between items-center">
+                <CardTitle>
+                  {selectedCategory?.name} Roster
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Sort by..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="first_name">First Name</SelectItem>
+                      <SelectItem value="last_name">Last Name</SelectItem>
+                      <SelectItem value="department">Job Title</SelectItem>
+                      <SelectItem value="custom">Custom Order</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSortDialog(true)}
+                  >
+                    <ArrowUpDown className="w-4 h-4 mr-2" />
+                    Custom Sort
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {employees && employees.length > 0 ? (
