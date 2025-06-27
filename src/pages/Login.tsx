@@ -12,15 +12,20 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, user } = useAuth();
+  const { signIn, user, userRole } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
-      navigate('/');
+    if (user && userRole) {
+      // Redirect based on user role
+      if (userRole === 'admin') {
+        navigate('/');
+      } else if (userRole === 'hr_user') {
+        navigate('/hr');
+      }
     }
-  }, [user, navigate]);
+  }, [user, userRole, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +45,7 @@ const Login = () => {
           title: "Login Successful",
           description: "Welcome back!",
         });
-        navigate('/');
+        // Navigation will happen in useEffect when userRole is available
       }
     } catch (error) {
       toast({
