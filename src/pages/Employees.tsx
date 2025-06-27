@@ -115,11 +115,13 @@ const Employees = () => {
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                       <User className="w-5 h-5 text-blue-600" />
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <CardTitle className="text-lg">
                         {employee.first_name} {employee.last_name}
                       </CardTitle>
-                      <CardDescription>{employee.email}</CardDescription>
+                      <CardDescription className="break-words text-sm">
+                        {employee.email}
+                      </CardDescription>
                     </div>
                   </div>
                 </CardHeader>
@@ -127,8 +129,8 @@ const Employees = () => {
                   <div className="space-y-2">
                     {employee.job_title && (
                       <div className="flex items-center text-sm text-gray-600">
-                        <Briefcase className="w-4 h-4 mr-2" />
-                        {employee.job_title}
+                        <Briefcase className="w-4 h-4 mr-2 flex-shrink-0" />
+                        <span className="break-words">{employee.job_title}</span>
                       </div>
                     )}
                     {employee.department && (
@@ -137,7 +139,7 @@ const Employees = () => {
                       </Badge>
                     )}
                     {employee.location && (
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-500 break-words">
                         📍 {employee.location}
                       </div>
                     )}
