@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import MenuSets from "./pages/MenuSets";
 import Processes from "./pages/Processes";
 import Settings from "./pages/Settings";
+import Reports from "./pages/Reports";
 import Login from "./pages/Login";
 import AdminUsers from "./pages/AdminUsers";
 import NotFound from "./pages/NotFound";
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="menu-sets" element={<MenuSets />} />
               <Route path="processes" element={<Processes />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="reports" element={<Reports />} />
               <Route path="employees" element={
                 <ProtectedRoute requiredPermission="view_employees">
                   <Employees />
