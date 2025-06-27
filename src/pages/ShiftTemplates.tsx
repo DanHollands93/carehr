@@ -36,8 +36,27 @@ const ShiftTemplates = () => {
     end_time: "",
     color: "#3B82F6",
     position: "",
-    pay_value: 0
+    unpaid_break: 0
   });
+
+  // Calculate total hours from start and end time
+  const calculateTotalHours = (startTime: string, endTime: string) => {
+    if (!startTime || !endTime) return 0;
+    
+    const start = new Date(`2000-01-01 ${startTime}`);
+    const end = new Date(`2000-01-01 ${endTime}`);
+    
+    // Handle overnight shifts
+    if (end < start) {
+      end.setDate(end.getDate() + 1);
+    }
+    
+    const diffMs = end.getTime() - start.getTime();
+    return diffMs / (1000 * 60 * 60); // Convert to hours
+  };
+
+  const totalHours = calculateTotalHours(formData.start_time, formData.end_time);
+  const payHours = Math.max(0, totalHours - formData.unpaid_break);
 
   const { data: shiftTemplates, isLoading } = useQuery({
     queryKey: ['shift-templates'],
@@ -128,7 +147,7 @@ const ShiftTemplates = () => {
       end_time: "",
       color: "#3B82F6",
       position: "",
-      pay_value: 0
+      unpaid_break: 0
     });
     setEditingTemplate(null);
   };
@@ -136,22 +155,35 @@ const ShiftTemplates = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Use pay hours as the pay_value
+    const submitData = {
+      name: formData.name,
+      start_time: formData.start_time,
+      end_time: formData.end_time,
+      color: formData.color,
+      position: formData.position,
+      pay_value: payHours
+    };
+    
     if (editingTemplate) {
-      updateMutation.mutate({ id: editingTemplate.id, ...formData });
+      updateMutation.mutate({ id: editingTemplate.id, ...submitData });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(submitData);
     }
   };
 
   const handleEdit = (template: ShiftTemplate) => {
     setEditingTemplate(template);
+    const totalHrs = calculateTotalHours(template.start_time, template.end_time);
+    const unpaidBreak = Math.max(0, totalHrs - template.pay_value);
+    
     setFormData({
       name: template.name,
       start_time: template.start_time,
       end_time: template.end_time,
       color: template.color,
       position: template.position,
-      pay_value: template.pay_value
+      unpaid_break: unpaidBreak
     });
     setIsDialogOpen(true);
   };
@@ -241,15 +273,15 @@ const ShiftTemplates = () => {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="pay_value">Hours</Label>
+                  <Label htmlFor="unpaid_break">Unpaid Break (hours)</Label>
                   <Input
-                    id="pay_value"
+                    id="unpaid_break"
                     type="number"
-                    step="0.5"
-                    value={formData.pay_value}
-                    onChange={(e) => setFormData({ ...formData, pay_value: parseFloat(e.target.value) || 0 })}
-                    placeholder="e.g., 8"
-                    required
+                    step="0.25"
+                    value={formData.unpaid_break}
+                    onChange={(e) => setFormData({ ...formData, unpaid_break: parseFloat(e.target.value) || 0 })}
+                    placeholder="e.g., 0.5"
+                    min="0"
                   />
                 </div>
                 <div>
@@ -260,6 +292,16 @@ const ShiftTemplates = () => {
                     value={formData.color}
                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                   />
+                </div>
+              </div>
+
+              {/* Calculated hours display */}
+              <div className="bg-gray-50 p-3 rounded space-y-2">
+                <div className="text-sm">
+                  <span className="font-medium">Total Shift Hours:</span> {totalHours.toFixed(2)} hrs
+                </div>
+                <div className="text-sm">
+                  <span className="font-medium">Pay Hours:</span> {payHours.toFixed(2)} hrs
                 </div>
               </div>
               
@@ -293,7 +335,7 @@ const ShiftTemplates = () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead>Position</TableHead>
-                  <TableHead>Hours</TableHead>
+                  <TableHead>Pay Hours</TableHead>
                   <TableHead>Color</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
