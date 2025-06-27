@@ -17,11 +17,16 @@ const Login = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log('Login useEffect - user:', user?.email, 'userRole:', userRole);
+    
     if (user && userRole) {
+      console.log('User is authenticated, redirecting based on role:', userRole);
       // Redirect based on user role
       if (userRole === 'admin') {
+        console.log('Redirecting admin to dashboard');
         navigate('/');
       } else if (userRole === 'hr_user') {
+        console.log('Redirecting HR user to HR dashboard');
         navigate('/hr');
       }
     }
@@ -29,18 +34,21 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Login form submitted with email:', email);
     setLoading(true);
 
     try {
       const { error } = await signIn(email, password);
       
       if (error) {
+        console.error('Login failed:', error);
         toast({
           title: "Login Failed",
           description: error.message,
           variant: "destructive",
         });
       } else {
+        console.log('Login successful');
         toast({
           title: "Login Successful",
           description: "Welcome back!",
@@ -48,6 +56,7 @@ const Login = () => {
         // Navigation will happen in useEffect when userRole is available
       }
     } catch (error) {
+      console.error('Unexpected login error:', error);
       toast({
         title: "Login Failed",
         description: "An unexpected error occurred",
@@ -97,6 +106,11 @@ const Login = () => {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
+          <div className="mt-4 text-center text-sm text-gray-600">
+            <p>Demo credentials:</p>
+            <p>Admin: admin@demo.com / admin</p>
+            <p>HR User: hr@demo.com / hr</p>
+          </div>
         </CardContent>
       </Card>
     </div>
