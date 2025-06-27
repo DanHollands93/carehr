@@ -18,9 +18,9 @@ const DashboardLayout = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <DashboardSidebar isMobileOpen={isMobileSidebarOpen} setIsMobileOpen={setIsMobileSidebarOpen} />
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-col flex-1 min-w-0">
           <DashboardHeader onToggleSidebar={toggleMobileSidebar} />
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-6 overflow-auto">
             <Outlet />
           </main>
         </div>
