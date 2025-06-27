@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import DashboardSidebar from "./DashboardSidebar";
 import DashboardHeader from "./DashboardHeader";
 import { useToast } from "@/hooks/use-toast";
@@ -16,14 +16,14 @@ const DashboardLayout = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="flex min-h-screen w-full">
         <DashboardSidebar isMobileOpen={isMobileSidebarOpen} setIsMobileOpen={setIsMobileSidebarOpen} />
-        <div className="flex flex-col flex-1 min-w-0">
+        <SidebarInset>
           <DashboardHeader onToggleSidebar={toggleMobileSidebar} />
-          <main className="flex-1 p-6 overflow-auto">
+          <main className="flex-1 p-6">
             <Outlet />
           </main>
-        </div>
+        </SidebarInset>
       </div>
     </SidebarProvider>
   );
