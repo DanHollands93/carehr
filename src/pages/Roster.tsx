@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus } from "lucide-react";
@@ -516,85 +518,88 @@ const Roster = () => {
             </CardHeader>
             <CardContent>
               {employees && employees.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="p-3 text-left font-medium border-b">Staff</th>
-                        {weekDays.map((day) => (
-                          <th key={day.toISOString()} className="p-3 text-center font-medium border-b min-w-32">
-                            <div>{format(day, 'EEE')}</div>
-                            <div className="text-sm text-gray-500">{format(day, 'MMM dd')}</div>
-                            <div className="flex items-center justify-center mt-1 text-xs text-blue-600">
-                              <Users className="w-3 h-3 mr-1" />
-                              {getStaffCountForDate(day.toISOString())}
-                            </div>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {employees.map((employee) => (
-                        <tr key={employee.id} className="border-b">
-                          <td className="p-3 font-medium">
-                            <div>{employee.first_name} {employee.last_name}</div>
-                            <div className="text-sm text-gray-500">{employee.department}</div>
-                          </td>
-                          {weekDays.map((day) => {
-                            const shift = getShiftForEmployeeAndDate(employee.id, day.toISOString());
-                            const template = shiftTemplates?.find(t => 
-                              shift && t.position === shift.position && 
-                              t.start_time === shift.start_time && 
-                              t.end_time === shift.end_time
-                            );
-                            return (
-                              <td
-                                key={day.toISOString()}
-                                className="p-2 border-r border-l"
-                                onDrop={() => handleDrop(employee.id, day.toISOString())}
-                                onDragOver={handleDragOver}
-                              >
-                                <div 
-                                  className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors relative group cursor-pointer"
-                                  style={{
-                                    backgroundColor: (draggedTemplate || draggedShift) ? '#f0f9ff' : 'transparent'
-                                  }}
-                                  onClick={() => !shift && handleCellClick(
-                                    employee.id, 
-                                    `${employee.first_name} ${employee.last_name}`, 
-                                    day.toISOString()
-                                  )}
-                                >
-                                  {shift ? (
-                                    <div 
-                                      draggable
-                                      onDragStart={() => handleShiftDragStart(shift)}
-                                      onDragEnd={handleDragEnd}
-                                      className="p-2 rounded text-xs cursor-move hover:shadow-md transition-shadow"
-                                      style={{ 
-                                        backgroundColor: template?.color + '20' || '#3B82F6' + '20',
-                                        borderColor: template?.color || '#3B82F6'
-                                      }}
-                                      onDoubleClick={() => deleteShiftMutation.mutate(shift.id)}
-                                      title="Drag to move or delete, double-click to delete"
-                                    >
-                                      <div className="font-medium">{shift.position}</div>
-                                      <div>{shift.start_time} - {shift.end_time}</div>
-                                    </div>
-                                  ) : (
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center h-full">
-                                      <Plus className="w-4 h-4 text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            );
-                          })}
+                <ScrollArea className="w-full">
+                  <div className="min-w-full">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="p-3 text-left font-medium border-b min-w-[160px]">Staff</th>
+                          {weekDays.map((day) => (
+                            <th key={day.toISOString()} className="p-3 text-center font-medium border-b min-w-32">
+                              <div>{format(day, 'EEE')}</div>
+                              <div className="text-sm text-gray-500">{format(day, 'MMM dd')}</div>
+                              <div className="flex items-center justify-center mt-1 text-xs text-blue-600">
+                                <Users className="w-3 h-3 mr-1" />
+                                {getStaffCountForDate(day.toISOString())}
+                              </div>
+                            </th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {employees.map((employee) => (
+                          <tr key={employee.id} className="border-b">
+                            <td className="p-3 font-medium min-w-[160px]">
+                              <div>{employee.first_name} {employee.last_name}</div>
+                              <div className="text-sm text-gray-500">{employee.department}</div>
+                            </td>
+                            {weekDays.map((day) => {
+                              const shift = getShiftForEmployeeAndDate(employee.id, day.toISOString());
+                              const template = shiftTemplates?.find(t => 
+                                shift && t.position === shift.position && 
+                                t.start_time === shift.start_time && 
+                                t.end_time === shift.end_time
+                              );
+                              return (
+                                <td
+                                  key={day.toISOString()}
+                                  className="p-2 border-r border-l min-w-32"
+                                  onDrop={() => handleDrop(employee.id, day.toISOString())}
+                                  onDragOver={handleDragOver}
+                                >
+                                  <div 
+                                    className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors relative group cursor-pointer"
+                                    style={{
+                                      backgroundColor: (draggedTemplate || draggedShift) ? '#f0f9ff' : 'transparent'
+                                    }}
+                                    onClick={() => !shift && handleCellClick(
+                                      employee.id, 
+                                      `${employee.first_name} ${employee.last_name}`, 
+                                      day.toISOString()
+                                    )}
+                                  >
+                                    {shift ? (
+                                      <div 
+                                        draggable
+                                        onDragStart={() => handleShiftDragStart(shift)}
+                                        onDragEnd={handleDragEnd}
+                                        className="p-2 rounded text-xs cursor-move hover:shadow-md transition-shadow"
+                                        style={{ 
+                                          backgroundColor: template?.color + '20' || '#3B82F6' + '20',
+                                          borderColor: template?.color || '#3B82F6'
+                                        }}
+                                        onDoubleClick={() => deleteShiftMutation.mutate(shift.id)}
+                                        title="Drag to move or delete, double-click to delete"
+                                      >
+                                        <div className="font-medium">{shift.position}</div>
+                                        <div>{shift.start_time} - {shift.end_time}</div>
+                                      </div>
+                                    ) : (
+                                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center h-full">
+                                        <Plus className="w-4 h-4 text-gray-400" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-500">
