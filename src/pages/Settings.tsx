@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import LookupListsManager from "@/components/LookupListsManager";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -32,7 +32,9 @@ const Settings = () => {
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="integration">Integration</TabsTrigger>
+          <TabsTrigger value="lookups">Lookup Lists</TabsTrigger>
         </TabsList>
+
         <TabsContent value="general">
           <Card>
             <CardHeader>
@@ -79,6 +81,7 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
         <TabsContent value="appearance">
           <Card>
             <CardHeader>
@@ -136,6 +139,7 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
         <TabsContent value="permissions">
           <Card>
             <CardHeader>
@@ -202,6 +206,7 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
         <TabsContent value="integration">
           <Card>
             <CardHeader>
@@ -252,6 +257,10 @@ const Settings = () => {
               <Button onClick={handleSaveSettings}>Save Changes</Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="lookups">
+          <LookupListsManager />
         </TabsContent>
       </Tabs>
     </div>
