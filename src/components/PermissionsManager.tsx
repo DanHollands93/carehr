@@ -138,7 +138,7 @@ const PermissionsManager = () => {
         user_id: item.user_id,
         permission_id: item.permission_id,
         location: item.location,
-        permission: item.permissions
+        permission: Array.isArray(item.permissions) ? item.permissions[0] : item.permissions
       })) || [];
       setUserPermissions(transformedData);
     }
