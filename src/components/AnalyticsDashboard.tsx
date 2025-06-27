@@ -212,7 +212,7 @@ const AnalyticsDashboard = () => {
                 ))}
               </div>
             </CardContent>
-          </div>
+          </Card>
         </div>
       </div>
     );
