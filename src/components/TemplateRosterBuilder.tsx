@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, Users } from "lucide-react";
 import RosterCategoryManager from "@/components/RosterCategoryManager";
 import StaffAssignmentManager from "@/components/StaffAssignmentManager";
 import { useRosterCategories } from "@/hooks/useRosterCategories";
@@ -55,6 +56,7 @@ const TemplateRosterBuilder = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
+  const [draggedShift, setDraggedShift] = useState<TemplateShift | null>(null);
   const [templateShifts, setTemplateShifts] = useState<TemplateShift[]>([]);
   const [currentWeek, setCurrentWeek] = useState(0);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -193,6 +195,12 @@ const TemplateRosterBuilder = ({
 
   const handleDragStart = (template: ShiftTemplate) => {
     setDraggedTemplate(template);
+    setDraggedShift(null);
+  };
+
+  const handleShiftDragStart = (shift: TemplateShift) => {
+    setDraggedShift(shift);
+    setDraggedTemplate(null);
   };
 
   const handleDrop = (employeeId: string, dayIndex: number) => {
@@ -205,6 +213,15 @@ const TemplateRosterBuilder = ({
       
       setTemplateShifts(prev => [...prev, newShift]);
       setDraggedTemplate(null);
+    } else if (draggedShift) {
+      setTemplateShifts(prev => 
+        prev.map(shift => 
+          shift === draggedShift 
+            ? { ...shift, employee_id: employeeId, day_index: dayIndex }
+            : shift
+        )
+      );
+      setDraggedShift(null);
     }
   };
 
@@ -212,18 +229,18 @@ const TemplateRosterBuilder = ({
     e.preventDefault();
   };
 
-  const removeShift = (employeeId: string, dayIndex: number) => {
-    setTemplateShifts(prev => 
-      prev.filter(shift => 
-        !(shift.employee_id === employeeId && shift.day_index === dayIndex)
-      )
-    );
+  const removeShift = (shiftToRemove: TemplateShift) => {
+    setTemplateShifts(prev => prev.filter(shift => shift !== shiftToRemove));
   };
 
   const getShiftForEmployeeAndDay = (employeeId: string, dayIndex: number) => {
     return templateShifts.find(shift => 
       shift.employee_id === employeeId && shift.day_index === dayIndex
     );
+  };
+
+  const getStaffCountForDay = (dayIndex: number) => {
+    return templateShifts.filter(shift => shift.day_index === dayIndex).length;
   };
 
   const getDayLabel = (dayIndex: number) => {
@@ -249,7 +266,7 @@ const TemplateRosterBuilder = ({
         <div>
           <h2 className="text-xl font-bold text-gray-900">{templateName}</h2>
           <p className="text-gray-600">
-            Template Period: {periodDays} days ({repeatType.replace('_', ' ')})
+            Template Period: {periodDays} days ({repeatType.replace('_', ' ')}) - Drag shifts to move between staff and days
           </p>
         </div>
         
@@ -377,6 +394,10 @@ const TemplateRosterBuilder = ({
                           <th key={dayIndex} className="p-3 text-center font-medium border-b min-w-24">
                             <div className="text-sm">{getDayLabel(dayIndex)}</div>
                             <div className="text-xs text-gray-500">Day {dayIndex + 1}</div>
+                            <div className="flex items-center justify-center mt-1 text-xs text-blue-600">
+                              <Users className="w-3 h-3 mr-1" />
+                              {getStaffCountForDay(dayIndex)}
+                            </div>
                           </th>
                         ))}
                       </tr>
@@ -402,17 +423,20 @@ const TemplateRosterBuilder = ({
                                 <div 
                                   className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors"
                                   style={{
-                                    backgroundColor: draggedTemplate ? '#f0f9ff' : 'transparent'
+                                    backgroundColor: (draggedTemplate || draggedShift) ? '#f0f9ff' : 'transparent'
                                   }}
                                 >
                                   {shift && template && (
                                     <div 
-                                      className="p-2 rounded text-xs cursor-pointer"
+                                      draggable
+                                      onDragStart={() => handleShiftDragStart(shift)}
+                                      className="p-2 rounded text-xs cursor-move hover:shadow-md transition-shadow"
                                       style={{ 
                                         backgroundColor: template.color + '20',
                                         borderColor: template.color
                                       }}
-                                      onClick={() => removeShift(employee.id, dayIndex)}
+                                      onDoubleClick={() => removeShift(shift)}
+                                      title="Drag to move, double-click to remove"
                                     >
                                       <div className="font-medium">{template.position}</div>
                                       <div>{template.start_time} - {template.end_time}</div>

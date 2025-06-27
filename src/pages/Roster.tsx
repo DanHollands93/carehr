@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,7 @@ const Roster = () => {
   const queryClient = useQueryClient();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
+  const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   
@@ -145,6 +147,35 @@ const Roster = () => {
     }
   });
 
+  const updateShiftMutation = useMutation({
+    mutationFn: async ({ shiftId, employeeId, date }: {
+      shiftId: string;
+      employeeId: string;
+      date: string;
+    }) => {
+      const { error } = await supabase
+        .from('shifts')
+        .update({
+          employee_id: employeeId,
+          date: format(new Date(date), 'yyyy-MM-dd')
+        })
+        .eq('id', shiftId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast({ title: "Shift moved successfully" });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Error moving shift", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
   const deleteShiftMutation = useMutation({
     mutationFn: async (shiftId: string) => {
       const { error } = await supabase
@@ -169,6 +200,12 @@ const Roster = () => {
 
   const handleDragStart = (template: ShiftTemplate) => {
     setDraggedTemplate(template);
+    setDraggedShift(null);
+  };
+
+  const handleShiftDragStart = (shift: Shift) => {
+    setDraggedShift(shift);
+    setDraggedTemplate(null);
   };
 
   const handleDrop = (employeeId: string, date: string) => {
@@ -179,6 +216,13 @@ const Roster = () => {
         template: draggedTemplate
       });
       setDraggedTemplate(null);
+    } else if (draggedShift) {
+      updateShiftMutation.mutate({
+        shiftId: draggedShift.id,
+        employeeId,
+        date
+      });
+      setDraggedShift(null);
     }
   };
 
@@ -191,6 +235,11 @@ const Roster = () => {
       shift.employee_id === employeeId && 
       shift.date === format(new Date(date), 'yyyy-MM-dd')
     );
+  };
+
+  const getStaffCountForDate = (date: string) => {
+    const dateStr = format(new Date(date), 'yyyy-MM-dd');
+    return shifts?.filter(shift => shift.date === dateStr).length || 0;
   };
 
   // Group shift templates by position
@@ -226,7 +275,7 @@ const Roster = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Weekly Roster</h1>
-        <p className="text-gray-600">Drag and drop shifts to assign staff for this week</p>
+        <p className="text-gray-600">Drag and drop shifts to assign staff or move shifts between staff and days</p>
         
         {/* Date Navigation */}
         <div className="flex items-center justify-center space-x-4 mt-4">
@@ -345,6 +394,10 @@ const Roster = () => {
                           <th key={day.toISOString()} className="p-3 text-center font-medium border-b min-w-32">
                             <div>{format(day, 'EEE')}</div>
                             <div className="text-sm text-gray-500">{format(day, 'MMM dd')}</div>
+                            <div className="flex items-center justify-center mt-1 text-xs text-blue-600">
+                              <Users className="w-3 h-3 mr-1" />
+                              {getStaffCountForDate(day.toISOString())}
+                            </div>
                           </th>
                         ))}
                       </tr>
@@ -373,17 +426,20 @@ const Roster = () => {
                                 <div 
                                   className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors"
                                   style={{
-                                    backgroundColor: draggedTemplate ? '#f0f9ff' : 'transparent'
+                                    backgroundColor: (draggedTemplate || draggedShift) ? '#f0f9ff' : 'transparent'
                                   }}
                                 >
                                   {shift && (
                                     <div 
-                                      className="p-2 rounded text-xs cursor-pointer"
+                                      draggable
+                                      onDragStart={() => handleShiftDragStart(shift)}
+                                      className="p-2 rounded text-xs cursor-move hover:shadow-md transition-shadow"
                                       style={{ 
                                         backgroundColor: template?.color + '20' || '#3B82F6' + '20',
                                         borderColor: template?.color || '#3B82F6'
                                       }}
-                                      onClick={() => deleteShiftMutation.mutate(shift.id)}
+                                      onDoubleClick={() => deleteShiftMutation.mutate(shift.id)}
+                                      title="Drag to move, double-click to delete"
                                     >
                                       <div className="font-medium">{shift.position}</div>
                                       <div>{shift.start_time} - {shift.end_time}</div>
