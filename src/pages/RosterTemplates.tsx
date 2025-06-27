@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,9 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Plus, Edit, Trash2, Calendar, Copy } from "lucide-react";
+import { Plus, Edit, Trash2, Calendar, Play, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { format, addDays, startOfWeek } from "date-fns";
+import TemplateRosterBuilder from "@/components/TemplateRosterBuilder";
+import TemplateDeployment from "@/components/TemplateDeployment";
 
 type RepeatType = 'weekly' | 'bi_weekly' | 'monthly' | 'custom';
 
@@ -27,39 +29,14 @@ interface RosterTemplate {
   created_at: string;
 }
 
-interface Employee {
-  id: string;
-  first_name: string;
-  last_name: string;
-  department: string;
-}
-
-interface ShiftTemplate {
-  id: string;
-  name: string;
-  start_time: string;
-  end_time: string;
-  color: string;
-  position: string;
-  pay_value: number;
-}
-
-interface TemplateAssignment {
-  id: string;
-  roster_template_id: string;
-  employee_id: string;
-  day_of_period: number;
-  shift_template_id: string;
-}
-
 const RosterTemplates = () => {
   const { userRole } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<RosterTemplate | null>(null);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
-  const [viewingAssignments, setViewingAssignments] = useState(false);
+  const [buildingTemplateId, setBuildingTemplateId] = useState<string>("");
+  const [deployingTemplate, setDeployingTemplate] = useState<RosterTemplate | null>(null);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -81,61 +58,25 @@ const RosterTemplates = () => {
     }
   });
 
-  const { data: employees } = useQuery({
-    queryKey: ['employees'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('id, first_name, last_name, department')
-        .order('first_name');
-      
-      if (error) throw error;
-      return data as Employee[];
-    }
-  });
-
-  const { data: shiftTemplates } = useQuery({
-    queryKey: ['shift-templates'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('shift_templates')
-        .select('*')
-        .order('position, name');
-      
-      if (error) throw error;
-      return data as ShiftTemplate[];
-    }
-  });
-
-  const { data: templateAssignments } = useQuery({
-    queryKey: ['template-assignments', selectedTemplateId],
-    queryFn: async () => {
-      if (!selectedTemplateId) return [];
-      
-      const { data, error } = await supabase
-        .from('roster_template_assignments')
-        .select('*')
-        .eq('roster_template_id', selectedTemplateId);
-      
-      if (error) throw error;
-      return data as TemplateAssignment[];
-    },
-    enabled: !!selectedTemplateId
-  });
-
   const createMutation = useMutation({
     mutationFn: async (data: Omit<RosterTemplate, 'id' | 'created_at'>) => {
-      const { error } = await supabase
+      const { data: newTemplate, error } = await supabase
         .from('roster_templates')
-        .insert([data]);
+        .insert([data])
+        .select()
+        .single();
       
       if (error) throw error;
+      return newTemplate;
     },
-    onSuccess: () => {
+    onSuccess: (newTemplate) => {
       queryClient.invalidateQueries({ queryKey: ['roster-templates'] });
       setIsDialogOpen(false);
       resetForm();
       toast({ title: "Roster template created successfully" });
+      
+      // Automatically open the builder for the new template
+      setBuildingTemplateId(newTemplate.id);
     },
     onError: (error) => {
       toast({ 
@@ -192,65 +133,6 @@ const RosterTemplates = () => {
     }
   });
 
-  const applyTemplateMutation = useMutation({
-    mutationFn: async ({ templateId, startDate }: { templateId: string; startDate: string }) => {
-      const template = rosterTemplates?.find(t => t.id === templateId);
-      if (!template || !templateAssignments) return;
-
-      // Calculate period length
-      let periodDays = 7; // weekly
-      if (template.repeat_type === 'bi_weekly') periodDays = 14;
-      else if (template.repeat_type === 'monthly') periodDays = 30;
-      else if (template.repeat_type === 'custom') periodDays = template.repeat_interval * 7;
-
-      const endDate = format(addDays(new Date(startDate), periodDays - 1), 'yyyy-MM-dd');
-
-      // Create shifts for the period
-      const shiftsToCreate = templateAssignments.map(assignment => {
-        const shiftDate = format(addDays(new Date(startDate), assignment.day_of_period), 'yyyy-MM-dd');
-        const shiftTemplate = shiftTemplates?.find(st => st.id === assignment.shift_template_id);
-        
-        return {
-          employee_id: assignment.employee_id,
-          date: shiftDate,
-          start_time: shiftTemplate?.start_time || '09:00',
-          end_time: shiftTemplate?.end_time || '17:00',
-          position: shiftTemplate?.position || 'General',
-          job_role_id: '00000000-0000-0000-0000-000000000000'
-        };
-      });
-
-      // Insert shifts
-      const { error: shiftsError } = await supabase
-        .from('shifts')
-        .insert(shiftsToCreate);
-      
-      if (shiftsError) throw shiftsError;
-
-      // Record the application
-      const { error: recordError } = await supabase
-        .from('applied_roster_templates')
-        .insert([{
-          roster_template_id: templateId,
-          start_date: startDate,
-          end_date: endDate
-        }]);
-      
-      if (recordError) throw recordError;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast({ title: "Template applied successfully" });
-    },
-    onError: (error) => {
-      toast({ 
-        title: "Error applying template", 
-        description: error.message,
-        variant: "destructive" 
-      });
-    }
-  });
-
   const resetForm = () => {
     setFormData({
       name: "",
@@ -287,27 +169,14 @@ const RosterTemplates = () => {
     setIsDialogOpen(true);
   };
 
-  const handleApplyTemplate = (templateId: string) => {
-    const startDate = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-    applyTemplateMutation.mutate({ templateId, startDate });
-  };
-
   const getRepeatTypeLabel = (type: RepeatType, interval: number) => {
     switch (type) {
-      case 'weekly': return 'Weekly';
-      case 'bi_weekly': return 'Bi-weekly';
-      case 'monthly': return 'Monthly';
-      case 'custom': return `Every ${interval} weeks`;
+      case 'weekly': return 'Weekly (7 days)';
+      case 'bi_weekly': return 'Bi-weekly (14 days)';
+      case 'monthly': return 'Monthly (28 days)';
+      case 'custom': return `Every ${interval} weeks (${interval * 7} days)`;
       default: return type;
     }
-  };
-
-  const getDayName = (dayIndex: number, repeatType: RepeatType) => {
-    if (repeatType === 'weekly') {
-      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      return days[dayIndex] || `Day ${dayIndex + 1}`;
-    }
-    return `Day ${dayIndex + 1}`;
   };
 
   const canManageRosters = userRole === 'admin';
@@ -321,85 +190,23 @@ const RosterTemplates = () => {
     );
   }
 
-  if (viewingAssignments && selectedTemplateId) {
-    const selectedTemplate = rosterTemplates?.find(t => t.id === selectedTemplateId);
-    
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <Button variant="outline" onClick={() => setViewingAssignments(false)}>
-              ← Back to Templates
-            </Button>
-            <h1 className="text-2xl font-bold text-gray-900 mt-2">
-              {selectedTemplate?.name} - Assignments
-            </h1>
-            <p className="text-gray-600">
-              {getRepeatTypeLabel(selectedTemplate?.repeat_type || 'weekly', selectedTemplate?.repeat_interval || 1)}
-            </p>
-          </div>
-          
-          <Button
-            onClick={() => handleApplyTemplate(selectedTemplateId)}
-            disabled={applyTemplateMutation.isPending}
-          >
-            <Calendar className="w-4 h-4 mr-2" />
-            Apply to Current Week
-          </Button>
-        </div>
+  // Show template builder if building a template
+  if (buildingTemplateId) {
+    const template = rosterTemplates?.find(t => t.id === buildingTemplateId);
+    if (!template) return null;
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Template Assignments</CardTitle>
-            <CardDescription>
-              Shifts assigned in this template pattern
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {templateAssignments && templateAssignments.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Day</TableHead>
-                    <TableHead>Shift</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead>Time</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {templateAssignments.map((assignment) => {
-                    const employee = employees?.find(e => e.id === assignment.employee_id);
-                    const shiftTemplate = shiftTemplates?.find(st => st.id === assignment.shift_template_id);
-                    
-                    return (
-                      <TableRow key={assignment.id}>
-                        <TableCell>
-                          {employee ? `${employee.first_name} ${employee.last_name}` : 'Unknown Employee'}
-                        </TableCell>
-                        <TableCell>
-                          {getDayName(assignment.day_of_period, selectedTemplate?.repeat_type || 'weekly')}
-                        </TableCell>
-                        <TableCell>{shiftTemplate?.name}</TableCell>
-                        <TableCell>{shiftTemplate?.position}</TableCell>
-                        <TableCell>
-                          {shiftTemplate?.start_time} - {shiftTemplate?.end_time}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                No assignments found for this template.
-                <br />
-                Use the regular roster builder to create assignments, then save as a template.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+    return (
+      <TemplateRosterBuilder
+        templateId={buildingTemplateId}
+        templateName={template.name}
+        repeatType={template.repeat_type}
+        repeatInterval={template.repeat_interval}
+        onSave={() => {
+          setBuildingTemplateId("");
+          queryClient.invalidateQueries({ queryKey: ['roster-templates'] });
+        }}
+        onCancel={() => setBuildingTemplateId("")}
+      />
     );
   }
 
@@ -408,7 +215,7 @@ const RosterTemplates = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Roster Templates</h1>
-          <p className="text-gray-600">Create repeating roster patterns for easy scheduling</p>
+          <p className="text-gray-600">Create reusable roster patterns that you can deploy to specific weeks</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -425,7 +232,7 @@ const RosterTemplates = () => {
             <DialogHeader>
               <DialogTitle>{editingTemplate ? 'Edit' : 'Create'} Roster Template</DialogTitle>
               <DialogDescription>
-                {editingTemplate ? 'Update the roster template details.' : 'Create a new roster template pattern.'}
+                {editingTemplate ? 'Update the roster template details.' : 'Create a new roster template. After creating, you\'ll be able to build the roster pattern.'}
               </DialogDescription>
             </DialogHeader>
             
@@ -453,7 +260,7 @@ const RosterTemplates = () => {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="repeat_type">Repeat Pattern</Label>
+                  <Label htmlFor="repeat_type">Template Period</Label>
                   <Select 
                     value={formData.repeat_type} 
                     onValueChange={(value: RepeatType) => 
@@ -464,9 +271,9 @@ const RosterTemplates = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="bi_weekly">Bi-weekly (2 weeks)</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="weekly">Weekly (7 days)</SelectItem>
+                      <SelectItem value="bi_weekly">Bi-weekly (14 days)</SelectItem>
+                      <SelectItem value="monthly">Monthly (28 days)</SelectItem>
                       <SelectItem value="custom">Custom</SelectItem>
                     </SelectContent>
                   </Select>
@@ -474,11 +281,12 @@ const RosterTemplates = () => {
                 
                 {formData.repeat_type === 'custom' && (
                   <div>
-                    <Label htmlFor="repeat_interval">Repeat Every (weeks)</Label>
+                    <Label htmlFor="repeat_interval">Period Length (weeks)</Label>
                     <Input
                       id="repeat_interval"
                       type="number"
                       min="1"
+                      max="8"
                       value={formData.repeat_interval}
                       onChange={(e) => setFormData({ ...formData, repeat_interval: parseInt(e.target.value) || 1 })}
                     />
@@ -503,7 +311,7 @@ const RosterTemplates = () => {
         <CardHeader>
           <CardTitle>Roster Templates</CardTitle>
           <CardDescription>
-            Manage your repeating roster patterns
+            Create and manage your reusable roster patterns
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -515,7 +323,7 @@ const RosterTemplates = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Pattern</TableHead>
+                  <TableHead>Period</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -538,32 +346,32 @@ const RosterTemplates = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setSelectedTemplateId(template.id);
-                            setViewingAssignments(true);
-                          }}
-                        >
-                          <Calendar className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(template)}
+                          onClick={() => setBuildingTemplateId(template.id)}
+                          title="Build/Edit Template"
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleApplyTemplate(template.id)}
-                          disabled={applyTemplateMutation.isPending}
+                          onClick={() => setDeployingTemplate(template)}
+                          title="Deploy Template"
                         >
-                          <Copy className="w-4 h-4" />
+                          <Play className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(template)}
+                          title="Edit Details"
+                        >
+                          <Calendar className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => deleteMutation.mutate(template.id)}
+                          title="Delete Template"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -576,6 +384,17 @@ const RosterTemplates = () => {
           )}
         </CardContent>
       </Card>
+
+      {deployingTemplate && (
+        <TemplateDeployment
+          templateId={deployingTemplate.id}
+          templateName={deployingTemplate.name}
+          repeatType={deployingTemplate.repeat_type}
+          repeatInterval={deployingTemplate.repeat_interval}
+          isOpen={!!deployingTemplate}
+          onClose={() => setDeployingTemplate(null)}
+        />
+      )}
     </div>
   );
 };

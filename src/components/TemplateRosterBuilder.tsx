@@ -1,12 +1,12 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
+import { format, addDays, startOfWeek } from "date-fns";
+import { ChevronLeft, ChevronRight, Save } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -25,25 +25,48 @@ interface ShiftTemplate {
   pay_value: number;
 }
 
-interface Shift {
-  id: string;
+interface TemplateShift {
+  id?: string;
   employee_id: string;
-  date: string;
-  start_time: string;
-  end_time: string;
-  position: string;
-  job_role_id: string;
+  day_index: number; // 0-based index within the template period
+  shift_template_id: string;
 }
 
-const Roster = () => {
-  const { userRole } = useAuth();
+interface TemplateRosterBuilderProps {
+  templateId: string;
+  templateName: string;
+  repeatType: 'weekly' | 'bi_weekly' | 'monthly' | 'custom';
+  repeatInterval: number;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+const TemplateRosterBuilder = ({ 
+  templateId, 
+  templateName, 
+  repeatType, 
+  repeatInterval,
+  onSave, 
+  onCancel 
+}: TemplateRosterBuilderProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [currentWeek, setCurrentWeek] = useState(new Date());
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
+  const [templateShifts, setTemplateShifts] = useState<TemplateShift[]>([]);
 
-  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
-  const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon-Fri
+  // Calculate period length in days
+  const getPeriodDays = () => {
+    switch (repeatType) {
+      case 'weekly': return 7;
+      case 'bi_weekly': return 14;
+      case 'monthly': return 28; // 4 weeks
+      case 'custom': return repeatInterval * 7;
+      default: return 7;
+    }
+  };
+
+  const periodDays = getPeriodDays();
+  const weekDays = Array.from({ length: periodDays }, (_, i) => i);
 
   const { data: employees } = useQuery({
     queryKey: ['employees'],
@@ -71,71 +94,67 @@ const Roster = () => {
     }
   });
 
-  const { data: shifts } = useQuery({
-    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd')],
+  // Load existing template assignments
+  const { data: existingAssignments } = useQuery({
+    queryKey: ['template-assignments', templateId],
     queryFn: async () => {
-      const startDate = format(weekStart, 'yyyy-MM-dd');
-      const endDate = format(addDays(weekStart, 4), 'yyyy-MM-dd');
-      
       const { data, error } = await supabase
-        .from('shifts')
+        .from('roster_template_assignments')
         .select('*')
-        .gte('date', startDate)
-        .lte('date', endDate);
+        .eq('roster_template_id', templateId);
       
       if (error) throw error;
-      return data as Shift[];
-    }
+      return data;
+    },
+    enabled: !!templateId
   });
 
-  const createShiftMutation = useMutation({
-    mutationFn: async ({ employeeId, date, template }: {
-      employeeId: string;
-      date: string;
-      template: ShiftTemplate;
-    }) => {
-      const { error } = await supabase
-        .from('shifts')
-        .insert([{
-          employee_id: employeeId,
-          date,
-          start_time: template.start_time,
-          end_time: template.end_time,
-          position: template.position,
-          job_role_id: '00000000-0000-0000-0000-000000000000' // Default job role
-        }]);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast({ title: "Shift added successfully" });
-    },
-    onError: (error) => {
-      toast({ 
-        title: "Error adding shift", 
-        description: error.message,
-        variant: "destructive" 
-      });
+  useEffect(() => {
+    if (existingAssignments) {
+      const shifts: TemplateShift[] = existingAssignments.map(assignment => ({
+        id: assignment.id,
+        employee_id: assignment.employee_id,
+        day_index: assignment.day_of_period,
+        shift_template_id: assignment.shift_template_id
+      }));
+      setTemplateShifts(shifts);
     }
-  });
+  }, [existingAssignments]);
 
-  const deleteShiftMutation = useMutation({
-    mutationFn: async (shiftId: string) => {
-      const { error } = await supabase
-        .from('shifts')
+  const saveTemplateAssignmentsMutation = useMutation({
+    mutationFn: async () => {
+      // Delete existing assignments
+      const { error: deleteError } = await supabase
+        .from('roster_template_assignments')
         .delete()
-        .eq('id', shiftId);
+        .eq('roster_template_id', templateId);
       
-      if (error) throw error;
+      if (deleteError) throw deleteError;
+
+      // Insert new assignments
+      if (templateShifts.length > 0) {
+        const assignments = templateShifts.map(shift => ({
+          roster_template_id: templateId,
+          employee_id: shift.employee_id,
+          day_of_period: shift.day_index,
+          shift_template_id: shift.shift_template_id
+        }));
+
+        const { error: insertError } = await supabase
+          .from('roster_template_assignments')
+          .insert(assignments);
+        
+        if (insertError) throw insertError;
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast({ title: "Shift removed successfully" });
+      queryClient.invalidateQueries({ queryKey: ['template-assignments'] });
+      toast({ title: "Template saved successfully" });
+      onSave();
     },
     onError: (error) => {
       toast({ 
-        title: "Error removing shift", 
+        title: "Error saving template", 
         description: error.message,
         variant: "destructive" 
       });
@@ -146,13 +165,15 @@ const Roster = () => {
     setDraggedTemplate(template);
   };
 
-  const handleDrop = (employeeId: string, date: string) => {
+  const handleDrop = (employeeId: string, dayIndex: number) => {
     if (draggedTemplate) {
-      createShiftMutation.mutate({
-        employeeId,
-        date: format(new Date(date), 'yyyy-MM-dd'),
-        template: draggedTemplate
-      });
+      const newShift: TemplateShift = {
+        employee_id: employeeId,
+        day_index: dayIndex,
+        shift_template_id: draggedTemplate.id
+      };
+      
+      setTemplateShifts(prev => [...prev, newShift]);
       setDraggedTemplate(null);
     }
   };
@@ -161,11 +182,30 @@ const Roster = () => {
     e.preventDefault();
   };
 
-  const getShiftForEmployeeAndDate = (employeeId: string, date: string) => {
-    return shifts?.find(shift => 
-      shift.employee_id === employeeId && 
-      shift.date === format(new Date(date), 'yyyy-MM-dd')
+  const removeShift = (employeeId: string, dayIndex: number) => {
+    setTemplateShifts(prev => 
+      prev.filter(shift => 
+        !(shift.employee_id === employeeId && shift.day_index === dayIndex)
+      )
     );
+  };
+
+  const getShiftForEmployeeAndDay = (employeeId: string, dayIndex: number) => {
+    return templateShifts.find(shift => 
+      shift.employee_id === employeeId && shift.day_index === dayIndex
+    );
+  };
+
+  const getDayLabel = (dayIndex: number) => {
+    const weekIndex = Math.floor(dayIndex / 7);
+    const dayOfWeek = dayIndex % 7;
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    if (periodDays <= 7) {
+      return dayNames[dayOfWeek];
+    } else {
+      return `W${weekIndex + 1} ${dayNames[dayOfWeek]}`;
+    }
   };
 
   // Group shift templates by position
@@ -177,46 +217,29 @@ const Roster = () => {
     return acc;
   }, {} as Record<string, ShiftTemplate[]>) || {};
 
-  const canManageRoster = userRole === 'admin';
-
-  if (!canManageRoster) {
-    return (
-      <div className="text-center py-8">
-        <h2 className="text-xl font-semibold text-gray-600">Access Denied</h2>
-        <p className="text-gray-500 mt-2">You don't have permission to manage rosters.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Weekly Roster</h1>
-          <p className="text-gray-600">Drag and drop shifts to assign staff for this week</p>
+          <h2 className="text-xl font-bold text-gray-900">{templateName}</h2>
+          <p className="text-gray-600">
+            Template Period: {periodDays} days ({repeatType.replace('_', ' ')})
+          </p>
         </div>
         
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
-          >
-            <ChevronLeft className="w-4 h-4" />
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
           </Button>
-          <span className="font-medium">
-            Week of {format(weekStart, 'MMM dd, yyyy')}
-          </span>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
-          >
-            <ChevronRight className="w-4 h-4" />
+          <Button onClick={() => saveTemplateAssignmentsMutation.mutate()}>
+            <Save className="w-4 h-4 mr-2" />
+            Save Template
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Shift Templates Panel - Organized by Position */}
+        {/* Shift Templates Panel */}
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Shift Templates</CardTitle>
@@ -244,9 +267,6 @@ const Roster = () => {
                         <div className="text-xs text-gray-600">
                           {template.start_time} - {template.end_time}
                         </div>
-                        <div className="text-xs text-gray-600">
-                          {template.pay_value} hrs
-                        </div>
                       </div>
                     ))}
                   </div>
@@ -256,10 +276,10 @@ const Roster = () => {
           </CardContent>
         </Card>
 
-        {/* Roster Grid */}
+        {/* Template Roster Grid */}
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Staff Roster</CardTitle>
+            <CardTitle>Template Roster</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -267,10 +287,10 @@ const Roster = () => {
                 <thead>
                   <tr>
                     <th className="p-3 text-left font-medium border-b">Staff</th>
-                    {weekDays.map((day) => (
-                      <th key={day.toISOString()} className="p-3 text-center font-medium border-b min-w-32">
-                        <div>{format(day, 'EEE')}</div>
-                        <div className="text-sm text-gray-500">{format(day, 'MMM dd')}</div>
+                    {weekDays.map((dayIndex) => (
+                      <th key={dayIndex} className="p-3 text-center font-medium border-b min-w-24">
+                        <div className="text-sm">{getDayLabel(dayIndex)}</div>
+                        <div className="text-xs text-gray-500">Day {dayIndex + 1}</div>
                       </th>
                     ))}
                   </tr>
@@ -282,18 +302,15 @@ const Roster = () => {
                         <div>{employee.first_name} {employee.last_name}</div>
                         <div className="text-sm text-gray-500">{employee.department}</div>
                       </td>
-                      {weekDays.map((day) => {
-                        const shift = getShiftForEmployeeAndDate(employee.id, day.toISOString());
-                        const template = shiftTemplates?.find(t => 
-                          shift && t.position === shift.position && 
-                          t.start_time === shift.start_time && 
-                          t.end_time === shift.end_time
-                        );
+                      {weekDays.map((dayIndex) => {
+                        const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
+                        const template = shift ? shiftTemplates?.find(t => t.id === shift.shift_template_id) : null;
+                        
                         return (
                           <td
-                            key={day.toISOString()}
+                            key={dayIndex}
                             className="p-2 border-r border-l"
-                            onDrop={() => handleDrop(employee.id, day.toISOString())}
+                            onDrop={() => handleDrop(employee.id, dayIndex)}
                             onDragOver={handleDragOver}
                           >
                             <div 
@@ -302,17 +319,17 @@ const Roster = () => {
                                 backgroundColor: draggedTemplate ? '#f0f9ff' : 'transparent'
                               }}
                             >
-                              {shift && (
+                              {shift && template && (
                                 <div 
                                   className="p-2 rounded text-xs cursor-pointer"
                                   style={{ 
-                                    backgroundColor: template?.color + '20' || '#3B82F6' + '20',
-                                    borderColor: template?.color || '#3B82F6'
+                                    backgroundColor: template.color + '20',
+                                    borderColor: template.color
                                   }}
-                                  onClick={() => deleteShiftMutation.mutate(shift.id)}
+                                  onClick={() => removeShift(employee.id, dayIndex)}
                                 >
-                                  <div className="font-medium">{shift.position}</div>
-                                  <div>{shift.start_time} - {shift.end_time}</div>
+                                  <div className="font-medium">{template.position}</div>
+                                  <div>{template.start_time} - {template.end_time}</div>
                                 </div>
                               )}
                             </div>
@@ -331,4 +348,4 @@ const Roster = () => {
   );
 };
 
-export default Roster;
+export default TemplateRosterBuilder;
