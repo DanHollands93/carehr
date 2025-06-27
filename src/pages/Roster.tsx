@@ -2,11 +2,14 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface Employee {
   id: string;
@@ -41,6 +44,7 @@ const Roster = () => {
   const queryClient = useQueryClient();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon-Fri
@@ -179,6 +183,13 @@ const Roster = () => {
 
   const canManageRoster = userRole === 'admin';
 
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setCurrentWeek(date);
+      setIsCalendarOpen(false);
+    }
+  };
+
   if (!canManageRoster) {
     return (
       <div className="text-center py-8">
@@ -190,22 +201,42 @@ const Roster = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Weekly Roster</h1>
-          <p className="text-gray-600">Drag and drop shifts to assign staff for this week</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Weekly Roster</h1>
+        <p className="text-gray-600">Drag and drop shifts to assign staff for this week</p>
         
-        <div className="flex items-center space-x-4">
+        {/* Date Navigation - moved below the description */}
+        <div className="flex items-center justify-center space-x-4 mt-4">
           <Button
             variant="outline"
             onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <span className="font-medium">
-            Week of {format(weekStart, 'MMM dd, yyyy')}
-          </span>
+          
+          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal",
+                  !currentWeek && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                Week of {format(weekStart, 'MMM dd, yyyy')}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="center">
+              <Calendar
+                mode="single"
+                selected={currentWeek}
+                onSelect={handleDateSelect}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          
           <Button
             variant="outline"
             onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
