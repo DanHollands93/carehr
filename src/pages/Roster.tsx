@@ -7,12 +7,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
 import RosterCategoryManager from "@/components/RosterCategoryManager";
 import StaffAssignmentManager from "@/components/StaffAssignmentManager";
+import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import { useRosterCategories } from "@/hooks/useRosterCategories";
 
 interface Employee {
@@ -52,6 +53,17 @@ const Roster = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [showDeleteBin, setShowDeleteBin] = useState(false);
+  const [shiftPopup, setShiftPopup] = useState<{
+    isOpen: boolean;
+    employeeId: string;
+    employeeName: string;
+    date: string;
+  }>({
+    isOpen: false,
+    employeeId: '',
+    employeeName: '',
+    date: ''
+  });
   
   const { categories, getAssignedEmployees } = useRosterCategories();
 
@@ -115,19 +127,25 @@ const Roster = () => {
   });
 
   const createShiftMutation = useMutation({
-    mutationFn: async ({ employeeId, date, template }: {
+    mutationFn: async ({ employeeId, date, shiftData }: {
       employeeId: string;
       date: string;
-      template: ShiftTemplate;
+      shiftData: {
+        start_time: string;
+        end_time: string;
+        position: string;
+        pay_value?: number;
+        color?: string;
+      };
     }) => {
       const { error } = await supabase
         .from('shifts')
         .insert([{
           employee_id: employeeId,
           date,
-          start_time: template.start_time,
-          end_time: template.end_time,
-          position: template.position,
+          start_time: shiftData.start_time,
+          end_time: shiftData.end_time,
+          position: shiftData.position,
           job_role_id: '00000000-0000-0000-0000-000000000000',
           category_id: selectedCategoryId
         }]);
@@ -215,7 +233,13 @@ const Roster = () => {
       createShiftMutation.mutate({
         employeeId,
         date: format(new Date(date), 'yyyy-MM-dd'),
-        template: draggedTemplate
+        shiftData: {
+          start_time: draggedTemplate.start_time,
+          end_time: draggedTemplate.end_time,
+          position: draggedTemplate.position,
+          pay_value: draggedTemplate.pay_value,
+          color: draggedTemplate.color
+        }
       });
       setDraggedTemplate(null);
     } else if (draggedShift) {
@@ -275,6 +299,33 @@ const Roster = () => {
     }
   };
 
+  const handleCellClick = (employeeId: string, employeeName: string, date: string) => {
+    // Don't open popup if there's already a shift for this employee and date
+    const existingShift = getShiftForEmployeeAndDate(employeeId, date);
+    if (existingShift) return;
+
+    setShiftPopup({
+      isOpen: true,
+      employeeId,
+      employeeName,
+      date
+    });
+  };
+
+  const handleCreateShiftFromPopup = (shiftData: {
+    start_time: string;
+    end_time: string;
+    position: string;
+    pay_value?: number;
+    color?: string;
+  }) => {
+    createShiftMutation.mutate({
+      employeeId: shiftPopup.employeeId,
+      date: format(new Date(shiftPopup.date), 'yyyy-MM-dd'),
+      shiftData
+    });
+  };
+
   if (!canManageRoster) {
     return (
       <div className="text-center py-8">
@@ -302,9 +353,19 @@ const Roster = () => {
         </div>
       )}
 
+      {/* Shift Creation Popup */}
+      <ShiftCreationPopup
+        isOpen={shiftPopup.isOpen}
+        onClose={() => setShiftPopup(prev => ({ ...prev, isOpen: false }))}
+        onCreateShift={handleCreateShiftFromPopup}
+        shiftTemplates={shiftTemplates || []}
+        employeeName={shiftPopup.employeeName}
+        date={shiftPopup.date}
+      />
+
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Weekly Roster</h1>
-        <p className="text-gray-600">Drag and drop shifts to assign staff or move shifts between staff and days</p>
+        <p className="text-gray-600">Drag and drop shifts to assign staff or move shifts between staff and days, or click on empty cells to add shifts</p>
         
         {/* Date Navigation */}
         <div className="flex items-center justify-center space-x-4 mt-4">
@@ -453,12 +514,17 @@ const Roster = () => {
                                 onDragOver={handleDragOver}
                               >
                                 <div 
-                                  className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors"
+                                  className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors relative group cursor-pointer"
                                   style={{
                                     backgroundColor: (draggedTemplate || draggedShift) ? '#f0f9ff' : 'transparent'
                                   }}
+                                  onClick={() => !shift && handleCellClick(
+                                    employee.id, 
+                                    `${employee.first_name} ${employee.last_name}`, 
+                                    day.toISOString()
+                                  )}
                                 >
-                                  {shift && (
+                                  {shift ? (
                                     <div 
                                       draggable
                                       onDragStart={() => handleShiftDragStart(shift)}
@@ -473,6 +539,10 @@ const Roster = () => {
                                     >
                                       <div className="font-medium">{shift.position}</div>
                                       <div>{shift.start_time} - {shift.end_time}</div>
+                                    </div>
+                                  ) : (
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center h-full">
+                                      <Plus className="w-4 h-4 text-gray-400" />
                                     </div>
                                   )}
                                 </div>
