@@ -431,6 +431,30 @@ export type Database = {
         }
         Relationships: []
       }
+      lookup_lists: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          value: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          value: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          value?: string
+        }
+        Relationships: []
+      }
       menu_sets: {
         Row: {
           created_at: string | null
