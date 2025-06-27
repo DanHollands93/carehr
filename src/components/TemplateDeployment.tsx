@@ -34,6 +34,22 @@ const TemplateDeployment = ({
     format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
   );
 
+  // Get template info including category
+  const { data: templateInfo } = useQuery({
+    queryKey: ['roster-template', templateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('roster_templates')
+        .select('*, roster_categories(name)')
+        .eq('id', templateId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!templateId
+  });
+
   const { data: templateAssignments } = useQuery({
     queryKey: ['template-assignments', templateId],
     queryFn: async () => {
@@ -89,7 +105,8 @@ const TemplateDeployment = ({
           start_time: shiftTemplate?.start_time || '09:00',
           end_time: shiftTemplate?.end_time || '17:00',
           position: shiftTemplate?.position || 'General',
-          job_role_id: '00000000-0000-0000-0000-000000000000'
+          job_role_id: '00000000-0000-0000-0000-000000000000',
+          category_id: templateInfo?.category_id // Add the category_id from the template
         };
       });
 
@@ -177,6 +194,11 @@ const TemplateDeployment = ({
           <DialogDescription>
             Choose the start date to deploy this template to the actual roster.
             This will create shifts for {getPeriodDays()} days starting from your selected date.
+            {templateInfo?.roster_categories && (
+              <span className="block mt-2 text-sm">
+                Category: <strong>{templateInfo.roster_categories.name}</strong>
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
         
