@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -337,8 +337,49 @@ const Roster = () => {
 
   const selectedCategory = categories?.find(cat => cat.id === selectedCategoryId);
 
+  // Prevent horizontal scroll navigation
+  useEffect(() => {
+    const preventHorizontalNavigation = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+      }
+    };
+
+    const preventSwipeNavigation = (e: TouchEvent) => {
+      if (e.touches.length > 1) return;
+      
+      const touch = e.touches[0];
+      const startX = touch.clientX;
+      
+      const handleTouchMove = (moveEvent: TouchEvent) => {
+        const moveTouch = moveEvent.touches[0];
+        const deltaX = moveTouch.clientX - startX;
+        
+        if (Math.abs(deltaX) > 50) {
+          moveEvent.preventDefault();
+        }
+      };
+      
+      document.addEventListener('touchmove', handleTouchMove, { passive: false });
+      
+      const cleanup = () => {
+        document.removeEventListener('touchmove', handleTouchMove);
+      };
+      
+      document.addEventListener('touchend', cleanup, { once: true });
+    };
+
+    document.addEventListener('wheel', preventHorizontalNavigation, { passive: false });
+    document.addEventListener('touchstart', preventSwipeNavigation, { passive: false });
+
+    return () => {
+      document.removeEventListener('wheel', preventHorizontalNavigation);
+      document.removeEventListener('touchstart', preventSwipeNavigation);
+    };
+  }, []);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={{ overscrollBehavior: 'none' }}>
       {/* Delete Bin - appears when dragging a shift */}
       {showDeleteBin && (
         <div className="fixed top-20 right-8 z-50">
