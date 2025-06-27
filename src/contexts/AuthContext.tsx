@@ -39,13 +39,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('Error fetching user role:', error);
+        console.log('Role fetch failed, checking if user_roles table exists or if user has no role assigned');
         return null;
       }
       
-      console.log('User role data:', data);
+      console.log('User role data fetched successfully:', data);
       return data?.role || null;
     } catch (error) {
-      console.error('Error fetching user role:', error);
+      console.error('Exception in fetchUserRole:', error);
       return null;
     }
   };
@@ -61,13 +62,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('Error checking user status:', error);
+        console.log('Profiles table error, defaulting to active status');
         return true; // Default to active if we can't check
       }
       
-      console.log('User active status:', data?.active);
-      return data?.active ?? true;
+      console.log('User active status retrieved:', data?.active);
+      const isActive = data?.active ?? true;
+      console.log('Final active status determination:', isActive);
+      return isActive;
     } catch (error) {
-      console.error('Error checking user status:', error);
+      console.error('Exception in checkUserActive:', error);
       return true;
     }
   };
@@ -79,8 +83,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Auth state changed:', event, session?.user?.email);
         
         if (session?.user) {
+          console.log('Session user found, checking active status...');
           // Check if user is active
           const isActive = await checkUserActive(session.user.id);
+          console.log('Active status check completed:', isActive);
           
           if (!isActive) {
             console.log('User is inactive, signing out');
@@ -92,22 +98,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(false);
             return;
           }
+          
+          console.log('User is active, proceeding with authentication');
         }
 
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          console.log('Fetching user role...');
+          // Use setTimeout to prevent blocking
           setTimeout(async () => {
-            const role = await fetchUserRole(session.user.id);
-            console.log('Setting user role:', role);
-            setUserRole(role);
+            try {
+              const role = await fetchUserRole(session.user.id);
+              console.log('Setting user role:', role);
+              setUserRole(role);
+              console.log('Authentication process completed, setting loading to false');
+              setLoading(false);
+            } catch (error) {
+              console.error('Error in role fetching:', error);
+              setUserRole(null);
+              setLoading(false);
+            }
           }, 0);
         } else {
+          console.log('No session user, clearing role and setting loading to false');
           setUserRole(null);
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
@@ -115,8 +133,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Initial session check:', session?.user?.email);
       
       if (session?.user) {
+        console.log('Initial session user found, checking active status...');
         // Check if user is active
         const isActive = await checkUserActive(session.user.id);
+        console.log('Initial session active status check completed:', isActive);
         
         if (!isActive) {
           console.log('Initial session user is inactive, signing out');
@@ -128,19 +148,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false);
           return;
         }
+        
+        console.log('Initial session user is active, proceeding...');
       }
 
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
+        console.log('Initial session: fetching user role...');
         setTimeout(async () => {
-          const role = await fetchUserRole(session.user.id);
-          console.log('Initial session user role:', role);
-          setUserRole(role);
-          setLoading(false);
+          try {
+            const role = await fetchUserRole(session.user.id);
+            console.log('Initial session user role:', role);
+            setUserRole(role);
+            console.log('Initial session authentication complete, setting loading to false');
+            setLoading(false);
+          } catch (error) {
+            console.error('Error in initial session role fetching:', error);
+            setUserRole(null);
+            setLoading(false);
+          }
         }, 0);
       } else {
+        console.log('No initial session, setting loading to false');
         setLoading(false);
       }
     });
@@ -161,11 +192,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error };
     }
 
-    console.log('Sign in successful, checking user active status');
+    console.log('Sign in successful, user data:', data.user?.email);
     
     // Check if user is active after successful sign in
     if (data.user) {
+      console.log('Checking if signed-in user is active...');
       const isActive = await checkUserActive(data.user.id);
+      console.log('Signed-in user active status:', isActive);
       
       if (!isActive) {
         console.log('User is inactive after sign in, signing out');
@@ -192,6 +225,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     userRole,
   };
+
+  console.log('AuthProvider rendering with state:', { 
+    user: user?.email, 
+    userRole, 
+    loading,
+    hasSession: !!session 
+  });
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
