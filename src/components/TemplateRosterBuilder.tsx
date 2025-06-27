@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
@@ -278,40 +279,42 @@ const TemplateRosterBuilder = ({
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Shift Templates Panel */}
+        {/* Shift Templates Panel - Compact Grid Layout */}
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Shift Templates</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <Accordion type="multiple" className="w-full">
               {Object.entries(groupedTemplates).map(([position, templates]) => (
-                <div key={position} className="space-y-2">
-                  <h4 className="font-medium text-sm text-gray-700 border-b pb-1">
+                <AccordionItem value={position} key={position}>
+                  <AccordionTrigger className="text-sm font-medium">
                     {position}
-                  </h4>
-                  <div className="space-y-2">
-                    {templates.map((template) => (
-                      <div
-                        key={template.id}
-                        draggable
-                        onDragStart={() => handleDragStart(template)}
-                        className="p-3 rounded border cursor-move hover:shadow-md transition-shadow"
-                        style={{ 
-                          backgroundColor: template.color + '20',
-                          borderColor: template.color 
-                        }}
-                      >
-                        <div className="font-medium text-sm">{template.name}</div>
-                        <div className="text-xs text-gray-600">
-                          {template.start_time} - {template.end_time}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="grid grid-cols-2 gap-2">
+                      {templates.map((template) => (
+                        <div
+                          key={template.id}
+                          draggable
+                          onDragStart={() => handleDragStart(template)}
+                          className="p-2 rounded border cursor-move hover:shadow-md transition-shadow text-xs"
+                          style={{ 
+                            backgroundColor: template.color + '20',
+                            borderColor: template.color 
+                          }}
+                        >
+                          <div className="font-medium truncate">{template.name}</div>
+                          <div className="text-xs text-gray-600 truncate">
+                            {template.start_time} - {template.end_time}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
               ))}
-            </div>
+            </Accordion>
           </CardContent>
         </Card>
 
