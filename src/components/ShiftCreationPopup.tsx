@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-
 interface ShiftTemplate {
   id: string;
   name: string;
@@ -17,7 +15,6 @@ interface ShiftTemplate {
   position: string;
   pay_value: number;
 }
-
 interface ShiftCreationPopupProps {
   isOpen: boolean;
   onClose: () => void;
@@ -32,7 +29,6 @@ interface ShiftCreationPopupProps {
   employeeName: string;
   date: string;
 }
-
 const ShiftCreationPopup = ({
   isOpen,
   onClose,
@@ -51,11 +47,9 @@ const ShiftCreationPopup = ({
     color: '#3B82F6',
     description: ''
   });
-
   const handleTemplateSelect = (template: ShiftTemplate) => {
     setSelectedTemplate(template);
   };
-
   const handleCreateFromTemplate = () => {
     if (selectedTemplate) {
       onCreateShift({
@@ -69,7 +63,6 @@ const ShiftCreationPopup = ({
       setSelectedTemplate(null);
     }
   };
-
   const handleCreateCustom = () => {
     if (customShift.start_time && customShift.end_time && customShift.position) {
       onCreateShift({
@@ -91,13 +84,12 @@ const ShiftCreationPopup = ({
       });
     }
   };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric',
+      day: 'numeric'
     });
   };
 
@@ -109,10 +101,8 @@ const ShiftCreationPopup = ({
     acc[template.position].push(template);
     return acc;
   }, {} as Record<string, ShiftTemplate[]>) || {};
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+  return <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto px-[20px]">
         <DialogHeader>
           <DialogTitle>Add Shift for {employeeName}</DialogTitle>
           <p className="text-sm text-gray-600">{formatDate(date)}</p>
@@ -126,25 +116,14 @@ const ShiftCreationPopup = ({
 
           <TabsContent value="templates" className="space-y-4">
             <div className="space-y-4 max-h-96 overflow-y-auto">
-              {Object.entries(groupedTemplates).map(([position, templates]) => (
-                <div key={position} className="space-y-2">
+              {Object.entries(groupedTemplates).map(([position, templates]) => <div key={position} className="space-y-2">
                   <h4 className="font-medium text-sm text-gray-700">{position}</h4>
                   <div className="grid grid-cols-2 gap-2">
-                    {templates.map((template) => (
-                      <Card
-                        key={template.id}
-                        className={`cursor-pointer transition-all hover:shadow-md ${
-                          selectedTemplate?.id === template.id 
-                            ? 'ring-2 ring-blue-500' 
-                            : 'hover:ring-1 hover:ring-gray-300'
-                        }`}
-                        onClick={() => handleTemplateSelect(template)}
-                      >
+                    {templates.map(template => <Card key={template.id} className={`cursor-pointer transition-all hover:shadow-md ${selectedTemplate?.id === template.id ? 'ring-2 ring-blue-500' : 'hover:ring-1 hover:ring-gray-300'}`} onClick={() => handleTemplateSelect(template)}>
                         <CardContent className="p-3">
-                          <div
-                            className="w-full h-2 rounded mb-2"
-                            style={{ backgroundColor: template.color }}
-                          />
+                          <div className="w-full h-2 rounded mb-2" style={{
+                      backgroundColor: template.color
+                    }} />
                           <div className="font-medium text-sm">{template.name}</div>
                           <div className="text-xs text-gray-600">
                             {template.start_time} - {template.end_time}
@@ -153,21 +132,16 @@ const ShiftCreationPopup = ({
                             {template.pay_value} hrs
                           </div>
                         </CardContent>
-                      </Card>
-                    ))}
+                      </Card>)}
                   </div>
-                </div>
-              ))}
+                </div>)}
             </div>
             
             <div className="flex justify-end space-x-2 pt-4">
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button 
-                onClick={handleCreateFromTemplate}
-                disabled={!selectedTemplate}
-              >
+              <Button onClick={handleCreateFromTemplate} disabled={!selectedTemplate}>
                 Add Shift
               </Button>
             </div>
@@ -177,112 +151,66 @@ const ShiftCreationPopup = ({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Shift Name</Label>
-                <Input
-                  id="name"
-                  placeholder="Enter shift name"
-                  value={customShift.name}
-                  onChange={(e) => setCustomShift(prev => ({
-                    ...prev,
-                    name: e.target.value
-                  }))}
-                />
+                <Input id="name" placeholder="Enter shift name" value={customShift.name} onChange={e => setCustomShift(prev => ({
+                ...prev,
+                name: e.target.value
+              }))} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="start_time">Start Time</Label>
-                  <Input
-                    id="start_time"
-                    type="time"
-                    value={customShift.start_time}
-                    onChange={(e) => setCustomShift(prev => ({
-                      ...prev,
-                      start_time: e.target.value
-                    }))}
-                  />
+                  <Input id="start_time" type="time" value={customShift.start_time} onChange={e => setCustomShift(prev => ({
+                  ...prev,
+                  start_time: e.target.value
+                }))} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="end_time">End Time</Label>
-                  <Input
-                    id="end_time"
-                    type="time"
-                    value={customShift.end_time}
-                    onChange={(e) => setCustomShift(prev => ({
-                      ...prev,
-                      end_time: e.target.value
-                    }))}
-                  />
+                  <Input id="end_time" type="time" value={customShift.end_time} onChange={e => setCustomShift(prev => ({
+                  ...prev,
+                  end_time: e.target.value
+                }))} />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="position">Position</Label>
-                <Input
-                  id="position"
-                  placeholder="Enter position"
-                  value={customShift.position}
-                  onChange={(e) => setCustomShift(prev => ({
-                    ...prev,
-                    position: e.target.value
-                  }))}
-                />
+                <Input id="position" placeholder="Enter position" value={customShift.position} onChange={e => setCustomShift(prev => ({
+                ...prev,
+                position: e.target.value
+              }))} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="pay_value">Pay Value (hours)</Label>
-                  <Input
-                    id="pay_value"
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    placeholder="8"
-                    value={customShift.pay_value}
-                    onChange={(e) => setCustomShift(prev => ({
-                      ...prev,
-                      pay_value: parseFloat(e.target.value) || 0
-                    }))}
-                  />
+                  <Input id="pay_value" type="number" step="0.5" min="0" placeholder="8" value={customShift.pay_value} onChange={e => setCustomShift(prev => ({
+                  ...prev,
+                  pay_value: parseFloat(e.target.value) || 0
+                }))} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="color">Color</Label>
                   <div className="flex space-x-2">
-                    <Input
-                      id="color"
-                      type="color"
-                      value={customShift.color}
-                      onChange={(e) => setCustomShift(prev => ({
-                        ...prev,
-                        color: e.target.value
-                      }))}
-                      className="w-16 h-10 p-1 border rounded"
-                    />
-                    <Input
-                      type="text"
-                      value={customShift.color}
-                      onChange={(e) => setCustomShift(prev => ({
-                        ...prev,
-                        color: e.target.value
-                      }))}
-                      placeholder="#3B82F6"
-                      className="flex-1"
-                    />
+                    <Input id="color" type="color" value={customShift.color} onChange={e => setCustomShift(prev => ({
+                    ...prev,
+                    color: e.target.value
+                  }))} className="w-16 h-10 p-1 border rounded" />
+                    <Input type="text" value={customShift.color} onChange={e => setCustomShift(prev => ({
+                    ...prev,
+                    color: e.target.value
+                  }))} placeholder="#3B82F6" className="flex-1" />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">Description (Optional)</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Enter shift description"
-                  value={customShift.description}
-                  onChange={(e) => setCustomShift(prev => ({
-                    ...prev,
-                    description: e.target.value
-                  }))}
-                  rows={3}
-                />
+                <Textarea id="description" placeholder="Enter shift description" value={customShift.description} onChange={e => setCustomShift(prev => ({
+                ...prev,
+                description: e.target.value
+              }))} rows={3} />
               </div>
             </div>
 
@@ -290,18 +218,13 @@ const ShiftCreationPopup = ({
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button 
-                onClick={handleCreateCustom}
-                disabled={!customShift.start_time || !customShift.end_time || !customShift.position}
-              >
+              <Button onClick={handleCreateCustom} disabled={!customShift.start_time || !customShift.end_time || !customShift.position}>
                 Create Custom Shift
               </Button>
             </div>
           </TabsContent>
         </Tabs>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>;
 };
-
 export default ShiftCreationPopup;
