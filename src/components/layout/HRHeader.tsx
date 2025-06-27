@@ -4,16 +4,17 @@ import { Menu, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface HRHeaderProps {
-  onToggleSidebar: () => void;
+  isMobileOpen: boolean;
+  setIsMobileOpen: (isOpen: boolean) => void;
 }
 
-const HRHeader = ({ onToggleSidebar }: HRHeaderProps) => {
+const HRHeader = ({ isMobileOpen, setIsMobileOpen }: HRHeaderProps) => {
   const { user } = useAuth();
 
   return (
     <header className="border-b bg-white py-4 px-6 flex items-center justify-between">
       <div className="flex items-center">
-        <Button variant="ghost" size="icon" className="md:hidden mr-2" onClick={onToggleSidebar}>
+        <Button variant="ghost" size="icon" className="md:hidden mr-2" onClick={() => setIsMobileOpen(!isMobileOpen)}>
           <Menu className="h-5 w-5" />
         </Button>
         <h1 className="text-xl font-semibold text-gray-800">Welcome to HR Portal</h1>
