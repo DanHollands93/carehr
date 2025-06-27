@@ -118,7 +118,7 @@ const ShiftCreationPopup = ({
             <div className="space-y-4 max-h-96 overflow-y-auto">
               {Object.entries(groupedTemplates).map(([position, templates]) => <div key={position} className="space-y-2">
                   <h4 className="font-medium text-sm text-gray-700">{position}</h4>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 px-[5px]">
                     {templates.map(template => <Card key={template.id} className={`cursor-pointer transition-all hover:shadow-md ${selectedTemplate?.id === template.id ? 'ring-2 ring-blue-500' : 'hover:ring-1 hover:ring-gray-300'}`} onClick={() => handleTemplateSelect(template)}>
                         <CardContent className="p-3">
                           <div className="w-full h-2 rounded mb-2" style={{
