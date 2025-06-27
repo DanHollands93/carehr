@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +52,7 @@ const TemplateRosterBuilder = ({
   const queryClient = useQueryClient();
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
   const [templateShifts, setTemplateShifts] = useState<TemplateShift[]>([]);
+  const [currentWeek, setCurrentWeek] = useState(0); // 0-based week index
 
   // Calculate period length in days
   const getPeriodDays = () => {
@@ -66,7 +66,12 @@ const TemplateRosterBuilder = ({
   };
 
   const periodDays = getPeriodDays();
-  const weekDays = Array.from({ length: periodDays }, (_, i) => i);
+  const totalWeeks = Math.ceil(periodDays / 7);
+  
+  // Calculate days for current week view
+  const currentWeekStartDay = currentWeek * 7;
+  const currentWeekDays = Math.min(7, periodDays - currentWeekStartDay);
+  const weekDays = Array.from({ length: currentWeekDays }, (_, i) => currentWeekStartDay + i);
 
   const { data: employees } = useQuery({
     queryKey: ['employees'],
@@ -197,15 +202,9 @@ const TemplateRosterBuilder = ({
   };
 
   const getDayLabel = (dayIndex: number) => {
-    const weekIndex = Math.floor(dayIndex / 7);
     const dayOfWeek = dayIndex % 7;
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    
-    if (periodDays <= 7) {
-      return dayNames[dayOfWeek];
-    } else {
-      return `W${weekIndex + 1} ${dayNames[dayOfWeek]}`;
-    }
+    return dayNames[dayOfWeek];
   };
 
   // Group shift templates by position
@@ -237,6 +236,46 @@ const TemplateRosterBuilder = ({
           </Button>
         </div>
       </div>
+
+      {/* Week Navigation - only show if more than one week */}
+      {totalWeeks > 1 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-center space-x-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentWeek(Math.max(0, currentWeek - 1))}
+                disabled={currentWeek === 0}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              
+              <div className="flex space-x-2">
+                {Array.from({ length: totalWeeks }, (_, weekIndex) => (
+                  <Button
+                    key={weekIndex}
+                    variant={currentWeek === weekIndex ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentWeek(weekIndex)}
+                  >
+                    Week {weekIndex + 1}
+                  </Button>
+                ))}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentWeek(Math.min(totalWeeks - 1, currentWeek + 1))}
+                disabled={currentWeek === totalWeeks - 1}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Shift Templates Panel */}
@@ -276,10 +315,12 @@ const TemplateRosterBuilder = ({
           </CardContent>
         </Card>
 
-        {/* Template Roster Grid */}
+        {/* Current Week Roster Grid */}
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Template Roster</CardTitle>
+            <CardTitle>
+              {totalWeeks > 1 ? `Week ${currentWeek + 1} Roster` : 'Template Roster'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
