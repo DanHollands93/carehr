@@ -9,6 +9,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
@@ -48,6 +49,7 @@ interface Shift {
 
 const Roster = () => {
   const { userRole } = useAuth();
+  const { hasPermission } = usePermissions();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [currentWeek, setCurrentWeek] = useState(new Date());
@@ -323,7 +325,7 @@ const Roster = () => {
     return acc;
   }, {} as Record<string, ShiftTemplate[]>) || {};
 
-  const canManageRoster = userRole === 'admin';
+  const canManageRoster = hasPermission('view_roster') || hasPermission('edit_roster');
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
@@ -409,7 +411,7 @@ const Roster = () => {
     return (
       <div className="text-center py-8">
         <h2 className="text-xl font-semibold text-gray-600">Access Denied</h2>
-        <p className="text-gray-500 mt-2">You don't have permission to manage rosters.</p>
+        <p className="text-gray-500 mt-2">You don't have permission to view rosters.</p>
       </div>
     );
   }

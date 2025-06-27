@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +15,7 @@ import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import AdminUsers from "./pages/AdminUsers";
 import NotFound from "./pages/NotFound";
+import Employees from "./pages/Employees";
 import HRDashboard from "./pages/hr/HRDashboard";
 import HRHolidays from "./pages/hr/HRHolidays";
 import HRProfile from "./pages/hr/HRProfile";
@@ -46,19 +48,49 @@ const App = () => (
               <Route path="menu-sets" element={<MenuSets />} />
               <Route path="processes" element={<Processes />} />
               <Route path="settings" element={<Settings />} />
-              <Route path="roster" element={<Roster />} />
-              <Route path="roster-templates" element={<RosterTemplates />} />
-              <Route path="shift-templates" element={<ShiftTemplates />} />
+              <Route path="employees" element={
+                <ProtectedRoute requiredPermission="view_employees">
+                  <Employees />
+                </ProtectedRoute>
+              } />
+              <Route path="employees/new" element={
+                <ProtectedRoute requiredPermission="create_employees">
+                  <Employees />
+                </ProtectedRoute>
+              } />
+              <Route path="roster" element={
+                <ProtectedRoute requiredPermission="view_roster">
+                  <Roster />
+                </ProtectedRoute>
+              } />
+              <Route path="roster-templates" element={
+                <ProtectedRoute requiredPermission="edit_roster">
+                  <RosterTemplates />
+                </ProtectedRoute>
+              } />
+              <Route path="shift-templates" element={
+                <ProtectedRoute requiredPermission="edit_roster">
+                  <ShiftTemplates />
+                </ProtectedRoute>
+              } />
               
               {/* HR Routes accessible to all users with permissions */}
-              <Route path="hr/holidays" element={<HRHolidays />} />
+              <Route path="hr/holidays" element={
+                <ProtectedRoute requiredPermission="submit_holidays">
+                  <HRHolidays />
+                </ProtectedRoute>
+              } />
               <Route path="hr/profile" element={<HRProfile />} />
               <Route path="hr/documents" element={<HRDocuments />} />
               <Route path="hr/notifications" element={<HRNotifications />} />
               <Route path="hr/process/:processId" element={<DynamicProcessPage />} />
               
               {/* Admin Routes - now permission-based instead of role-based */}
-              <Route path="admin/users" element={<AdminUsers />} />
+              <Route path="admin/users" element={
+                <ProtectedRoute requiredPermission="manage_users">
+                  <AdminUsers />
+                </ProtectedRoute>
+              } />
             </Route>
 
             <Route path="*" element={<NotFound />} />
