@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, Edit, UserX, RotateCcw } from 'lucide-react';
 
 interface User {
   id: string;
@@ -16,18 +17,28 @@ interface User {
   last_name: string;
   role: 'admin' | 'hr_user';
   created_at: string;
+  active: boolean;
 }
 
 const AdminUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     firstName: '',
     lastName: '',
     role: 'hr_user' as 'admin' | 'hr_user',
+  });
+  const [editFormData, setEditFormData] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    role: 'hr_user' as 'admin' | 'hr_user',
+    active: true,
   });
   const { toast } = useToast();
 
@@ -52,6 +63,7 @@ const AdminUsers = () => {
         last_name: profile.last_name || '',
         role: profile.user_roles?.[0]?.role || 'hr_user',
         created_at: profile.created_at,
+        active: profile.active ?? true,
       })) || [];
 
       setUsers(usersWithRoles);
@@ -71,7 +83,6 @@ const AdminUsers = () => {
     setLoading(true);
 
     try {
-      // Create the user with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: formData.email,
         password: formData.password,
@@ -90,7 +101,6 @@ const AdminUsers = () => {
         return;
       }
 
-      // Assign role to the user
       if (authData.user) {
         const { error: roleError } = await supabase
           .from('user_roles')
@@ -114,7 +124,6 @@ const AdminUsers = () => {
         description: `${formData.firstName} ${formData.lastName} has been added as a ${formData.role}.`,
       });
 
-      // Reset form and refresh users
       setFormData({
         email: '',
         password: '',
@@ -132,6 +141,158 @@ const AdminUsers = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setEditFormData({
+      email: user.email,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      role: user.role,
+      active: user.active,
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    setLoading(true);
+
+    try {
+      // Update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          email: editFormData.email,
+          first_name: editFormData.firstName,
+          last_name: editFormData.lastName,
+          active: editFormData.active,
+        })
+        .eq('id', editingUser.id);
+
+      if (profileError) {
+        toast({
+          title: "Error Updating Profile",
+          description: profileError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .update({ role: editFormData.role })
+        .eq('user_id', editingUser.id);
+
+      if (roleError) {
+        toast({
+          title: "Error Updating Role",
+          description: roleError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update auth email if changed
+      if (editFormData.email !== editingUser.email) {
+        const { error: authError } = await supabase.auth.admin.updateUserById(
+          editingUser.id,
+          { email: editFormData.email }
+        );
+
+        if (authError) {
+          toast({
+            title: "Error Updating Email",
+            description: authError.message,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      toast({
+        title: "User Updated Successfully",
+        description: `${editFormData.firstName} ${editFormData.lastName} has been updated.`,
+      });
+
+      setShowEditDialog(false);
+      setEditingUser(null);
+      fetchUsers();
+    } catch (error) {
+      toast({
+        title: "Error Updating User",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (user: User) => {
+    try {
+      const { error } = await supabase.auth.admin.generateLink({
+        type: 'recovery',
+        email: user.email,
+      });
+
+      if (error) {
+        toast({
+          title: "Error Sending Reset",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Password Reset Sent",
+        description: `Password reset email sent to ${user.email}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send password reset",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleActive = async (user: User) => {
+    const newActiveStatus = !user.active;
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ active: newActiveStatus })
+        .eq('id', user.id);
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "User Status Updated",
+        description: `User ${newActiveStatus ? 'activated' : 'deactivated'} successfully`,
+      });
+
+      fetchUsers();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update user status",
+        variant: "destructive",
+      });
     }
   };
 
@@ -239,16 +400,46 @@ const AdminUsers = () => {
             <div className="space-y-4">
               {users.map((user) => (
                 <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <h3 className="font-medium">{user.first_name} {user.last_name}</h3>
-                    <p className="text-sm text-gray-600">{user.email}</p>
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <h3 className="font-medium">{user.first_name} {user.last_name}</h3>
+                      <p className="text-sm text-gray-600">{user.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        user.role === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {user.role === 'admin' ? 'Admin' : 'HR User'}
+                      </span>
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        user.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {user.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      user.role === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {user.role === 'admin' ? 'Admin' : 'HR User'}
-                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEditUser(user)}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleResetPassword(user)}
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={user.active ? "destructive" : "default"}
+                      onClick={() => handleToggleActive(user)}
+                    >
+                      <UserX className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -261,6 +452,87 @@ const AdminUsers = () => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user information and settings
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateUser} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="editFirstName">First Name</Label>
+                <Input
+                  id="editFirstName"
+                  value={editFormData.firstName}
+                  onChange={(e) => setEditFormData({ ...editFormData, firstName: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editLastName">Last Name</Label>
+                <Input
+                  id="editLastName"
+                  value={editFormData.lastName}
+                  onChange={(e) => setEditFormData({ ...editFormData, lastName: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editEmail">Email</Label>
+              <Input
+                id="editEmail"
+                type="email"
+                value={editFormData.email}
+                onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editRole">Role</Label>
+              <Select
+                value={editFormData.role}
+                onValueChange={(value: 'admin' | 'hr_user') => setEditFormData({ ...editFormData, role: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hr_user">HR User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editActive">Status</Label>
+              <Select
+                value={editFormData.active ? 'active' : 'inactive'}
+                onValueChange={(value) => setEditFormData({ ...editFormData, active: value === 'active' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Updating...' : 'Update User'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

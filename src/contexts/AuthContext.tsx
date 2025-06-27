@@ -48,9 +48,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const checkUserActive = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('active')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.error('Error checking user status:', error);
+        return true; // Default to active if we can't check
+      }
+      
+      return data?.active ?? true;
+    } catch (error) {
+      console.error('Error checking user status:', error);
+      return true;
+    }
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (session?.user) {
+          // Check if user is active
+          const isActive = await checkUserActive(session.user.id);
+          
+          if (!isActive) {
+            // Sign out inactive user
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            setUserRole(null);
+            setLoading(false);
+            return;
+          }
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -67,7 +102,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        // Check if user is active
+        const isActive = await checkUserActive(session.user.id);
+        
+        if (!isActive) {
+          // Sign out inactive user
+          await supabase.auth.signOut();
+          setSession(null);
+          setUser(null);
+          setUserRole(null);
+          setLoading(false);
+          return;
+        }
+      }
+
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -86,11 +136,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { error };
+
+    if (error) {
+      return { error };
+    }
+
+    // Check if user is active after successful sign in
+    if (data.user) {
+      const isActive = await checkUserActive(data.user.id);
+      
+      if (!isActive) {
+        // Sign out inactive user immediately
+        await supabase.auth.signOut();
+        return { error: { message: 'Your account has been deactivated. Please contact an administrator.' } };
+      }
+    }
+
+    return { error: null };
   };
 
   const signOut = async () => {
