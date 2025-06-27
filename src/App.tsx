@@ -25,6 +25,7 @@ import DynamicProcessPage from "./pages/DynamicProcessPage";
 import ShiftTemplates from "./pages/ShiftTemplates";
 import Roster from "./pages/Roster";
 import RosterTemplates from "./pages/RosterTemplates";
+import HolidayApprovals from "./pages/HolidayApprovals";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,13 @@ const App = () => (
               <Route path="hr/documents" element={<HRDocuments />} />
               <Route path="hr/notifications" element={<HRNotifications />} />
               <Route path="hr/process/:processId" element={<DynamicProcessPage />} />
+              
+              {/* Holiday Approvals Route */}
+              <Route path="holidays/approvals" element={
+                <ProtectedRoute requiredPermission="approve_holidays">
+                  <HolidayApprovals />
+                </ProtectedRoute>
+              } />
               
               {/* Admin Routes - now permission-based instead of role-based */}
               <Route path="admin/users" element={

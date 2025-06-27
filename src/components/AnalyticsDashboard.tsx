@@ -4,10 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { analyticsService } from "@/services/analyticsService";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Users, UserCheck, Clock, CheckCircle, Calendar, FileText, Activity } from "lucide-react";
+import HolidayApprovalsWidget from "./HolidayApprovalsWidget";
 
 const AnalyticsDashboard = () => {
   const { userRole, user } = useAuth();
+  const { hasPermission } = usePermissions();
   const [adminData, setAdminData] = useState<any>(null);
   const [personalData, setPersonalData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -89,32 +92,39 @@ const AnalyticsDashboard = () => {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {adminData.recentActivity.map((activity: any) => (
-                <div key={activity.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{activity.user}</p>
-                    <p className="text-sm text-muted-foreground">{activity.description}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Holiday Approvals Widget - Show for users with approve_holidays permission */}
+          {hasPermission('approve_holidays') && (
+            <HolidayApprovalsWidget />
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Recent Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {adminData.recentActivity.map((activity: any) => (
+                  <div key={activity.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">{activity.user}</p>
+                      <p className="text-sm text-muted-foreground">{activity.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="outline">{activity.type.replace('_', ' ')}</Badge>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(activity.timestamp).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <Badge variant="outline">{activity.type.replace('_', ' ')}</Badge>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(activity.timestamp).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -172,31 +182,38 @@ const AnalyticsDashboard = () => {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Your Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {personalData.recentActivity.map((activity: any) => (
-                <div key={activity.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{activity.description}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Holiday Approvals Widget - Show for users with approve_holidays permission */}
+          {hasPermission('approve_holidays') && (
+            <HolidayApprovalsWidget />
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Your Recent Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {personalData.recentActivity.map((activity: any) => (
+                  <div key={activity.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">{activity.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="outline">{activity.type.replace('_', ' ')}</Badge>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(activity.timestamp).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <Badge variant="outline">{activity.type.replace('_', ' ')}</Badge>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(activity.timestamp).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </div>
+        </div>
       </div>
     );
   }
