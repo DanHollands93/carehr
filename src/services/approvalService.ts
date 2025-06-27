@@ -23,45 +23,145 @@ export interface ApprovalAction {
 
 export const approvalService = {
   async getHolidayRequests(): Promise<HolidayRequest[]> {
-    // Mock data - in production this would be a real Supabase query
-    return [
-      {
-        id: "req-1",
-        employeeId: "emp-1",
-        employeeName: "John Doe",
-        startDate: "2025-07-15",
-        endDate: "2025-07-22",
-        reason: "Summer vacation",
-        status: "pending",
-        submittedAt: "2025-06-20T10:00:00Z"
-      },
-      {
-        id: "req-2",
-        employeeId: "emp-2",
-        employeeName: "Jane Smith",
-        startDate: "2025-08-01",
-        endDate: "2025-08-05",
-        reason: "Family event",
-        status: "approved",
-        submittedAt: "2025-06-18T14:30:00Z",
-        approvedBy: "manager-1",
-        approvedAt: "2025-06-19T09:15:00Z"
-      }
-    ];
+    const { data, error } = await supabase
+      .from('holiday_requests')
+      .select(`
+        id,
+        employee_id,
+        employee_name,
+        start_date,
+        end_date,
+        reason,
+        status,
+        submitted_at,
+        approved_by,
+        approval_date,
+        comments,
+        hours_requested
+      `)
+      .order('submitted_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching holiday requests:', error);
+      throw error;
+    }
+
+    return (data || []).map(req => ({
+      id: req.id,
+      employeeId: req.employee_id,
+      employeeName: req.employee_name || 'Unknown Employee',
+      startDate: req.start_date,
+      endDate: req.end_date,
+      reason: req.reason || '',
+      status: req.status as 'pending' | 'approved' | 'rejected',
+      submittedAt: req.submitted_at || new Date().toISOString(),
+      approvedBy: req.approved_by || undefined,
+      approvedAt: req.approval_date || undefined,
+      comments: req.comments || undefined
+    }));
   },
 
   async submitHolidayRequest(request: Omit<HolidayRequest, 'id' | 'status' | 'submittedAt'>): Promise<void> {
-    // Mock implementation - would create record in Supabase
-    console.log('Holiday request submitted:', request);
+    // First, get the employee record for the current user
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('employee_id')
+      .eq('id', (await supabase.auth.getUser()).data.user?.id)
+      .single();
+
+    if (!profile?.employee_id) {
+      throw new Error('No employee record found for current user');
+    }
+
+    // Calculate hours requested (assuming 8 hours per day)
+    const startDate = new Date(request.startDate);
+    const endDate = new Date(request.endDate);
+    const daysDifference = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24)) + 1;
+    const hoursRequested = daysDifference * 8;
+
+    const { error } = await supabase
+      .from('holiday_requests')
+      .insert({
+        employee_id: profile.employee_id,
+        employee_name: request.employeeName,
+        start_date: request.startDate,
+        end_date: request.endDate,
+        reason: request.reason,
+        hours_requested: hoursRequested,
+        status: 'pending',
+        submitted_at: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Error submitting holiday request:', error);
+      throw error;
+    }
   },
 
   async processApproval(approval: ApprovalAction): Promise<void> {
-    // Mock implementation - would update record in Supabase
-    console.log('Approval processed:', approval);
+    const { error } = await supabase
+      .from('holiday_requests')
+      .update({
+        status: approval.action === 'approve' ? 'approved' : 'rejected',
+        approved_by: (await supabase.auth.getUser()).data.user?.id,
+        approval_date: new Date().toISOString(),
+        comments: approval.comments
+      })
+      .eq('id', approval.requestId);
+
+    if (error) {
+      console.error('Error processing approval:', error);
+      throw error;
+    }
   },
 
   async getMyRequests(employeeId: string): Promise<HolidayRequest[]> {
-    const allRequests = await this.getHolidayRequests();
-    return allRequests.filter(req => req.employeeId === employeeId);
+    // Get current user's employee record
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('employee_id')
+      .eq('id', (await supabase.auth.getUser()).data.user?.id)
+      .single();
+
+    if (!profile?.employee_id) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('holiday_requests')
+      .select(`
+        id,
+        employee_id,
+        employee_name,
+        start_date,
+        end_date,
+        reason,
+        status,
+        submitted_at,
+        approved_by,
+        approval_date,
+        comments
+      `)
+      .eq('employee_id', profile.employee_id)
+      .order('submitted_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching my requests:', error);
+      throw error;
+    }
+
+    return (data || []).map(req => ({
+      id: req.id,
+      employeeId: req.employee_id,
+      employeeName: req.employee_name || 'Unknown Employee',
+      startDate: req.start_date,
+      endDate: req.end_date,
+      reason: req.reason || '',
+      status: req.status as 'pending' | 'approved' | 'rejected',
+      submittedAt: req.submitted_at || new Date().toISOString(),
+      approvedBy: req.approved_by || undefined,
+      approvedAt: req.approval_date || undefined,
+      comments: req.comments || undefined
+    }));
   }
 };

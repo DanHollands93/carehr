@@ -13,6 +13,7 @@ export const useHolidayRequests = () => {
     const loadRequests = async () => {
       try {
         setLoading(true);
+        setError(null);
         let holidayRequests: HolidayRequest[];
         
         if (userRole === 'admin') {
@@ -39,21 +40,37 @@ export const useHolidayRequests = () => {
 
   const submitRequest = async (request: Omit<HolidayRequest, 'id' | 'status' | 'submittedAt' | 'employeeId' | 'employeeName'>) => {
     try {
+      setError(null);
       await approvalService.submitHolidayRequest({
         ...request,
         employeeId: user?.id || '',
         employeeName: user?.email || ''
       });
-      // Reload requests
+      
+      // Reload requests after submission
       const updatedRequests = userRole === 'admin' 
         ? await approvalService.getHolidayRequests()
         : await approvalService.getMyRequests(user?.id || '');
       setRequests(updatedRequests);
     } catch (err) {
       setError('Failed to submit request');
+      console.error('Error submitting request:', err);
       throw err;
     }
   };
 
-  return { requests, loading, error, submitRequest };
+  const refreshRequests = async () => {
+    try {
+      setError(null);
+      const updatedRequests = userRole === 'admin' 
+        ? await approvalService.getHolidayRequests()
+        : await approvalService.getMyRequests(user?.id || '');
+      setRequests(updatedRequests);
+    } catch (err) {
+      setError('Failed to refresh requests');
+      console.error('Error refreshing requests:', err);
+    }
+  };
+
+  return { requests, loading, error, submitRequest, refreshRequests };
 };

@@ -4,7 +4,7 @@ import HolidayRequestsList from "@/components/HolidayRequestsList";
 import { useHolidayRequests } from "@/hooks/useHolidayRequests";
 
 const AdminUsers = () => {
-  const { requests, loading, error } = useHolidayRequests();
+  const { requests, loading, error, refreshRequests } = useHolidayRequests();
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -27,7 +27,7 @@ const AdminUsers = () => {
           ) : (
             <HolidayRequestsList 
               requests={requests.filter(req => req.status === 'pending')}
-              onUpdate={() => window.location.reload()}
+              onUpdate={refreshRequests}
             />
           )}
         </TabsContent>

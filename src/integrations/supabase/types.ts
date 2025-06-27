@@ -175,9 +175,12 @@ export type Database = {
       holiday_requests: {
         Row: {
           approval_date: string | null
+          approved_by: string | null
           approver_id: string | null
+          comments: string | null
           created_at: string | null
           employee_id: string
+          employee_name: string | null
           end_date: string
           hours_requested: number
           id: string
@@ -185,12 +188,16 @@ export type Database = {
           reason: string | null
           start_date: string
           status: string
+          submitted_at: string | null
         }
         Insert: {
           approval_date?: string | null
+          approved_by?: string | null
           approver_id?: string | null
+          comments?: string | null
           created_at?: string | null
           employee_id: string
+          employee_name?: string | null
           end_date: string
           hours_requested: number
           id?: string
@@ -198,12 +205,16 @@ export type Database = {
           reason?: string | null
           start_date: string
           status?: string
+          submitted_at?: string | null
         }
         Update: {
           approval_date?: string | null
+          approved_by?: string | null
           approver_id?: string | null
+          comments?: string | null
           created_at?: string | null
           employee_id?: string
+          employee_name?: string | null
           end_date?: string
           hours_requested?: number
           id?: string
@@ -211,6 +222,7 @@ export type Database = {
           reason?: string | null
           start_date?: string
           status?: string
+          submitted_at?: string | null
         }
         Relationships: [
           {
@@ -310,8 +322,60 @@ export type Database = {
         }
         Relationships: []
       }
+      menu_sets: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: string
+          items: Json | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: string
+          items?: Json | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: string
+          items?: Json | null
+          name?: string
+        }
+        Relationships: []
+      }
+      processes: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: string
+          menu_set_id: string | null
+          name: string
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: string
+          menu_set_id?: string | null
+          name: string
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: string
+          menu_set_id?: string | null
+          name?: string
+          type?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          active: boolean | null
           created_at: string | null
           email: string
           employee_id: string | null
@@ -321,6 +385,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          active?: boolean | null
           created_at?: string | null
           email: string
           employee_id?: string | null
@@ -330,6 +395,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          active?: boolean | null
           created_at?: string | null
           email?: string
           employee_id?: string | null

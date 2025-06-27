@@ -5,7 +5,7 @@ import HolidayRequestsList from "@/components/HolidayRequestsList";
 import { useHolidayRequests } from "@/hooks/useHolidayRequests";
 
 const HRHolidays = () => {
-  const { requests, loading, error, submitRequest } = useHolidayRequests();
+  const { requests, loading, error, submitRequest, refreshRequests } = useHolidayRequests();
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
@@ -30,7 +30,7 @@ const HRHolidays = () => {
         <TabsContent value="history">
           <HolidayRequestsList 
             requests={requests} 
-            onUpdate={() => window.location.reload()} 
+            onUpdate={refreshRequests} 
           />
         </TabsContent>
       </Tabs>
