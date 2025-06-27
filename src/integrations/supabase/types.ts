@@ -470,6 +470,72 @@ export type Database = {
           },
         ]
       }
+      roster_categories: {
+        Row: {
+          created_at: string | null
+          department: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
+      roster_staff_assignments: {
+        Row: {
+          created_at: string | null
+          employee_id: string | null
+          id: string
+          is_active: boolean | null
+          roster_category_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          employee_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          roster_category_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          employee_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          roster_category_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_staff_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_staff_assignments_roster_category_id_fkey"
+            columns: ["roster_category_id"]
+            isOneToOne: false
+            referencedRelation: "roster_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roster_template_assignments: {
         Row: {
           created_at: string | null
@@ -521,6 +587,7 @@ export type Database = {
       }
       roster_templates: {
         Row: {
+          category_id: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
@@ -531,6 +598,7 @@ export type Database = {
           repeat_type: string | null
         }
         Insert: {
+          category_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -541,6 +609,7 @@ export type Database = {
           repeat_type?: string | null
         }
         Update: {
+          category_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -550,7 +619,15 @@ export type Database = {
           repeat_interval?: number | null
           repeat_type?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "roster_templates_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "roster_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shift_templates: {
         Row: {
@@ -587,6 +664,7 @@ export type Database = {
       }
       shifts: {
         Row: {
+          category_id: string | null
           created_at: string | null
           date: string
           employee_id: string
@@ -597,6 +675,7 @@ export type Database = {
           start_time: string
         }
         Insert: {
+          category_id?: string | null
           created_at?: string | null
           date: string
           employee_id: string
@@ -607,6 +686,7 @@ export type Database = {
           start_time: string
         }
         Update: {
+          category_id?: string | null
           created_at?: string | null
           date?: string
           employee_id?: string
@@ -616,7 +696,15 @@ export type Database = {
           position?: string
           start_time?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shifts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "roster_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       template_shifts: {
         Row: {

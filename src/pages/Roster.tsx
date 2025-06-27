@@ -11,6 +11,9 @@ import { ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
+import RosterCategoryManager from "@/components/RosterCategoryManager";
+import StaffAssignmentManager from "@/components/StaffAssignmentManager";
+import { useRosterCategories } from "@/hooks/useRosterCategories";
 
 interface Employee {
   id: string;
@@ -46,11 +49,17 @@ const Roster = () => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  
+  const { categories, getAssignedEmployees } = useRosterCategories();
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon-Fri
 
-  const { data: employees } = useQuery({
+  // Get assigned employees for selected category
+  const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
+
+  const { data: allEmployees } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -62,6 +71,11 @@ const Roster = () => {
       return data as Employee[];
     }
   });
+
+  // Filter employees based on category selection
+  const employees = selectedCategoryId 
+    ? allEmployees?.filter(emp => assignedEmployeeIds.includes(emp.id))
+    : allEmployees;
 
   const { data: shiftTemplates } = useQuery({
     queryKey: ['shift-templates'],
@@ -77,17 +91,22 @@ const Roster = () => {
   });
 
   const { data: shifts } = useQuery({
-    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd')],
+    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedCategoryId],
     queryFn: async () => {
       const startDate = format(weekStart, 'yyyy-MM-dd');
       const endDate = format(addDays(weekStart, 4), 'yyyy-MM-dd');
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('shifts')
         .select('*')
         .gte('date', startDate)
         .lte('date', endDate);
+
+      if (selectedCategoryId) {
+        query = query.eq('category_id', selectedCategoryId);
+      }
       
+      const { data, error } = await query;
       if (error) throw error;
       return data as Shift[];
     }
@@ -107,7 +126,8 @@ const Roster = () => {
           start_time: template.start_time,
           end_time: template.end_time,
           position: template.position,
-          job_role_id: '00000000-0000-0000-0000-000000000000' // Default job role
+          job_role_id: '00000000-0000-0000-0000-000000000000',
+          category_id: selectedCategoryId
         }]);
       
       if (error) throw error;
@@ -200,13 +220,15 @@ const Roster = () => {
     );
   }
 
+  const selectedCategory = categories?.find(cat => cat.id === selectedCategoryId);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Weekly Roster</h1>
         <p className="text-gray-600">Drag and drop shifts to assign staff for this week</p>
         
-        {/* Date Navigation - moved below the description */}
+        {/* Date Navigation */}
         <div className="flex items-center justify-center space-x-4 mt-4">
           <Button
             variant="outline"
@@ -247,120 +269,157 @@ const Roster = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Shift Templates Panel - Compact Grid Layout */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Shift Templates</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Accordion type="multiple" className="w-full">
-              {Object.entries(groupedTemplates).map(([position, templates]) => (
-                <AccordionItem value={position} key={position}>
-                  <AccordionTrigger className="text-sm font-medium">
-                    {position}
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="grid grid-cols-2 gap-2">
-                      {templates.map((template) => (
-                        <div
-                          key={template.id}
-                          draggable
-                          onDragStart={() => handleDragStart(template)}
-                          className="p-2 rounded border cursor-move hover:shadow-md transition-shadow text-xs"
-                          style={{ 
-                            backgroundColor: template.color + '20',
-                            borderColor: template.color 
-                          }}
-                        >
-                          <div className="font-medium truncate">{template.name}</div>
-                          <div className="text-xs text-gray-600 truncate">
-                            {template.start_time} - {template.end_time}
-                          </div>
-                          <div className="text-xs text-gray-600 truncate">
-                            {template.pay_value} hrs
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </CardContent>
-        </Card>
+      {/* Category Selection */}
+      <RosterCategoryManager
+        selectedCategoryId={selectedCategoryId}
+        onCategorySelect={setSelectedCategoryId}
+      />
 
-        {/* Roster Grid */}
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle>Staff Roster</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="p-3 text-left font-medium border-b">Staff</th>
-                    {weekDays.map((day) => (
-                      <th key={day.toISOString()} className="p-3 text-center font-medium border-b min-w-32">
-                        <div>{format(day, 'EEE')}</div>
-                        <div className="text-sm text-gray-500">{format(day, 'MMM dd')}</div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {employees?.map((employee) => (
-                    <tr key={employee.id} className="border-b">
-                      <td className="p-3 font-medium">
-                        <div>{employee.first_name} {employee.last_name}</div>
-                        <div className="text-sm text-gray-500">{employee.department}</div>
-                      </td>
-                      {weekDays.map((day) => {
-                        const shift = getShiftForEmployeeAndDate(employee.id, day.toISOString());
-                        const template = shiftTemplates?.find(t => 
-                          shift && t.position === shift.position && 
-                          t.start_time === shift.start_time && 
-                          t.end_time === shift.end_time
-                        );
-                        return (
-                          <td
-                            key={day.toISOString()}
-                            className="p-2 border-r border-l"
-                            onDrop={() => handleDrop(employee.id, day.toISOString())}
-                            onDragOver={handleDragOver}
+      {/* Staff Assignment for Selected Category */}
+      {selectedCategory && (
+        <StaffAssignmentManager
+          categoryId={selectedCategory.id}
+          categoryName={selectedCategory.name}
+        />
+      )}
+
+      {selectedCategoryId && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Shift Templates Panel */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Shift Templates</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Accordion type="multiple" className="w-full">
+                {Object.entries(groupedTemplates).map(([position, templates]) => (
+                  <AccordionItem value={position} key={position}>
+                    <AccordionTrigger className="text-sm font-medium">
+                      {position}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-2">
+                        {templates.map((template) => (
+                          <div
+                            key={template.id}
+                            draggable
+                            onDragStart={() => handleDragStart(template)}
+                            className="p-2 rounded border cursor-move hover:shadow-md transition-shadow text-xs"
+                            style={{ 
+                              backgroundColor: template.color + '20',
+                              borderColor: template.color 
+                            }}
                           >
-                            <div 
-                              className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors"
-                              style={{
-                                backgroundColor: draggedTemplate ? '#f0f9ff' : 'transparent'
-                              }}
-                            >
-                              {shift && (
-                                <div 
-                                  className="p-2 rounded text-xs cursor-pointer"
-                                  style={{ 
-                                    backgroundColor: template?.color + '20' || '#3B82F6' + '20',
-                                    borderColor: template?.color || '#3B82F6'
-                                  }}
-                                  onClick={() => deleteShiftMutation.mutate(shift.id)}
-                                >
-                                  <div className="font-medium">{shift.position}</div>
-                                  <div>{shift.start_time} - {shift.end_time}</div>
-                                </div>
-                              )}
+                            <div className="font-medium truncate">{template.name}</div>
+                            <div className="text-xs text-gray-600 truncate">
+                              {template.start_time} - {template.end_time}
                             </div>
+                            <div className="text-xs text-gray-600 truncate">
+                              {template.pay_value} hrs
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </CardContent>
+          </Card>
+
+          {/* Roster Grid */}
+          <Card className="lg:col-span-3">
+            <CardHeader>
+              <CardTitle>
+                {selectedCategory?.name} Roster
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {employees && employees.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="p-3 text-left font-medium border-b">Staff</th>
+                        {weekDays.map((day) => (
+                          <th key={day.toISOString()} className="p-3 text-center font-medium border-b min-w-32">
+                            <div>{format(day, 'EEE')}</div>
+                            <div className="text-sm text-gray-500">{format(day, 'MMM dd')}</div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {employees.map((employee) => (
+                        <tr key={employee.id} className="border-b">
+                          <td className="p-3 font-medium">
+                            <div>{employee.first_name} {employee.last_name}</div>
+                            <div className="text-sm text-gray-500">{employee.department}</div>
                           </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          {weekDays.map((day) => {
+                            const shift = getShiftForEmployeeAndDate(employee.id, day.toISOString());
+                            const template = shiftTemplates?.find(t => 
+                              shift && t.position === shift.position && 
+                              t.start_time === shift.start_time && 
+                              t.end_time === shift.end_time
+                            );
+                            return (
+                              <td
+                                key={day.toISOString()}
+                                className="p-2 border-r border-l"
+                                onDrop={() => handleDrop(employee.id, day.toISOString())}
+                                onDragOver={handleDragOver}
+                              >
+                                <div 
+                                  className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors"
+                                  style={{
+                                    backgroundColor: draggedTemplate ? '#f0f9ff' : 'transparent'
+                                  }}
+                                >
+                                  {shift && (
+                                    <div 
+                                      className="p-2 rounded text-xs cursor-pointer"
+                                      style={{ 
+                                        backgroundColor: template?.color + '20' || '#3B82F6' + '20',
+                                        borderColor: template?.color || '#3B82F6'
+                                      }}
+                                      onClick={() => deleteShiftMutation.mutate(shift.id)}
+                                    >
+                                      <div className="font-medium">{shift.position}</div>
+                                      <div>{shift.start_time} - {shift.end_time}</div>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">
+                    {selectedCategory ? 
+                      `No staff assigned to ${selectedCategory.name}. Add staff using the button above.` :
+                      'Select a category to view and manage rosters.'
+                    }
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {!selectedCategoryId && (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-gray-500">Select a roster category above to begin managing shifts and staff assignments.</p>
           </CardContent>
         </Card>
-      </div>
+      )}
     </div>
   );
 };

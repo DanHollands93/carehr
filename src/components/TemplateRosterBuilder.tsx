@@ -7,6 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
 import { ChevronLeft, ChevronRight, Save } from "lucide-react";
+import RosterCategoryManager from "@/components/RosterCategoryManager";
+import StaffAssignmentManager from "@/components/StaffAssignmentManager";
+import { useRosterCategories } from "@/hooks/useRosterCategories";
 
 interface Employee {
   id: string;
@@ -53,7 +56,10 @@ const TemplateRosterBuilder = ({
   const queryClient = useQueryClient();
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
   const [templateShifts, setTemplateShifts] = useState<TemplateShift[]>([]);
-  const [currentWeek, setCurrentWeek] = useState(0); // 0-based week index
+  const [currentWeek, setCurrentWeek] = useState(0);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  
+  const { categories, getAssignedEmployees } = useRosterCategories();
 
   // Calculate period length in days
   const getPeriodDays = () => {
@@ -74,7 +80,10 @@ const TemplateRosterBuilder = ({
   const currentWeekDays = Math.min(7, periodDays - currentWeekStartDay);
   const weekDays = Array.from({ length: currentWeekDays }, (_, i) => currentWeekStartDay + i);
 
-  const { data: employees } = useQuery({
+  // Get assigned employees for selected category
+  const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
+
+  const { data: allEmployees } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -86,6 +95,11 @@ const TemplateRosterBuilder = ({
       return data as Employee[];
     }
   });
+
+  // Filter employees based on category selection
+  const employees = selectedCategoryId 
+    ? allEmployees?.filter(emp => assignedEmployeeIds.includes(emp.id))
+    : allEmployees;
 
   const { data: shiftTemplates } = useQuery({
     queryKey: ['shift-templates'],
@@ -136,6 +150,16 @@ const TemplateRosterBuilder = ({
         .eq('roster_template_id', templateId);
       
       if (deleteError) throw deleteError;
+
+      // Update template with category
+      if (selectedCategoryId) {
+        const { error: updateError } = await supabase
+          .from('roster_templates')
+          .update({ category_id: selectedCategoryId })
+          .eq('id', templateId);
+        
+        if (updateError) throw updateError;
+      }
 
       // Insert new assignments
       if (templateShifts.length > 0) {
@@ -217,6 +241,8 @@ const TemplateRosterBuilder = ({
     return acc;
   }, {} as Record<string, ShiftTemplate[]>) || {};
 
+  const selectedCategory = categories?.find(cat => cat.id === selectedCategoryId);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -237,6 +263,20 @@ const TemplateRosterBuilder = ({
           </Button>
         </div>
       </div>
+
+      {/* Category Selection */}
+      <RosterCategoryManager
+        selectedCategoryId={selectedCategoryId}
+        onCategorySelect={setSelectedCategoryId}
+      />
+
+      {/* Staff Assignment for Selected Category */}
+      {selectedCategory && (
+        <StaffAssignmentManager
+          categoryId={selectedCategory.id}
+          categoryName={selectedCategory.name}
+        />
+      )}
 
       {/* Week Navigation - only show if more than one week */}
       {totalWeeks > 1 && (
@@ -278,116 +318,137 @@ const TemplateRosterBuilder = ({
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Shift Templates Panel - Compact Grid Layout */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Shift Templates</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Accordion type="multiple" className="w-full">
-              {Object.entries(groupedTemplates).map(([position, templates]) => (
-                <AccordionItem value={position} key={position}>
-                  <AccordionTrigger className="text-sm font-medium">
-                    {position}
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="grid grid-cols-2 gap-2">
-                      {templates.map((template) => (
-                        <div
-                          key={template.id}
-                          draggable
-                          onDragStart={() => handleDragStart(template)}
-                          className="p-2 rounded border cursor-move hover:shadow-md transition-shadow text-xs"
-                          style={{ 
-                            backgroundColor: template.color + '20',
-                            borderColor: template.color 
-                          }}
-                        >
-                          <div className="font-medium truncate">{template.name}</div>
-                          <div className="text-xs text-gray-600 truncate">
-                            {template.start_time} - {template.end_time}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </CardContent>
-        </Card>
-
-        {/* Current Week Roster Grid */}
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle>
-              {totalWeeks > 1 ? `Week ${currentWeek + 1} Roster` : 'Template Roster'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="p-3 text-left font-medium border-b">Staff</th>
-                    {weekDays.map((dayIndex) => (
-                      <th key={dayIndex} className="p-3 text-center font-medium border-b min-w-24">
-                        <div className="text-sm">{getDayLabel(dayIndex)}</div>
-                        <div className="text-xs text-gray-500">Day {dayIndex + 1}</div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {employees?.map((employee) => (
-                    <tr key={employee.id} className="border-b">
-                      <td className="p-3 font-medium">
-                        <div>{employee.first_name} {employee.last_name}</div>
-                        <div className="text-sm text-gray-500">{employee.department}</div>
-                      </td>
-                      {weekDays.map((dayIndex) => {
-                        const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
-                        const template = shift ? shiftTemplates?.find(t => t.id === shift.shift_template_id) : null;
-                        
-                        return (
-                          <td
-                            key={dayIndex}
-                            className="p-2 border-r border-l"
-                            onDrop={() => handleDrop(employee.id, dayIndex)}
-                            onDragOver={handleDragOver}
+      {selectedCategoryId && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Shift Templates Panel */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Shift Templates</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Accordion type="multiple" className="w-full">
+                {Object.entries(groupedTemplates).map(([position, templates]) => (
+                  <AccordionItem value={position} key={position}>
+                    <AccordionTrigger className="text-sm font-medium">
+                      {position}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-2">
+                        {templates.map((template) => (
+                          <div
+                            key={template.id}
+                            draggable
+                            onDragStart={() => handleDragStart(template)}
+                            className="p-2 rounded border cursor-move hover:shadow-md transition-shadow text-xs"
+                            style={{ 
+                              backgroundColor: template.color + '20',
+                              borderColor: template.color 
+                            }}
                           >
-                            <div 
-                              className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors"
-                              style={{
-                                backgroundColor: draggedTemplate ? '#f0f9ff' : 'transparent'
-                              }}
-                            >
-                              {shift && template && (
-                                <div 
-                                  className="p-2 rounded text-xs cursor-pointer"
-                                  style={{ 
-                                    backgroundColor: template.color + '20',
-                                    borderColor: template.color
-                                  }}
-                                  onClick={() => removeShift(employee.id, dayIndex)}
-                                >
-                                  <div className="font-medium">{template.position}</div>
-                                  <div>{template.start_time} - {template.end_time}</div>
-                                </div>
-                              )}
+                            <div className="font-medium truncate">{template.name}</div>
+                            <div className="text-xs text-gray-600 truncate">
+                              {template.start_time} - {template.end_time}
                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </CardContent>
+          </Card>
+
+          {/* Current Week Roster Grid */}
+          <Card className="lg:col-span-3">
+            <CardHeader>
+              <CardTitle>
+                {totalWeeks > 1 ? `Week ${currentWeek + 1} - ${selectedCategory?.name} Template` : `${selectedCategory?.name} Template`}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {employees && employees.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="p-3 text-left font-medium border-b">Staff</th>
+                        {weekDays.map((dayIndex) => (
+                          <th key={dayIndex} className="p-3 text-center font-medium border-b min-w-24">
+                            <div className="text-sm">{getDayLabel(dayIndex)}</div>
+                            <div className="text-xs text-gray-500">Day {dayIndex + 1}</div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {employees.map((employee) => (
+                        <tr key={employee.id} className="border-b">
+                          <td className="p-3 font-medium">
+                            <div>{employee.first_name} {employee.last_name}</div>
+                            <div className="text-sm text-gray-500">{employee.department}</div>
                           </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          {weekDays.map((dayIndex) => {
+                            const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
+                            const template = shift ? shiftTemplates?.find(t => t.id === shift.shift_template_id) : null;
+                            
+                            return (
+                              <td
+                                key={dayIndex}
+                                className="p-2 border-r border-l"
+                                onDrop={() => handleDrop(employee.id, dayIndex)}
+                                onDragOver={handleDragOver}
+                              >
+                                <div 
+                                  className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors"
+                                  style={{
+                                    backgroundColor: draggedTemplate ? '#f0f9ff' : 'transparent'
+                                  }}
+                                >
+                                  {shift && template && (
+                                    <div 
+                                      className="p-2 rounded text-xs cursor-pointer"
+                                      style={{ 
+                                        backgroundColor: template.color + '20',
+                                        borderColor: template.color
+                                      }}
+                                      onClick={() => removeShift(employee.id, dayIndex)}
+                                    >
+                                      <div className="font-medium">{template.position}</div>
+                                      <div>{template.start_time} - {template.end_time}</div>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">
+                    {selectedCategory ? 
+                      `No staff assigned to ${selectedCategory.name}. Add staff using the button above.` :
+                      'Select a category to build roster templates.'
+                    }
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {!selectedCategoryId && (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-gray-500">Select a roster category above to begin building your template.</p>
           </CardContent>
         </Card>
-      </div>
+      )}
     </div>
   );
 };
