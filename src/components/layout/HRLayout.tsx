@@ -1,25 +1,29 @@
 
-import { useState } from "react";
-import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import HRSidebar from "./HRSidebar";
+import { Outlet } from "react-router-dom";
+import { useState } from "react";
 import HRHeader from "./HRHeader";
+import UnifiedSidebar from "./UnifiedSidebar";
 
 const HRLayout = () => {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-  const toggleMobileSidebar = () => {
-    setIsMobileSidebarOpen(!isMobileSidebarOpen);
-  };
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <HRSidebar isMobileOpen={isMobileSidebarOpen} setIsMobileOpen={setIsMobileSidebarOpen} />
-        <SidebarInset>
-          <HRHeader onToggleSidebar={toggleMobileSidebar} />
-          <main className="flex-1 p-6 bg-gray-50">
-            <Outlet />
+      <div className="min-h-screen flex w-full">
+        <UnifiedSidebar 
+          isMobileOpen={isMobileOpen} 
+          setIsMobileOpen={setIsMobileOpen} 
+        />
+        <SidebarInset className="flex-1">
+          <HRHeader 
+            isMobileOpen={isMobileOpen} 
+            setIsMobileOpen={setIsMobileOpen} 
+          />
+          <main className="flex-1 overflow-auto">
+            <div className="container mx-auto p-6">
+              <Outlet />
+            </div>
           </main>
         </SidebarInset>
       </div>

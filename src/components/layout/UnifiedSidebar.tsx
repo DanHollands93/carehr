@@ -1,0 +1,134 @@
+
+import { NavLink } from "react-router-dom";
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
+import { 
+  Home, Calendar, User, FileText, Bell, LogOut, Settings, Users, 
+  Clock, CheckCircle, BarChart3, Menu, UserPlus
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { Button } from "@/components/ui/button";
+import { unifiedMenuConfig } from "@/config/menuConfig";
+
+const iconMap = {
+  Home,
+  Calendar,
+  User,
+  FileText,
+  Bell,
+  Settings,
+  Users,
+  Clock,
+  CheckCircle,
+  BarChart3,
+  Menu,
+  UserPlus
+};
+
+interface UnifiedSidebarProps {
+  isMobileOpen: boolean;
+  setIsMobileOpen: (isOpen: boolean) => void;
+}
+
+const UnifiedSidebar = ({
+  isMobileOpen,
+  setIsMobileOpen
+}: UnifiedSidebarProps) => {
+  const { signOut, userRole } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
+
+  const closeMobileSidebar = () => {
+    if (window.innerWidth < 768) {
+      setIsMobileOpen(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    signOut();
+  };
+
+  const isMenuItemVisible = (item: any) => {
+    // If no permission required, show to everyone
+    if (!item.requiredPermission) {
+      return true;
+    }
+    
+    // Check if user has the required permission
+    return hasPermission(item.requiredPermission, item.location);
+  };
+
+  const getVisibleGroups = () => {
+    return unifiedMenuConfig.map(group => ({
+      ...group,
+      items: group.items.filter(isMenuItemVisible)
+    })).filter(group => group.items.length > 0);
+  };
+
+  const visibleGroups = getVisibleGroups();
+
+  return (
+    <Sidebar>
+      <SidebarContent>
+        <div className="p-6 border-b bg-blue-50">
+          <h2 className="text-xl font-bold text-blue-900">
+            {userRole === 'admin' ? 'Admin Portal' : 'HR System'}
+          </h2>
+          <p className="text-sm text-blue-700">
+            {userRole === 'admin' ? 'System Administration' : 'Employee Portal'}
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {permissionsLoading ? (
+            <div className="p-4 text-center text-muted-foreground">
+              Loading menu...
+            </div>
+          ) : (
+            visibleGroups.map(group => (
+              <SidebarGroup key={group.label}>
+                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {group.items.map(item => {
+                      const IconComponent = iconMap[item.icon as keyof typeof iconMap] || FileText;
+                      return (
+                        <SidebarMenuItem key={item.path}>
+                          <SidebarMenuButton asChild>
+                            <NavLink 
+                              to={item.path} 
+                              onClick={closeMobileSidebar} 
+                              className={({ isActive }) => 
+                                cn("flex items-center gap-3 w-full", isActive && "font-semibold text-sidebar-primary")
+                              }
+                            >
+                              <IconComponent className="w-5 h-5" />
+                              <span>{item.title}</span>
+                            </NavLink>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))
+          )}
+        </div>
+
+        <div className="p-4 border-t">
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={handleSignOut}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
+        </div>
+      </SidebarContent>
+    </Sidebar>
+  );
+};
+
+export default UnifiedSidebar;

@@ -1,27 +1,29 @@
 
-import { useState } from "react";
-import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import DashboardSidebar from "./DashboardSidebar";
+import { Outlet } from "react-router-dom";
+import { useState } from "react";
 import DashboardHeader from "./DashboardHeader";
-import { useToast } from "@/hooks/use-toast";
+import UnifiedSidebar from "./UnifiedSidebar";
 
 const DashboardLayout = () => {
-  const { toast } = useToast();
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-  const toggleMobileSidebar = () => {
-    setIsMobileSidebarOpen(!isMobileSidebarOpen);
-  };
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <DashboardSidebar isMobileOpen={isMobileSidebarOpen} setIsMobileOpen={setIsMobileSidebarOpen} />
-        <SidebarInset>
-          <DashboardHeader onToggleSidebar={toggleMobileSidebar} />
-          <main className="flex-1 p-6">
-            <Outlet />
+      <div className="min-h-screen flex w-full">
+        <UnifiedSidebar 
+          isMobileOpen={isMobileOpen} 
+          setIsMobileOpen={setIsMobileOpen} 
+        />
+        <SidebarInset className="flex-1">
+          <DashboardHeader 
+            isMobileOpen={isMobileOpen} 
+            setIsMobileOpen={setIsMobileOpen} 
+          />
+          <main className="flex-1 overflow-auto">
+            <div className="container mx-auto p-6">
+              <Outlet />
+            </div>
           </main>
         </SidebarInset>
       </div>

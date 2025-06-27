@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -37,7 +36,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             
-            {/* Admin Routes */}
+            {/* Unified Routes - All authenticated users use the same layout */}
             <Route path="/" element={
               <ProtectedRoute>
                 <DashboardLayout />
@@ -50,25 +49,16 @@ const App = () => (
               <Route path="roster" element={<Roster />} />
               <Route path="roster-templates" element={<RosterTemplates />} />
               <Route path="shift-templates" element={<ShiftTemplates />} />
-              <Route path="admin/users" element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminUsers />
-                </ProtectedRoute>
-              } />
-            </Route>
-
-            {/* HR User Routes */}
-            <Route path="/hr" element={
-              <ProtectedRoute requiredRole="hr_user">
-                <HRLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<HRDashboard />} />
-              <Route path="holidays" element={<HRHolidays />} />
-              <Route path="profile" element={<HRProfile />} />
-              <Route path="documents" element={<HRDocuments />} />
-              <Route path="notifications" element={<HRNotifications />} />
-              <Route path="process/:processId" element={<DynamicProcessPage />} />
+              
+              {/* HR Routes accessible to all users with permissions */}
+              <Route path="hr/holidays" element={<HRHolidays />} />
+              <Route path="hr/profile" element={<HRProfile />} />
+              <Route path="hr/documents" element={<HRDocuments />} />
+              <Route path="hr/notifications" element={<HRNotifications />} />
+              <Route path="hr/process/:processId" element={<DynamicProcessPage />} />
+              
+              {/* Admin Routes - now permission-based instead of role-based */}
+              <Route path="admin/users" element={<AdminUsers />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
