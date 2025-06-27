@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +30,7 @@ const Employees = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [activeTab, setActiveTab] = useState("list");
 
   const { data: employees = [], isLoading, refetch } = useQuery({
     queryKey: ['employees'],
@@ -53,6 +53,7 @@ const Employees = () => {
 
   const handleEmployeeClick = (employee: Employee) => {
     setSelectedEmployee(employee);
+    setActiveTab("details");
   };
 
   const handleCreateSuccess = () => {
@@ -77,7 +78,7 @@ const Employees = () => {
         </Button>
       </div>
 
-      <Tabs defaultValue="list" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="list">Employee List</TabsTrigger>
           {selectedEmployee && (
@@ -171,7 +172,10 @@ const Employees = () => {
             <EmployeeDetails 
               employee={selectedEmployee} 
               onUpdate={refetch}
-              onBack={() => setSelectedEmployee(null)}
+              onBack={() => {
+                setSelectedEmployee(null);
+                setActiveTab("list");
+              }}
             />
           </TabsContent>
         )}
