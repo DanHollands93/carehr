@@ -77,11 +77,11 @@ const HolidayApprovalsWidget = () => {
             <Calendar className="h-5 w-5" />
             Holiday Approvals
           </CardTitle>
-          <Link to="/holidays/approvals">
-            <Button variant="ghost" size="sm" className="text-xs">
+          <Button variant="ghost" size="sm" className="text-xs" asChild>
+            <Link to="/holidays/approvals">
               View All <ArrowRight className="h-3 w-3 ml-1" />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -128,11 +128,11 @@ const HolidayApprovalsWidget = () => {
                   >
                     Quick Approve
                   </Button>
-                  <Link to="/holidays/approvals">
-                    <Button variant="outline" size="sm" className="text-xs h-7">
+                  <Button variant="outline" size="sm" className="text-xs h-7" asChild>
+                    <Link to="/holidays/approvals">
                       Review
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </div>
               </div>
             ))}
