@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -37,6 +36,12 @@ interface Shift {
   job_role_id: string;
 }
 
+interface Position {
+  id: string;
+  name: string;
+  department: string;
+}
+
 const Roster = () => {
   const { userRole } = useAuth();
   const { toast } = useToast();
@@ -60,13 +65,26 @@ const Roster = () => {
     }
   });
 
+  const { data: positions } = useQuery({
+    queryKey: ['positions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('positions')
+        .select('*')
+        .order('department, name');
+      
+      if (error) throw error;
+      return data as Position[];
+    }
+  });
+
   const { data: shiftTemplates } = useQuery({
     queryKey: ['shift-templates'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('shift_templates')
         .select('*')
-        .order('name');
+        .order('position, name');
       
       if (error) throw error;
       return data as ShiftTemplate[];
@@ -170,6 +188,15 @@ const Roster = () => {
     );
   };
 
+  // Group shift templates by position
+  const groupedTemplates = shiftTemplates?.reduce((acc, template) => {
+    if (!acc[template.position]) {
+      acc[template.position] = [];
+    }
+    acc[template.position].push(template);
+    return acc;
+  }, {} as Record<string, ShiftTemplate[]>) || {};
+
   const canManageRoster = userRole === 'admin';
 
   if (!canManageRoster) {
@@ -209,29 +236,40 @@ const Roster = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Shift Templates Panel */}
+        {/* Shift Templates Panel - Organized by Position */}
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Shift Templates</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {shiftTemplates?.map((template) => (
-                <div
-                  key={template.id}
-                  draggable
-                  onDragStart={() => handleDragStart(template)}
-                  className="p-3 rounded border cursor-move hover:shadow-md transition-shadow"
-                  style={{ 
-                    backgroundColor: template.color + '20',
-                    borderColor: template.color 
-                  }}
-                >
-                  <div className="font-medium text-sm">{template.name}</div>
-                  <div className="text-xs text-gray-600">
-                    {template.start_time} - {template.end_time}
+            <div className="space-y-4">
+              {Object.entries(groupedTemplates).map(([position, templates]) => (
+                <div key={position} className="space-y-2">
+                  <h4 className="font-medium text-sm text-gray-700 border-b pb-1">
+                    {position}
+                  </h4>
+                  <div className="space-y-2">
+                    {templates.map((template) => (
+                      <div
+                        key={template.id}
+                        draggable
+                        onDragStart={() => handleDragStart(template)}
+                        className="p-3 rounded border cursor-move hover:shadow-md transition-shadow"
+                        style={{ 
+                          backgroundColor: template.color + '20',
+                          borderColor: template.color 
+                        }}
+                      >
+                        <div className="font-medium text-sm">{template.name}</div>
+                        <div className="text-xs text-gray-600">
+                          {template.start_time} - {template.end_time}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {template.pay_value} hrs
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-xs text-gray-600">{template.position}</div>
                 </div>
               ))}
             </div>
@@ -266,6 +304,11 @@ const Roster = () => {
                       </td>
                       {weekDays.map((day) => {
                         const shift = getShiftForEmployeeAndDate(employee.id, day.toISOString());
+                        const template = shiftTemplates?.find(t => 
+                          shift && t.position === shift.position && 
+                          t.start_time === shift.start_time && 
+                          t.end_time === shift.end_time
+                        );
                         return (
                           <td
                             key={day.toISOString()}
@@ -282,7 +325,10 @@ const Roster = () => {
                               {shift && (
                                 <div 
                                   className="p-2 rounded text-xs cursor-pointer"
-                                  style={{ backgroundColor: '#3B82F6' + '20' }}
+                                  style={{ 
+                                    backgroundColor: template?.color + '20' || '#3B82F6' + '20',
+                                    borderColor: template?.color || '#3B82F6'
+                                  }}
                                   onClick={() => deleteShiftMutation.mutate(shift.id)}
                                 >
                                   <div className="font-medium">{shift.position}</div>

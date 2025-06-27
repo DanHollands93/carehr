@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Plus, Edit, Trash2 } from "lucide-react";
@@ -23,11 +23,20 @@ interface ShiftTemplate {
   created_at: string;
 }
 
+interface Position {
+  id: string;
+  name: string;
+  department: string;
+}
+
 const ShiftTemplates = () => {
   const { userRole } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddingPosition, setIsAddingPosition] = useState(false);
+  const [newPositionName, setNewPositionName] = useState("");
+  const [newPositionDepartment, setNewPositionDepartment] = useState("");
   const [editingTemplate, setEditingTemplate] = useState<ShiftTemplate | null>(null);
   
   const [formData, setFormData] = useState({
@@ -57,6 +66,19 @@ const ShiftTemplates = () => {
 
   const totalHours = calculateTotalHours(formData.start_time, formData.end_time);
   const payHours = Math.max(0, totalHours - formData.unpaid_break);
+
+  const { data: positions } = useQuery({
+    queryKey: ['positions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('positions')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data as Position[];
+    }
+  });
 
   const { data: shiftTemplates, isLoading } = useQuery({
     queryKey: ['shift-templates'],
@@ -140,6 +162,30 @@ const ShiftTemplates = () => {
     }
   });
 
+  const createPositionMutation = useMutation({
+    mutationFn: async (data: { name: string; department: string }) => {
+      const { error } = await supabase
+        .from('positions')
+        .insert([data]);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['positions'] });
+      setIsAddingPosition(false);
+      setNewPositionName("");
+      setNewPositionDepartment("");
+      toast({ title: "Position added successfully" });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Error adding position", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -150,6 +196,15 @@ const ShiftTemplates = () => {
       unpaid_break: 0
     });
     setEditingTemplate(null);
+  };
+
+  const handleAddPosition = () => {
+    if (newPositionName.trim()) {
+      createPositionMutation.mutate({
+        name: newPositionName.trim(),
+        department: newPositionDepartment.trim() || "General"
+      });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -262,13 +317,70 @@ const ShiftTemplates = () => {
               
               <div>
                 <Label htmlFor="position">Position</Label>
-                <Input
-                  id="position"
-                  value={formData.position}
-                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                  placeholder="e.g., Cashier, Manager"
-                  required
-                />
+                <div className="space-y-2">
+                  <Select 
+                    value={formData.position} 
+                    onValueChange={(value) => setFormData({ ...formData, position: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a position" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {positions?.map((position) => (
+                        <SelectItem key={position.id} value={position.name}>
+                          {position.name} {position.department && `(${position.department})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  {!isAddingPosition ? (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setIsAddingPosition(true)}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add New Position
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 p-3 border rounded">
+                      <Input
+                        placeholder="Position name"
+                        value={newPositionName}
+                        onChange={(e) => setNewPositionName(e.target.value)}
+                      />
+                      <Input
+                        placeholder="Department (optional)"
+                        value={newPositionDepartment}
+                        onChange={(e) => setNewPositionDepartment(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <Button 
+                          type="button" 
+                          size="sm" 
+                          onClick={handleAddPosition}
+                          disabled={!newPositionName.trim()}
+                        >
+                          Add
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setIsAddingPosition(false);
+                            setNewPositionName("");
+                            setNewPositionDepartment("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">

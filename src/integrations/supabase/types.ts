@@ -346,6 +346,27 @@ export type Database = {
         }
         Relationships: []
       }
+      positions: {
+        Row: {
+          created_at: string | null
+          department: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       processes: {
         Row: {
           created_at: string | null
