@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,11 +15,13 @@ import { Plus, Edit, Trash2, Calendar, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
 
+type RepeatType = 'weekly' | 'bi_weekly' | 'monthly' | 'custom';
+
 interface RosterTemplate {
   id: string;
   name: string;
   description: string;
-  repeat_type: 'weekly' | 'bi_weekly' | 'monthly' | 'custom';
+  repeat_type: RepeatType;
   repeat_interval: number;
   is_active: boolean;
   created_at: string;
@@ -63,7 +64,7 @@ const RosterTemplates = () => {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    repeat_type: "weekly" as const,
+    repeat_type: "weekly" as RepeatType,
     repeat_interval: 1
   });
 
@@ -291,7 +292,7 @@ const RosterTemplates = () => {
     applyTemplateMutation.mutate({ templateId, startDate });
   };
 
-  const getRepeatTypeLabel = (type: string, interval: number) => {
+  const getRepeatTypeLabel = (type: RepeatType, interval: number) => {
     switch (type) {
       case 'weekly': return 'Weekly';
       case 'bi_weekly': return 'Bi-weekly';
@@ -301,7 +302,7 @@ const RosterTemplates = () => {
     }
   };
 
-  const getDayName = (dayIndex: number, repeatType: string) => {
+  const getDayName = (dayIndex: number, repeatType: RepeatType) => {
     if (repeatType === 'weekly') {
       const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       return days[dayIndex] || `Day ${dayIndex + 1}`;
@@ -455,7 +456,7 @@ const RosterTemplates = () => {
                   <Label htmlFor="repeat_type">Repeat Pattern</Label>
                   <Select 
                     value={formData.repeat_type} 
-                    onValueChange={(value: 'weekly' | 'bi_weekly' | 'monthly' | 'custom') => 
+                    onValueChange={(value: RepeatType) => 
                       setFormData({ ...formData, repeat_type: value })
                     }
                   >

@@ -45,6 +45,8 @@ interface Position {
   department: string;
 }
 
+type RepeatType = 'weekly' | 'bi_weekly' | 'monthly' | 'custom';
+
 const Roster = () => {
   const { userRole } = useAuth();
   const { toast } = useToast();
@@ -55,7 +57,7 @@ const Roster = () => {
   const [templateFormData, setTemplateFormData] = useState({
     name: "",
     description: "",
-    repeat_type: "weekly" as const
+    repeat_type: "weekly" as RepeatType
   });
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
@@ -327,7 +329,7 @@ const Roster = () => {
                   <Label htmlFor="repeat-type">Repeat Pattern</Label>
                   <Select 
                     value={templateFormData.repeat_type} 
-                    onValueChange={(value: 'weekly' | 'bi_weekly' | 'monthly' | 'custom') => 
+                    onValueChange={(value: RepeatType) => 
                       setTemplateFormData({ ...templateFormData, repeat_type: value })
                     }
                   >
