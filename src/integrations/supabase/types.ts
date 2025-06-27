@@ -9,6 +9,41 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      applied_roster_templates: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          end_date: string
+          id: string
+          roster_template_id: string
+          start_date: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          end_date: string
+          id?: string
+          roster_template_id: string
+          start_date: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          end_date?: string
+          id?: string
+          roster_template_id?: string
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applied_roster_templates_roster_template_id_fkey"
+            columns: ["roster_template_id"]
+            isOneToOne: false
+            referencedRelation: "roster_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       career_history: {
         Row: {
           created_at: string | null
@@ -435,21 +470,85 @@ export type Database = {
           },
         ]
       }
-      roster_templates: {
+      roster_template_assignments: {
         Row: {
           created_at: string | null
+          day_of_period: number
+          employee_id: string
           id: string
-          name: string
+          roster_template_id: string
+          shift_template_id: string
         }
         Insert: {
           created_at?: string | null
+          day_of_period: number
+          employee_id: string
           id?: string
-          name: string
+          roster_template_id: string
+          shift_template_id: string
         }
         Update: {
           created_at?: string | null
+          day_of_period?: number
+          employee_id?: string
           id?: string
+          roster_template_id?: string
+          shift_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_template_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_template_assignments_roster_template_id_fkey"
+            columns: ["roster_template_id"]
+            isOneToOne: false
+            referencedRelation: "roster_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_template_assignments_shift_template_id_fkey"
+            columns: ["shift_template_id"]
+            isOneToOne: false
+            referencedRelation: "shift_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roster_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          repeat_interval: number | null
+          repeat_type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          repeat_interval?: number | null
+          repeat_type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
           name?: string
+          repeat_interval?: number | null
+          repeat_type?: string | null
         }
         Relationships: []
       }

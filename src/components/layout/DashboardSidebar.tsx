@@ -1,8 +1,7 @@
-
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { Home, Calendar, Settings, Users, Menu, FileText, LogOut, Clock, Grid3X3 } from "lucide-react";
+import { Home, Calendar, Settings, Users, Menu, FileText, LogOut, Clock, Grid3X3, CalendarDays } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 
@@ -50,6 +49,11 @@ const DashboardSidebar = ({
           title: "Weekly Roster",
           path: "/roster",
           icon: Calendar
+        },
+        {
+          title: "Roster Templates",
+          path: "/roster-templates",
+          icon: CalendarDays
         },
         {
           title: "Shift Templates",

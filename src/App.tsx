@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +23,7 @@ import HRNotifications from "./pages/hr/HRNotifications";
 import DynamicProcessPage from "./pages/DynamicProcessPage";
 import ShiftTemplates from "./pages/ShiftTemplates";
 import Roster from "./pages/Roster";
+import RosterTemplates from "./pages/RosterTemplates";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +48,7 @@ const App = () => (
               <Route path="processes" element={<Processes />} />
               <Route path="settings" element={<Settings />} />
               <Route path="roster" element={<Roster />} />
+              <Route path="roster-templates" element={<RosterTemplates />} />
               <Route path="shift-templates" element={<ShiftTemplates />} />
               <Route path="admin/users" element={
                 <ProtectedRoute requiredRole="admin">

@@ -1,11 +1,14 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 
@@ -48,6 +51,12 @@ const Roster = () => {
   const queryClient = useQueryClient();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
+  const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
+  const [templateFormData, setTemplateFormData] = useState({
+    name: "",
+    description: "",
+    repeat_type: "weekly" as const
+  });
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon-Fri
@@ -162,6 +171,66 @@ const Roster = () => {
     }
   });
 
+  const saveAsTemplateMutation = useMutation({
+    mutationFn: async () => {
+      if (!shifts || shifts.length === 0) {
+        throw new Error("No shifts to save as template");
+      }
+
+      // Create the roster template
+      const { data: templateData, error: templateError } = await supabase
+        .from('roster_templates')
+        .insert([{
+          name: templateFormData.name,
+          description: templateFormData.description,
+          repeat_type: templateFormData.repeat_type,
+          repeat_interval: 1,
+          is_active: true
+        }])
+        .select()
+        .single();
+
+      if (templateError) throw templateError;
+
+      // Create template assignments for each shift
+      const assignments = shifts.map(shift => {
+        const shiftDate = new Date(shift.date);
+        const dayOfPeriod = Math.floor((shiftDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
+        const matchingTemplate = shiftTemplates?.find(st => 
+          st.position === shift.position && 
+          st.start_time === shift.start_time && 
+          st.end_time === shift.end_time
+        );
+
+        return {
+          roster_template_id: templateData.id,
+          employee_id: shift.employee_id,
+          day_of_period: dayOfPeriod,
+          shift_template_id: matchingTemplate?.id || shiftTemplates?.[0]?.id || '00000000-0000-0000-0000-000000000000'
+        };
+      });
+
+      const { error: assignmentsError } = await supabase
+        .from('roster_template_assignments')
+        .insert(assignments);
+
+      if (assignmentsError) throw assignmentsError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roster-templates'] });
+      setIsSaveTemplateOpen(false);
+      setTemplateFormData({ name: "", description: "", repeat_type: "weekly" });
+      toast({ title: "Roster saved as template successfully" });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Error saving template", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
   const handleDragStart = (template: ShiftTemplate) => {
     setDraggedTemplate(template);
   };
@@ -217,6 +286,77 @@ const Roster = () => {
         </div>
         
         <div className="flex items-center space-x-4">
+          <Dialog open={isSaveTemplateOpen} onOpenChange={setIsSaveTemplateOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={!shifts || shifts.length === 0}>
+                <Save className="w-4 h-4 mr-2" />
+                Save as Template
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Save Roster as Template</DialogTitle>
+                <DialogDescription>
+                  Save this week's roster pattern as a reusable template
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="template-name">Template Name</Label>
+                  <Input
+                    id="template-name"
+                    value={templateFormData.name}
+                    onChange={(e) => setTemplateFormData({ ...templateFormData, name: e.target.value })}
+                    placeholder="e.g., Standard Week Pattern"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="template-description">Description</Label>
+                  <Input
+                    id="template-description"
+                    value={templateFormData.description}
+                    onChange={(e) => setTemplateFormData({ ...templateFormData, description: e.target.value })}
+                    placeholder="Describe this roster pattern..."
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="repeat-type">Repeat Pattern</Label>
+                  <Select 
+                    value={templateFormData.repeat_type} 
+                    onValueChange={(value: 'weekly' | 'bi_weekly' | 'monthly' | 'custom') => 
+                      setTemplateFormData({ ...templateFormData, repeat_type: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="bi_weekly">Bi-weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsSaveTemplateOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => saveAsTemplateMutation.mutate()}
+                    disabled={!templateFormData.name || saveAsTemplateMutation.isPending}
+                  >
+                    Save Template
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          
           <Button
             variant="outline"
             onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
