@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,6 +20,7 @@ import HRHolidays from "./pages/hr/HRHolidays";
 import HRProfile from "./pages/hr/HRProfile";
 import HRDocuments from "./pages/hr/HRDocuments";
 import HRNotifications from "./pages/hr/HRNotifications";
+import DynamicProcessPage from "./pages/DynamicProcessPage";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +62,7 @@ const App = () => (
               <Route path="profile" element={<HRProfile />} />
               <Route path="documents" element={<HRDocuments />} />
               <Route path="notifications" element={<HRNotifications />} />
+              <Route path="process/:processId" element={<DynamicProcessPage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
