@@ -5,9 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ShiftTemplate {
   id: string;
@@ -43,48 +42,33 @@ const ShiftCreationPopup = ({
   date
 }: ShiftCreationPopupProps) => {
   const [selectedTemplate, setSelectedTemplate] = useState<ShiftTemplate | null>(null);
-  const [customShift, setCustomShift] = useState({
-    name: '',
-    start_time: '',
-    end_time: '',
-    position: '',
-    pay_value: 0,
-    color: '#3B82F6',
-    description: '',
-    break_duration: 0,
-    deduct_break: false
+  const [formData, setFormData] = useState({
+    name: "",
+    start_time: "",
+    end_time: "",
+    color: "#3B82F6",
+    position: "",
+    unpaid_break: 0
   });
 
-  // Calculate hours between start and end time
-  const calculateHours = (startTime: string, endTime: string, breakDuration: number = 0) => {
+  // Calculate total hours from start and end time
+  const calculateTotalHours = (startTime: string, endTime: string) => {
     if (!startTime || !endTime) return 0;
     
-    const [startHour, startMin] = startTime.split(':').map(Number);
-    const [endHour, endMin] = endTime.split(':').map(Number);
-    
-    let startMinutes = startHour * 60 + startMin;
-    let endMinutes = endHour * 60 + endMin;
+    const start = new Date(`2000-01-01 ${startTime}`);
+    const end = new Date(`2000-01-01 ${endTime}`);
     
     // Handle overnight shifts
-    if (endMinutes < startMinutes) {
-      endMinutes += 24 * 60;
+    if (end < start) {
+      end.setDate(end.getDate() + 1);
     }
     
-    const totalMinutes = endMinutes - startMinutes - breakDuration;
-    return Math.max(0, totalMinutes / 60);
+    const diffMs = end.getTime() - start.getTime();
+    return diffMs / (1000 * 60 * 60); // Convert to hours
   };
 
-  // Auto-calculate pay value when times change
-  useEffect(() => {
-    if (customShift.start_time && customShift.end_time) {
-      const breakMinutes = customShift.deduct_break ? customShift.break_duration : 0;
-      const hours = calculateHours(customShift.start_time, customShift.end_time, breakMinutes);
-      setCustomShift(prev => ({
-        ...prev,
-        pay_value: parseFloat(hours.toFixed(2))
-      }));
-    }
-  }, [customShift.start_time, customShift.end_time, customShift.break_duration, customShift.deduct_break]);
+  const totalHours = calculateTotalHours(formData.start_time, formData.end_time);
+  const payHours = Math.max(0, totalHours - formData.unpaid_break);
 
   const handleTemplateSelect = (template: ShiftTemplate) => {
     setSelectedTemplate(template);
@@ -105,25 +89,22 @@ const ShiftCreationPopup = ({
   };
 
   const handleCreateCustom = () => {
-    if (customShift.start_time && customShift.end_time && customShift.position) {
+    if (formData.start_time && formData.end_time && formData.position) {
       onCreateShift({
-        start_time: customShift.start_time,
-        end_time: customShift.end_time,
-        position: customShift.position,
-        pay_value: customShift.pay_value,
-        color: customShift.color
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        position: formData.position,
+        pay_value: payHours,
+        color: formData.color
       });
       onClose();
-      setCustomShift({
-        name: '',
-        start_time: '',
-        end_time: '',
-        position: '',
-        pay_value: 0,
-        color: '#3B82F6',
-        description: '',
-        break_duration: 0,
-        deduct_break: false
+      setFormData({
+        name: "",
+        start_time: "",
+        end_time: "",
+        color: "#3B82F6",
+        position: "",
+        unpaid_break: 0
       });
     }
   };
@@ -211,195 +192,98 @@ const ShiftCreationPopup = ({
           </TabsContent>
 
           <TabsContent value="custom" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Column */}
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="shift-name" className="text-sm font-medium">
-                    Shift Name
-                  </Label>
+            <form className="space-y-4">
+              <div>
+                <Label htmlFor="name">Template Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Morning Shift"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="start_time">Start Time</Label>
                   <Input
-                    id="shift-name"
-                    placeholder="e.g., Morning Shift"
-                    value={customShift.name}
-                    onChange={(e) => setCustomShift(prev => ({
-                      ...prev,
-                      name: e.target.value
-                    }))}
-                    className="w-full"
+                    id="start_time"
+                    type="time"
+                    value={formData.start_time}
+                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                    required
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="start-time" className="text-sm font-medium">
-                      Start Time
-                    </Label>
-                    <Input
-                      id="start-time"
-                      type="time"
-                      value={customShift.start_time}
-                      onChange={(e) => setCustomShift(prev => ({
-                        ...prev,
-                        start_time: e.target.value
-                      }))}
-                      className="w-full"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="end-time" className="text-sm font-medium">
-                      End Time
-                    </Label>
-                    <Input
-                      id="end-time"
-                      type="time"
-                      value={customShift.end_time}
-                      onChange={(e) => setCustomShift(prev => ({
-                        ...prev,
-                        end_time: e.target.value
-                      }))}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="position" className="text-sm font-medium">
-                    Position
-                  </Label>
+                <div>
+                  <Label htmlFor="end_time">End Time</Label>
                   <Input
-                    id="position"
-                    placeholder="e.g., Server, Cook, Manager"
-                    value={customShift.position}
-                    onChange={(e) => setCustomShift(prev => ({
-                      ...prev,
-                      position: e.target.value
-                    }))}
-                    className="w-full"
+                    id="end_time"
+                    type="time"
+                    value={formData.end_time}
+                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                    required
                   />
-                </div>
-
-                <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="deduct-break"
-                      checked={customShift.deduct_break}
-                      onCheckedChange={(checked) => setCustomShift(prev => ({
-                        ...prev,
-                        deduct_break: checked as boolean
-                      }))}
-                    />
-                    <Label htmlFor="deduct-break" className="text-sm font-medium">
-                      Deduct break time from shift hours
-                    </Label>
-                  </div>
-                  
-                  {customShift.deduct_break && (
-                    <div className="space-y-2 mt-3">
-                      <Label htmlFor="break-duration" className="text-sm font-medium">
-                        Break Duration (minutes)
-                      </Label>
-                      <Input
-                        id="break-duration"
-                        type="number"
-                        min="0"
-                        step="15"
-                        placeholder="30"
-                        value={customShift.break_duration}
-                        onChange={(e) => setCustomShift(prev => ({
-                          ...prev,
-                          break_duration: parseInt(e.target.value) || 0
-                        }))}
-                        className="w-full"
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
-
-              {/* Right Column */}
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="pay-value" className="text-sm font-medium">
-                    Shift Hours
-                  </Label>
+              
+              <div>
+                <Label htmlFor="position">Position</Label>
+                <Input
+                  id="position"
+                  placeholder="e.g., Server, Cook, Manager"
+                  value={formData.position}
+                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="unpaid_break">Unpaid Break (hours)</Label>
                   <Input
-                    id="pay-value"
+                    id="unpaid_break"
                     type="number"
                     step="0.25"
+                    value={formData.unpaid_break}
+                    onChange={(e) => setFormData({ ...formData, unpaid_break: parseFloat(e.target.value) || 0 })}
+                    placeholder="e.g., 0.5"
                     min="0"
-                    value={customShift.pay_value}
-                    onChange={(e) => setCustomShift(prev => ({
-                      ...prev,
-                      pay_value: parseFloat(e.target.value) || 0
-                    }))}
-                    className="w-full bg-gray-50"
-                    readOnly
                   />
-                  <p className="text-xs text-gray-500">
-                    Automatically calculated from shift duration
-                  </p>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="color" className="text-sm font-medium">
-                    Color Theme
-                  </Label>
-                  <div className="flex items-center space-x-3">
-                    <Input
-                      id="color"
-                      type="color"
-                      value={customShift.color}
-                      onChange={(e) => setCustomShift(prev => ({
-                        ...prev,
-                        color: e.target.value
-                      }))}
-                      className="w-16 h-10 p-1 border rounded cursor-pointer"
-                    />
-                    <Input
-                      type="text"
-                      value={customShift.color}
-                      onChange={(e) => setCustomShift(prev => ({
-                        ...prev,
-                        color: e.target.value
-                      }))}
-                      placeholder="#3B82F6"
-                      className="flex-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description" className="text-sm font-medium">
-                    Description (Optional)
-                  </Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Add any additional notes or requirements..."
-                    value={customShift.description}
-                    onChange={(e) => setCustomShift(prev => ({
-                      ...prev,
-                      description: e.target.value
-                    }))}
-                    rows={4}
-                    className="w-full resize-none"
+                <div>
+                  <Label htmlFor="color">Color</Label>
+                  <Input
+                    id="color"
+                    type="color"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="flex justify-end space-x-3 pt-6 border-t">
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateCustom}
-                disabled={!customShift.start_time || !customShift.end_time || !customShift.position}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                Create Custom Shift
-              </Button>
-            </div>
+              {/* Calculated hours display */}
+              <div className="bg-gray-50 p-3 rounded space-y-2">
+                <div className="text-sm">
+                  <span className="font-medium">Total Shift Hours:</span> {totalHours.toFixed(2)} hrs
+                </div>
+                <div className="text-sm">
+                  <span className="font-medium">Pay Hours:</span> {payHours.toFixed(2)} hrs
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button 
+                  type="button" 
+                  onClick={handleCreateCustom}
+                  disabled={!formData.start_time || !formData.end_time || !formData.position}
+                >
+                  Create Template
+                </Button>
+              </div>
+            </form>
           </TabsContent>
         </Tabs>
       </DialogContent>
