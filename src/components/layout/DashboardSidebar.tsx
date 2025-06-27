@@ -2,7 +2,7 @@
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { FileText, List, Settings, Users, LogOut } from "lucide-react";
+import { Home, Calendar, Settings, Users, Menu, FileText, LogOut, Clock, Grid3X3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 
@@ -15,45 +15,65 @@ const DashboardSidebar = ({
   isMobileOpen,
   setIsMobileOpen
 }: DashboardSidebarProps) => {
-  const { userRole, signOut } = useAuth();
+  const { signOut } = useAuth();
 
-  const navItems = [{
-    label: "Builder",
-    items: [{
-      title: "Dashboard",
-      path: "/",
-      icon: List
-    }, {
-      title: "Menu Sets",
-      path: "/menu-sets",
-      icon: List
-    }, {
-      title: "Processes",
-      path: "/processes",
-      icon: FileText
-    }]
-  }];
-
-  // Add admin-only items
-  if (userRole === 'admin') {
-    navItems.push({
+  const navigationItems = [
+    {
+      label: "Overview",
+      items: [
+        {
+          title: "Dashboard",
+          path: "/",
+          icon: Home
+        }
+      ]
+    },
+    {
+      label: "Management",
+      items: [
+        {
+          title: "Menu Sets",
+          path: "/menu-sets",
+          icon: Menu
+        },
+        {
+          title: "Processes",
+          path: "/processes",
+          icon: FileText
+        }
+      ]
+    },
+    {
+      label: "Rostering",
+      items: [
+        {
+          title: "Weekly Roster",
+          path: "/roster",
+          icon: Calendar
+        },
+        {
+          title: "Shift Templates",
+          path: "/shift-templates",
+          icon: Clock
+        }
+      ]
+    },
+    {
       label: "Administration",
-      items: [{
-        title: "User Management",
-        path: "/admin/users",
-        icon: Users
-      }]
-    });
-  }
-
-  navItems.push({
-    label: "System",
-    items: [{
-      title: "Settings",
-      path: "/settings",
-      icon: Settings
-    }]
-  });
+      items: [
+        {
+          title: "User Management",
+          path: "/admin/users",
+          icon: Users
+        },
+        {
+          title: "Settings",
+          path: "/settings",
+          icon: Settings
+        }
+      ]
+    }
+  ];
 
   const closeMobileSidebar = () => {
     if (window.innerWidth < 768) {
@@ -68,12 +88,13 @@ const DashboardSidebar = ({
   return (
     <Sidebar>
       <SidebarContent>
-        <div className="p-6 border-b">
-          <h2 className="text-xl font-bold text-sidebar-foreground">CareHR</h2>
+        <div className="p-6 border-b bg-blue-50">
+          <h2 className="text-xl font-bold text-blue-900">Admin Portal</h2>
+          <p className="text-sm text-blue-700">Management Dashboard</p>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {navItems.map(group => (
+          {navigationItems.map(group => (
             <SidebarGroup key={group.label}>
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
