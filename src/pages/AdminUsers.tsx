@@ -2,6 +2,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import HolidayRequestsList from "@/components/HolidayRequestsList";
 import { useHolidayRequests } from "@/hooks/useHolidayRequests";
+import Employees from "./Employees";
 
 const AdminUsers = () => {
   const { requests, loading, error, refreshRequests } = useHolidayRequests();
@@ -13,11 +14,16 @@ const AdminUsers = () => {
         <p className="text-gray-600 mt-2">Manage users and approve requests</p>
       </div>
 
-      <Tabs defaultValue="approvals" className="space-y-6">
+      <Tabs defaultValue="employees" className="space-y-6">
         <TabsList>
+          <TabsTrigger value="employees">Employees</TabsTrigger>
           <TabsTrigger value="approvals">Pending Approvals</TabsTrigger>
           <TabsTrigger value="users">User Accounts</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="employees">
+          <Employees />
+        </TabsContent>
 
         <TabsContent value="approvals">
           {loading ? (
