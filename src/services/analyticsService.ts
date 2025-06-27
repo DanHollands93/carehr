@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface AnalyticsData {
@@ -13,12 +12,21 @@ export interface AnalyticsData {
   requestsByStatus: ChartData[];
 }
 
+export interface PersonalAnalyticsData {
+  holidaysUsed: number;
+  holidaysRemaining: number;
+  pendingRequests: number;
+  documentsAccessed: number;
+  recentActivity: ActivityItem[];
+}
+
 export interface ActivityItem {
   id: string;
   type: 'request_submitted' | 'request_approved' | 'request_rejected' | 'user_registered';
-  message: string;
-  timestamp: string;
+  message?: string;
+  description?: string;
   user?: string;
+  timestamp: string;
 }
 
 export interface ChartData {
@@ -27,7 +35,7 @@ export interface ChartData {
 }
 
 export const analyticsService = {
-  async getAnalytics(): Promise<AnalyticsData> {
+  async getAdminAnalytics(): Promise<AnalyticsData> {
     try {
       // Get user counts
       const { data: profiles, error: profilesError } = await supabase
@@ -60,7 +68,7 @@ export const analyticsService = {
           id: req.id,
           type: req.status === 'pending' ? 'request_submitted' : 
                 req.status === 'approved' ? 'request_approved' : 'request_rejected',
-          message: `${req.employee_name || 'Employee'} ${
+          description: `${req.employee_name || 'Employee'} ${
             req.status === 'pending' ? 'submitted' : req.status
           } holiday request: ${req.reason || 'Holiday'}`,
           timestamp: req.submitted_at || new Date().toISOString(),
@@ -69,11 +77,11 @@ export const analyticsService = {
       });
 
       // Add recent user registrations
-      profiles?.slice(0, 3).forEach(profile => {
+      profiles?.slice(-3).forEach(profile => {
         recentActivity.push({
           id: profile.id,
           type: 'user_registered',
-          message: `New user registered`,
+          description: `New user registered`,
           timestamp: profile.created_at || new Date().toISOString()
         });
       });
@@ -120,7 +128,7 @@ export const analyticsService = {
         requestsByStatus
       };
     } catch (error) {
-      console.error('Error fetching analytics:', error);
+      console.error('Error fetching admin analytics:', error);
       // Return fallback data
       return {
         totalUsers: 0,
@@ -134,5 +142,78 @@ export const analyticsService = {
         requestsByStatus: []
       };
     }
+  },
+
+  async getPersonalAnalytics(userId: string): Promise<PersonalAnalyticsData> {
+    try {
+      // Get user's employee record
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('employee_id')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) throw profileError;
+
+      if (!profile?.employee_id) {
+        return {
+          holidaysUsed: 0,
+          holidaysRemaining: 25, // Default holiday allowance
+          pendingRequests: 0,
+          documentsAccessed: 0,
+          recentActivity: []
+        };
+      }
+
+      // Get user's holiday requests
+      const { data: requests, error: requestsError } = await supabase
+        .from('holiday_requests')
+        .select('id, status, submitted_at, hours_requested, reason')
+        .eq('employee_id', profile.employee_id);
+
+      if (requestsError) throw requestsError;
+
+      const approvedRequests = requests?.filter(r => r.status === 'approved') || [];
+      const pendingRequests = requests?.filter(r => r.status === 'pending')?.length || 0;
+      const holidaysUsed = approvedRequests.reduce((total, req) => total + (Number(req.hours_requested) || 0), 0) / 8; // Convert hours to days
+      const holidaysRemaining = Math.max(0, 25 - holidaysUsed); // Assuming 25 days allowance
+
+      // Generate recent activity
+      const recentActivity: ActivityItem[] = [];
+      requests?.slice(0, 10).forEach(req => {
+        recentActivity.push({
+          id: req.id,
+          type: req.status === 'pending' ? 'request_submitted' : 
+                req.status === 'approved' ? 'request_approved' : 'request_rejected',
+          description: `Holiday request ${req.status}: ${req.reason || 'Holiday'}`,
+          timestamp: req.submitted_at || new Date().toISOString()
+        });
+      });
+
+      // Sort by timestamp
+      recentActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      return {
+        holidaysUsed: Math.round(holidaysUsed),
+        holidaysRemaining: Math.round(holidaysRemaining),
+        pendingRequests,
+        documentsAccessed: Math.floor(Math.random() * 20) + 5, // Mock for now
+        recentActivity: recentActivity.slice(0, 5)
+      };
+    } catch (error) {
+      console.error('Error fetching personal analytics:', error);
+      return {
+        holidaysUsed: 0,
+        holidaysRemaining: 25,
+        pendingRequests: 0,
+        documentsAccessed: 0,
+        recentActivity: []
+      };
+    }
+  },
+
+  // Keep the original method for backward compatibility
+  async getAnalytics(): Promise<AnalyticsData> {
+    return this.getAdminAnalytics();
   }
 };
