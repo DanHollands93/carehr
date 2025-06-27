@@ -466,9 +466,9 @@ const Roster = () => {
       )}
 
       {selectedCategoryId && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="space-y-6">
           {/* Shift Templates Panel */}
-          <Card className="lg:col-span-1">
+          <Card>
             <CardHeader>
               <CardTitle>Shift Templates</CardTitle>
             </CardHeader>
@@ -510,7 +510,7 @@ const Roster = () => {
           </Card>
 
           {/* Roster Grid */}
-          <Card className="lg:col-span-3">
+          <Card>
             <CardHeader>
               <CardTitle>
                 {selectedCategory?.name} Roster
