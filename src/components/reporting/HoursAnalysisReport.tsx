@@ -9,9 +9,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { format, parseISO, differenceInMinutes, startOfDay, endOfDay } from "date-fns";
-import { CalendarIcon, Download, Printer, Settings, BarChart3, AlertTriangle } from "lucide-react";
+import { format, parseISO, differenceInMinutes } from "date-fns";
+import { CalendarIcon, Download, Printer, Settings, BarChart3, AlertTriangle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
@@ -26,11 +27,25 @@ interface HoursRecord {
   clock_out: string | null;
   scheduled_hours: number;
   actual_hours: number;
-  pay_rate?: number;
-  total_pay?: number;
+  pay_rate: number;
+  total_pay: number;
   has_issue: boolean;
   issue_type?: string;
   exception_status?: string;
+  job_title?: string;
+}
+
+interface TimeDiscrepancy {
+  id: string;
+  employee_name: string;
+  shift_date: string;
+  expected_start: string;
+  expected_end: string;
+  actual_clock_in: string | null;
+  actual_clock_out: string | null;
+  discrepancy_type: string;
+  status: string;
+  approval_status: string;
 }
 
 interface ColumnConfig {
@@ -48,8 +63,8 @@ const defaultColumns: ColumnConfig[] = [
   { key: 'scheduled_hours', label: 'Scheduled Hours', enabled: true, width: '130px' },
   { key: 'actual_hours', label: 'Actual Hours', enabled: true, width: '120px' },
   { key: 'variance', label: 'Variance', enabled: true, width: '100px' },
-  { key: 'pay_rate', label: 'Pay Rate', enabled: false, width: '100px' },
-  { key: 'total_pay', label: 'Total Pay', enabled: false, width: '120px' }
+  { key: 'pay_rate', label: 'Pay Rate', enabled: true, width: '100px' },
+  { key: 'total_pay', label: 'Total Pay', enabled: true, width: '120px' }
 ];
 
 const HoursAnalysisReport = () => {
@@ -60,7 +75,8 @@ const HoursAnalysisReport = () => {
   const [columns, setColumns] = useState<ColumnConfig[]>(defaultColumns);
   const [showSettings, setShowSettings] = useState(false);
 
-  const { data: hoursData, isLoading } = useQuery({
+  // Fetch hours data including all shifts
+  const { data: hoursData, isLoading: isLoadingHours } = useQuery({
     queryKey: ['hours-analysis', dateRange.from, dateRange.to],
     queryFn: async () => {
       console.log('Fetching hours analysis data for date range:', {
@@ -71,7 +87,7 @@ const HoursAnalysisReport = () => {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
       
-      // Get all shifts in the date range with their time clock records
+      // Get all shifts in the date range with their time clock records and job role info
       const { data: shifts, error: shiftsError } = await supabase
         .from('shifts')
         .select(`
@@ -81,6 +97,8 @@ const HoursAnalysisReport = () => {
           start_time,
           end_time,
           position,
+          pay_rate,
+          actual_job_role_id,
           time_clock_records (
             id,
             clock_in_time,
@@ -88,6 +106,15 @@ const HoursAnalysisReport = () => {
             status,
             discrepancy_type,
             approval_status
+          ),
+          employees (
+            id,
+            first_name,
+            last_name,
+            department
+          ),
+          job_roles (
+            title
           )
         `)
         .gte('date', startDate)
@@ -105,29 +132,10 @@ const HoursAnalysisReport = () => {
         return [];
       }
       
-      // Get unique employee IDs
-      const employeeIds = [...new Set(shifts.map(s => s.employee_id))];
-      
-      // Get employee data
-      const { data: employees, error: empError } = await supabase
-        .from('employees')
-        .select('id, first_name, last_name, department')
-        .in('id', employeeIds);
-        
-      if (empError) {
-        console.error('Error fetching employees:', empError);
-        throw empError;
-      }
-      
-      console.log('Found employees:', employees?.length || 0);
-      
-      // Create lookup map
-      const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
-      
       // Process the data - include ALL shifts
       const processedData: HoursRecord[] = shifts
         .map(shift => {
-          const employee = employeeMap.get(shift.employee_id);
+          const employee = shift.employees;
           
           if (!employee) {
             console.log('Missing employee for shift:', shift.employee_id);
@@ -174,8 +182,15 @@ const HoursAnalysisReport = () => {
               issueType = 'Missing clock in';
             } else {
               // No clock times at all
-              hasIssue = true;
-              issueType = 'No clock data';
+              const now = new Date();
+              const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
+              
+              if (now > shiftEndTime) {
+                hasIssue = true;
+                issueType = 'Did not clock in';
+              } else {
+                issueType = 'Scheduled';
+              }
             }
           } else {
             // No time record at all - check if shift time has passed
@@ -186,15 +201,19 @@ const HoursAnalysisReport = () => {
               hasIssue = true;
               issueType = 'Did not clock in';
             } else {
-              // Shift hasn't started/ended yet
               issueType = 'Scheduled';
             }
           }
+
+          // Calculate pay
+          const payRate = shift.pay_rate || 0;
+          const totalPay = actualHours * payRate;
           
           return {
             employee_id: employee.id,
             employee_name: `${employee.first_name} ${employee.last_name}`,
             position: shift.position || employee.department || 'Unknown',
+            job_title: shift.job_roles?.title || 'Unknown',
             date: shift.date,
             shift_start: shift.start_time,
             shift_end: shift.end_time,
@@ -202,8 +221,8 @@ const HoursAnalysisReport = () => {
             clock_out: timeRecord?.clock_out_time || null,
             scheduled_hours: scheduledHours,
             actual_hours: actualHours,
-            pay_rate: 0,
-            total_pay: 0,
+            pay_rate: payRate,
+            total_pay: totalPay,
             has_issue: hasIssue,
             issue_type: issueType,
             exception_status: exceptionStatus
@@ -213,6 +232,54 @@ const HoursAnalysisReport = () => {
       
       console.log('Processed hours data:', processedData.length, 'records');
       return processedData;
+    }
+  });
+
+  // Fetch time discrepancies
+  const { data: timeDiscrepancies, isLoading: isLoadingDiscrepancies } = useQuery({
+    queryKey: ['time-discrepancies', dateRange.from, dateRange.to],
+    queryFn: async () => {
+      const startDate = format(dateRange.from, 'yyyy-MM-dd');
+      const endDate = format(dateRange.to, 'yyyy-MM-dd');
+      
+      const { data, error } = await supabase
+        .from('time_clock_records')
+        .select(`
+          id,
+          employee_id,
+          shift_date,
+          expected_start_time,
+          expected_end_time,
+          clock_in_time,
+          clock_out_time,
+          discrepancy_type,
+          status,
+          approval_status,
+          employees (
+            first_name,
+            last_name
+          )
+        `)
+        .eq('status', 'discrepancy')
+        .eq('approval_status', 'pending')
+        .gte('shift_date', startDate)
+        .lte('shift_date', endDate)
+        .order('shift_date', { ascending: false });
+      
+      if (error) throw error;
+      
+      return data.map(record => ({
+        id: record.id,
+        employee_name: `${record.employees?.first_name} ${record.employees?.last_name}`,
+        shift_date: record.shift_date,
+        expected_start: record.expected_start_time,
+        expected_end: record.expected_end_time,
+        actual_clock_in: record.clock_in_time,
+        actual_clock_out: record.clock_out_time,
+        discrepancy_type: record.discrepancy_type || '',
+        status: record.status,
+        approval_status: record.approval_status || 'pending'
+      })) as TimeDiscrepancy[];
     }
   });
 
@@ -232,6 +299,8 @@ const HoursAnalysisReport = () => {
     return groups;
   }, [hoursData]);
 
+  const pendingDiscrepancyCount = timeDiscrepancies?.length || 0;
+
   const toggleColumn = (columnKey: string) => {
     setColumns(prev => prev.map(col => 
       col.key === columnKey ? { ...col, enabled: !col.enabled } : col
@@ -250,7 +319,7 @@ const HoursAnalysisReport = () => {
             row[col.label] = record.employee_name;
             break;
           case 'position':
-            row[col.label] = record.position;
+            row[col.label] = record.job_title || record.position;
             break;
           case 'date':
             row[col.label] = format(parseISO(record.date), 'dd/MM/yyyy');
@@ -268,10 +337,10 @@ const HoursAnalysisReport = () => {
             row[col.label] = record.actual_hours - record.scheduled_hours;
             break;
           case 'pay_rate':
-            row[col.label] = record.pay_rate || 0;
+            row[col.label] = record.pay_rate;
             break;
           case 'total_pay':
-            row[col.label] = record.total_pay || 0;
+            row[col.label] = record.total_pay;
             break;
         }
       });
@@ -301,23 +370,31 @@ const HoursAnalysisReport = () => {
   };
 
   const getIssueDisplay = (record: HoursRecord) => {
-    if (!record.has_issue) return null;
+    if (!record.has_issue && record.exception_status !== 'approved') return null;
     
     if (record.exception_status === 'approved') {
       return (
         <Badge variant="default" className="bg-green-100 text-green-800">
           <AlertTriangle className="w-3 h-3 mr-1" />
-          Resolved
+          Exception Cleared
         </Badge>
       );
     }
     
-    return (
-      <Badge variant="destructive">
-        <AlertTriangle className="w-3 h-3 mr-1" />
-        {record.issue_type}
-      </Badge>
-    );
+    if (record.has_issue) {
+      return (
+        <Badge variant="destructive">
+          <AlertTriangle className="w-3 h-3 mr-1" />
+          {record.issue_type}
+        </Badge>
+      );
+    }
+
+    return null;
+  };
+
+  const formatDiscrepancyType = (type: string) => {
+    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   const enabledColumns = columns.filter(col => col.enabled);
@@ -430,96 +507,186 @@ const HoursAnalysisReport = () => {
         </Card>
       )}
 
-      {/* Report Table */}
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="text-center py-8">Loading hours analysis...</div>
-          ) : !hoursData?.length ? (
-            <div className="text-center py-8 text-gray-500">
-              <p>No shifts found for the selected period</p>
-              <p className="text-sm mt-2">
-                Date range: {format(dateRange.from, 'dd/MM/yyyy')} - {format(dateRange.to, 'dd/MM/yyyy')}
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {enabledColumns.map((column) => (
-                    <TableHead key={column.key} style={{ width: column.width }}>
-                      {column.label}
-                    </TableHead>
-                  ))}
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Object.entries(groupedData).map(([employeeId, records]) => {
-                  const totalScheduled = records.reduce((sum, r) => sum + r.scheduled_hours, 0);
-                  const totalActual = records.reduce((sum, r) => sum + r.actual_hours, 0);
-                  const totalVariance = totalActual - totalScheduled;
-                  
-                  return (
-                    <React.Fragment key={employeeId}>
-                      {records.map((record, index) => (
-                        <TableRow key={`${employeeId}-${index}`} className={getRowClassName(record)}>
-                          {enabledColumns.map((column) => (
-                            <TableCell key={column.key}>
-                              {column.key === 'employee_name' && record.employee_name}
-                              {column.key === 'position' && record.position}
-                              {column.key === 'date' && format(parseISO(record.date), 'dd/MM/yyyy')}
-                              {column.key === 'clock_times' && (
-                                <div className="text-sm">
-                                  <div>In: {record.clock_in ? format(parseISO(record.clock_in), 'HH:mm') : 'N/A'}</div>
-                                  <div>Out: {record.clock_out ? format(parseISO(record.clock_out), 'HH:mm') : 'N/A'}</div>
-                                </div>
-                              )}
-                              {column.key === 'scheduled_hours' && record.scheduled_hours.toFixed(2)}
-                              {column.key === 'actual_hours' && record.actual_hours.toFixed(2)}
-                              {column.key === 'variance' && (
-                                <Badge variant={record.actual_hours - record.scheduled_hours >= 0 ? 'default' : 'destructive'}>
-                                  {(record.actual_hours - record.scheduled_hours).toFixed(2)}h
-                                </Badge>
-                              )}
-                              {column.key === 'pay_rate' && `£${record.pay_rate?.toFixed(2) || '0.00'}`}
-                              {column.key === 'total_pay' && `£${record.total_pay?.toFixed(2) || '0.00'}`}
-                            </TableCell>
-                          ))}
-                          <TableCell>
-                            {getIssueDisplay(record)}
-                          </TableCell>
-                        </TableRow>
+      {/* Tabs for Hours Report and Time Discrepancies */}
+      <Tabs defaultValue="hours" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="hours">Hours Analysis</TabsTrigger>
+          <TabsTrigger value="discrepancies" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Time Discrepancies
+            {pendingDiscrepancyCount > 0 && (
+              <Badge variant="destructive" className="ml-1 px-1.5 py-0.5 text-xs">
+                {pendingDiscrepancyCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="hours">
+          {/* Hours Report Table */}
+          <Card>
+            <CardContent className="p-0">
+              {isLoadingHours ? (
+                <div className="text-center py-8">Loading hours analysis...</div>
+              ) : !hoursData?.length ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No shifts found for the selected period</p>
+                  <p className="text-sm mt-2">
+                    Date range: {format(dateRange.from, 'dd/MM/yyyy')} - {format(dateRange.to, 'dd/MM/yyyy')}
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {enabledColumns.map((column) => (
+                        <TableHead key={column.key} style={{ width: column.width }}>
+                          {column.label}
+                        </TableHead>
                       ))}
-                      {/* Employee Total Row */}
-                      <TableRow className="bg-gray-50 font-medium">
-                        {enabledColumns.map((column) => (
-                          <TableCell key={column.key}>
-                            {column.key === 'employee_name' && `${records[0].employee_name} - Total`}
-                            {column.key === 'position' && 'All Roles'}
-                            {column.key === 'date' && ''}
-                            {column.key === 'clock_times' && ''}
-                            {column.key === 'scheduled_hours' && `${totalScheduled.toFixed(2)}h`}
-                            {column.key === 'actual_hours' && `${totalActual.toFixed(2)}h`}
-                            {column.key === 'variance' && (
-                              <Badge variant={totalVariance >= 0 ? 'default' : 'destructive'}>
-                                {totalVariance.toFixed(2)}h
-                              </Badge>
-                            )}
-                            {column.key === 'pay_rate' && ''}
-                            {column.key === 'total_pay' && `£${records.reduce((sum, r) => sum + (r.total_pay || 0), 0).toFixed(2)}`}
-                          </TableCell>
-                        ))}
-                        <TableCell></TableCell>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(groupedData).map(([employeeId, records]) => {
+                      const totalScheduled = records.reduce((sum, r) => sum + r.scheduled_hours, 0);
+                      const totalActual = records.reduce((sum, r) => sum + r.actual_hours, 0);
+                      const totalVariance = totalActual - totalScheduled;
+                      const totalPay = records.reduce((sum, r) => sum + r.total_pay, 0);
+                      
+                      return (
+                        <React.Fragment key={employeeId}>
+                          {records.map((record, index) => (
+                            <TableRow key={`${employeeId}-${index}`} className={getRowClassName(record)}>
+                              {enabledColumns.map((column) => (
+                                <TableCell key={column.key}>
+                                  {column.key === 'employee_name' && record.employee_name}
+                                  {column.key === 'position' && (record.job_title || record.position)}
+                                  {column.key === 'date' && format(parseISO(record.date), 'dd/MM/yyyy')}
+                                  {column.key === 'clock_times' && (
+                                    <div className="text-sm">
+                                      <div>In: {record.clock_in ? format(parseISO(record.clock_in), 'HH:mm') : 'N/A'}</div>
+                                      <div>Out: {record.clock_out ? format(parseISO(record.clock_out), 'HH:mm') : 'N/A'}</div>
+                                    </div>
+                                  )}
+                                  {column.key === 'scheduled_hours' && record.scheduled_hours.toFixed(2)}
+                                  {column.key === 'actual_hours' && record.actual_hours.toFixed(2)}
+                                  {column.key === 'variance' && (
+                                    <Badge variant={record.actual_hours - record.scheduled_hours >= 0 ? 'default' : 'destructive'}>
+                                      {(record.actual_hours - record.scheduled_hours).toFixed(2)}h
+                                    </Badge>
+                                  )}
+                                  {column.key === 'pay_rate' && `£${record.pay_rate.toFixed(2)}`}
+                                  {column.key === 'total_pay' && `£${record.total_pay.toFixed(2)}`}
+                                </TableCell>
+                              ))}
+                              <TableCell>
+                                {getIssueDisplay(record)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {/* Employee Total Row */}
+                          <TableRow className="bg-gray-50 font-medium">
+                            {enabledColumns.map((column) => (
+                              <TableCell key={column.key}>
+                                {column.key === 'employee_name' && `${records[0].employee_name} - Total`}
+                                {column.key === 'position' && 'All Roles'}
+                                {column.key === 'date' && ''}
+                                {column.key === 'clock_times' && ''}
+                                {column.key === 'scheduled_hours' && `${totalScheduled.toFixed(2)}h`}
+                                {column.key === 'actual_hours' && `${totalActual.toFixed(2)}h`}
+                                {column.key === 'variance' && (
+                                  <Badge variant={totalVariance >= 0 ? 'default' : 'destructive'}>
+                                    {totalVariance.toFixed(2)}h
+                                  </Badge>
+                                )}
+                                {column.key === 'pay_rate' && ''}
+                                {column.key === 'total_pay' && `£${totalPay.toFixed(2)}`}
+                              </TableCell>
+                            ))}
+                            <TableCell></TableCell>
+                          </TableRow>
+                        </React.Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="discrepancies">
+          {/* Time Discrepancies Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Time Discrepancies 
+                {pendingDiscrepancyCount > 0 && (
+                  <Badge variant="destructive">
+                    {pendingDiscrepancyCount} Pending
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingDiscrepancies ? (
+                <div className="text-center py-8">Loading time discrepancies...</div>
+              ) : !timeDiscrepancies?.length ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Clock className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No pending time discrepancies found</p>
+                  <p className="text-sm mt-2">All time records are up to date for the selected period</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Expected Times</TableHead>
+                      <TableHead>Actual Times</TableHead>
+                      <TableHead>Issue</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {timeDiscrepancies.map((discrepancy) => (
+                      <TableRow key={discrepancy.id} className="bg-red-50">
+                        <TableCell className="font-medium">{discrepancy.employee_name}</TableCell>
+                        <TableCell>{format(parseISO(discrepancy.shift_date), 'dd/MM/yyyy')}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>Start: {discrepancy.expected_start}</div>
+                            <div>End: {discrepancy.expected_end}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>In: {discrepancy.actual_clock_in ? format(parseISO(discrepancy.actual_clock_in), 'HH:mm') : 'N/A'}</div>
+                            <div>Out: {discrepancy.actual_clock_out ? format(parseISO(discrepancy.actual_clock_out), 'HH:mm') : 'N/A'}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="destructive">
+                            {formatDiscrepancyType(discrepancy.discrepancy_type)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {discrepancy.approval_status}
+                          </Badge>
+                        </TableCell>
                       </TableRow>
-                    </React.Fragment>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

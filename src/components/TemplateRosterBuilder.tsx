@@ -12,7 +12,9 @@ import RosterCategoryManager from "@/components/RosterCategoryManager";
 import StaffAssignmentManager from "@/components/StaffAssignmentManager";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
+import RoleSelectionDialog from "@/components/RoleSelectionDialog";
 import { useRosterCategories } from "@/hooks/useRosterCategories";
+import { useEmployeeJobRoles, useAllEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Employee {
@@ -37,6 +39,8 @@ interface TemplateShift {
   employee_id: string;
   day_index: number; // 0-based index within the template period
   shift_template_id: string;
+  job_role_id?: string;
+  pay_rate?: number;
 }
 
 interface LookupItem {
@@ -75,6 +79,19 @@ const TemplateRosterBuilder = ({
   const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'department' | 'custom'>('first_name');
   const [customOrder, setCustomOrder] = useState<string[]>([]);
   const [showSortDialog, setShowSortDialog] = useState(false);
+  const [roleSelectionDialog, setRoleSelectionDialog] = useState<{
+    isOpen: boolean;
+    employeeId: string;
+    employeeName: string;
+    dayIndex: number;
+    shiftTemplateId: string;
+  }>({
+    isOpen: false,
+    employeeId: '',
+    employeeName: '',
+    dayIndex: 0,
+    shiftTemplateId: ''
+  });
   const [shiftPopup, setShiftPopup] = useState<{
     isOpen: boolean;
     employeeId: string;
@@ -89,6 +106,7 @@ const TemplateRosterBuilder = ({
   });
   
   const { categories, getAssignedEmployees } = useRosterCategories();
+  const { data: allEmployeeJobRoles } = useAllEmployeeJobRoles();
 
   // Calculate period length in days
   const getPeriodDays = () => {
@@ -262,6 +280,11 @@ const TemplateRosterBuilder = ({
     }
   });
 
+  // Get employee job roles for role selection
+  const getEmployeeJobRoles = (employeeId: string) => {
+    return allEmployeeJobRoles?.filter(ejr => ejr.employee_id === employeeId) || [];
+  };
+
   const handleDragStart = (template: ShiftTemplate) => {
     if (isMobile) return;
     setDraggedTemplate(template);
@@ -278,15 +301,35 @@ const TemplateRosterBuilder = ({
 
   const handleDrop = (employeeId: string, dayIndex: number) => {
     if (isMobile) return;
+    
     if (draggedTemplate) {
-      const newShift: TemplateShift = {
-        employee_id: employeeId,
-        day_index: dayIndex,
-        shift_template_id: draggedTemplate.id
-      };
+      const employee = employees.find(e => e.id === employeeId);
+      const employeeName = employee ? `${employee.first_name} ${employee.last_name}` : '';
+      const employeeJobRoles = getEmployeeJobRoles(employeeId);
       
-      setTemplateShifts(prev => [...prev, newShift]);
-      setDraggedTemplate(null);
+      // If employee has multiple job roles, show selection dialog
+      if (employeeJobRoles.length > 1) {
+        setRoleSelectionDialog({
+          isOpen: true,
+          employeeId,
+          employeeName,
+          dayIndex,
+          shiftTemplateId: draggedTemplate.id
+        });
+      } else {
+        // Use primary role or single role
+        const jobRole = employeeJobRoles.find(r => r.is_primary) || employeeJobRoles[0];
+        const newShift: TemplateShift = {
+          employee_id: employeeId,
+          day_index: dayIndex,
+          shift_template_id: draggedTemplate.id,
+          job_role_id: jobRole?.job_role_id,
+          pay_rate: jobRole?.pay_rate || 0
+        };
+        
+        setTemplateShifts(prev => [...prev, newShift]);
+        setDraggedTemplate(null);
+      }
     } else if (draggedShift) {
       setTemplateShifts(prev => 
         prev.map(shift => 
@@ -298,6 +341,29 @@ const TemplateRosterBuilder = ({
       setDraggedShift(null);
     }
     setShowDeleteBin(false);
+  };
+
+  const handleRoleSelection = (roleId: string, payRate: number) => {
+    if (draggedTemplate && roleSelectionDialog.employeeId) {
+      const newShift: TemplateShift = {
+        employee_id: roleSelectionDialog.employeeId,
+        day_index: roleSelectionDialog.dayIndex,
+        shift_template_id: roleSelectionDialog.shiftTemplateId,
+        job_role_id: roleId,
+        pay_rate: payRate
+      };
+      
+      setTemplateShifts(prev => [...prev, newShift]);
+      setDraggedTemplate(null);
+    }
+    
+    setRoleSelectionDialog({
+      isOpen: false,
+      employeeId: '',
+      employeeName: '',
+      dayIndex: 0,
+      shiftTemplateId: ''
+    });
   };
 
   const handleDeleteDrop = () => {
@@ -442,6 +508,21 @@ const TemplateRosterBuilder = ({
 
   return (
     <div className="space-y-6">
+      {/* Role Selection Dialog */}
+      <RoleSelectionDialog
+        isOpen={roleSelectionDialog.isOpen}
+        onClose={() => setRoleSelectionDialog({ isOpen: false, employeeId: '', employeeName: '', dayIndex: 0, shiftTemplateId: '' })}
+        onSelectRole={handleRoleSelection}
+        employeeName={roleSelectionDialog.employeeName}
+        jobRoles={getEmployeeJobRoles(roleSelectionDialog.employeeId).map(ejr => ({
+          id: ejr.job_role_id,
+          title: ejr.job_roles?.title || 'Unknown',
+          department: ejr.job_roles?.department || 'Unknown',
+          pay_rate: ejr.pay_rate,
+          currency: ejr.currency
+        }))}
+      />
+
       {/* Delete Bin - appears when dragging a shift on desktop */}
       {showDeleteBin && !isMobile && (
         <div className="fixed top-20 right-8 z-50">
@@ -683,6 +764,9 @@ const TemplateRosterBuilder = ({
                                     >
                                       <div className="font-medium">{template.position}</div>
                                       <div>{template.start_time} - {template.end_time}</div>
+                                      {shift.pay_rate && (
+                                        <div className="text-xs text-gray-500">£{shift.pay_rate}/hr</div>
+                                      )}
                                     </div>
                                   ) : (
                                     <div className="opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center h-full">

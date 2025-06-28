@@ -279,6 +279,64 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_job_roles: {
+        Row: {
+          created_at: string | null
+          currency: string | null
+          employee_id: string
+          end_date: string | null
+          id: string
+          is_primary: boolean | null
+          job_role_id: string
+          pay_rate: number
+          start_date: string
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string | null
+          employee_id: string
+          end_date?: string | null
+          id?: string
+          is_primary?: boolean | null
+          job_role_id: string
+          pay_rate?: number
+          start_date?: string
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string | null
+          employee_id?: string
+          end_date?: string | null
+          id?: string
+          is_primary?: boolean | null
+          job_role_id?: string
+          pay_rate?: number
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_job_roles_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "current_employee_positions"
+            referencedColumns: ["employee_id"]
+          },
+          {
+            foreignKeyName: "employee_job_roles_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_job_roles_job_role_id_fkey"
+            columns: ["job_role_id"]
+            isOneToOne: false
+            referencedRelation: "job_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           address: Json | null
@@ -1070,6 +1128,7 @@ export type Database = {
       }
       shifts: {
         Row: {
+          actual_job_role_id: string | null
           category_id: string | null
           created_at: string | null
           date: string
@@ -1077,10 +1136,12 @@ export type Database = {
           end_time: string
           id: string
           job_role_id: string
+          pay_rate: number | null
           position: string
           start_time: string
         }
         Insert: {
+          actual_job_role_id?: string | null
           category_id?: string | null
           created_at?: string | null
           date: string
@@ -1088,10 +1149,12 @@ export type Database = {
           end_time: string
           id?: string
           job_role_id: string
+          pay_rate?: number | null
           position: string
           start_time: string
         }
         Update: {
+          actual_job_role_id?: string | null
           category_id?: string | null
           created_at?: string | null
           date?: string
@@ -1099,10 +1162,18 @@ export type Database = {
           end_time?: string
           id?: string
           job_role_id?: string
+          pay_rate?: number | null
           position?: string
           start_time?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "shifts_actual_job_role_id_fkey"
+            columns: ["actual_job_role_id"]
+            isOneToOne: false
+            referencedRelation: "job_roles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shifts_category_id_fkey"
             columns: ["category_id"]
@@ -1184,8 +1255,11 @@ export type Database = {
           created_at: string | null
           discrepancy_type: string | null
           employee_id: string
+          expected_end_time: string | null
+          expected_start_time: string | null
           id: string
           notes: string | null
+          shift_date: string | null
           shift_id: string | null
           status: string
           updated_at: string | null
@@ -1198,8 +1272,11 @@ export type Database = {
           created_at?: string | null
           discrepancy_type?: string | null
           employee_id: string
+          expected_end_time?: string | null
+          expected_start_time?: string | null
           id?: string
           notes?: string | null
+          shift_date?: string | null
           shift_id?: string | null
           status?: string
           updated_at?: string | null
@@ -1212,8 +1289,11 @@ export type Database = {
           created_at?: string | null
           discrepancy_type?: string | null
           employee_id?: string
+          expected_end_time?: string | null
+          expected_start_time?: string | null
           id?: string
           notes?: string | null
+          shift_date?: string | null
           shift_id?: string | null
           status?: string
           updated_at?: string | null
@@ -1441,6 +1521,10 @@ export type Database = {
     Functions: {
       assign_default_permissions_to_user: {
         Args: { p_user_id: string }
+        Returns: undefined
+      }
+      check_missing_clock_ins: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
       create_employees_table: {
