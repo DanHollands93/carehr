@@ -53,9 +53,9 @@ const UnifiedSidebar = ({
   };
 
   const isMenuItemVisible = (item: any) => {
-    // Debug logging for Email Logs specifically
-    if (item.title === 'Email Logs') {
-      console.log('Checking Email Logs visibility:', {
+    // Debug logging for specific items
+    if (item.title === 'My Shifts') {
+      console.log('Checking My Shifts visibility:', {
         title: item.title,
         requiredPermission: item.requiredPermission,
         hasPermission: hasPermission(item.requiredPermission, item.location),
@@ -78,9 +78,9 @@ const UnifiedSidebar = ({
       items: group.items.filter(isMenuItemVisible)
     })).filter(group => group.items.length > 0);
 
-    // Debug logging for Administration group
-    const adminGroup = visibleGroups.find(group => group.label === 'Administration');
-    console.log('Administration group:', adminGroup);
+    // Debug logging for Roster & Time group
+    const rosterGroup = visibleGroups.find(group => group.label === 'Roster & Time');
+    console.log('Roster & Time group:', rosterGroup);
     
     return visibleGroups;
   };
