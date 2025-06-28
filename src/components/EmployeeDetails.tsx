@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,8 @@ import CareerHistoryForm from "@/components/CareerHistoryForm";
 import { usePermissions } from "@/hooks/usePermissions";
 
 interface Employee {
-  id: string;
+  id?: string;
+  employee_id?: string;
   first_name: string;
   last_name: string;
   email: string;
@@ -97,32 +97,41 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
 
   const { hasPermission } = usePermissions();
 
+  // Get the correct employee ID - could be 'id' or 'employee_id' depending on the data source
+  const employeeId = employee.id || employee.employee_id;
+
   const { data: fullEmployee, refetch: refetchEmployee } = useQuery({
-    queryKey: ['employee', employee.id],
+    queryKey: ['employee', employeeId],
     queryFn: async () => {
+      if (!employeeId) return null;
+      
       const { data, error } = await supabase
         .from('employees')
         .select('*')
-        .eq('id', employee.id)
+        .eq('id', employeeId)
         .single();
       
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!employeeId
   });
 
   const { data: careerHistory = [], refetch: refetchCareer } = useQuery({
-    queryKey: ['career-history', employee.id],
+    queryKey: ['career-history', employeeId],
     queryFn: async () => {
+      if (!employeeId) return [];
+      
       const { data, error } = await supabase
         .from('career_history')
         .select('*')
-        .eq('employee_id', employee.id)
+        .eq('employee_id', employeeId)
         .order('start_date', { ascending: false });
       
       if (error) throw error;
       return data as CareerHistoryEntry[];
-    }
+    },
+    enabled: !!employeeId
   });
 
   // Mock address history - in real implementation, this would come from a separate addresses table
@@ -160,11 +169,16 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
   };
 
   const handlePersonalSave = async () => {
+    if (!employeeId) {
+      toast.error("Employee ID not found");
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('employees')
         .update(personalFormData)
-        .eq('id', employee.id);
+        .eq('id', employeeId);
 
       if (error) throw error;
 
@@ -204,6 +218,23 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
 
   // Use the passed employee data or fullEmployee data, prioritizing fullEmployee when available
   const displayEmployee = fullEmployee || employee;
+
+  if (!employeeId) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to List
+          </Button>
+          <div>
+            <h2 className="text-2xl font-bold text-red-600">Error: Employee ID not found</h2>
+            <p className="text-gray-600">Unable to load employee details</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -699,7 +730,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
 
       {showCareerForm && (
         <CareerHistoryForm
-          employeeId={employee.id}
+          employeeId={employeeId}
           onClose={() => setShowCareerForm(false)}
           onSuccess={() => {
             setShowCareerForm(false);
