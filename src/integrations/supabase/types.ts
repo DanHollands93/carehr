@@ -1209,6 +1209,10 @@ export type Database = {
         Args: { _user_id: string; _permission_name: string; _location?: string }
         Returns: boolean
       }
+      validate_notification_template: {
+        Args: { title_template: string; message_template: string }
+        Returns: boolean
+      }
     }
     Enums: {
       user_role: "admin" | "hr_user"
