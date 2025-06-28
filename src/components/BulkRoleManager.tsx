@@ -87,9 +87,32 @@ const BulkRoleManager = () => {
 
   const loadBulkRules = async () => {
     try {
-      // For now, we'll create a temporary table structure
-      // Later we'll need to create a proper bulk_position_rules table
-      setBulkRules([]);
+      const { data, error } = await supabase
+        .from('bulk_position_rules')
+        .select(`
+          id,
+          position,
+          permission_group_id,
+          created_at,
+          permission_groups!inner(
+            id,
+            name,
+            description
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error loading bulk rules:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load position rules",
+          variant: "destructive"
+        });
+      } else {
+        console.log('Loaded bulk rules:', data);
+        setBulkRules(data || []);
+      }
     } catch (error) {
       console.error('Exception loading bulk rules:', error);
     }
@@ -105,21 +128,93 @@ const BulkRoleManager = () => {
       return;
     }
 
-    // For now, show a placeholder message
-    toast({
-      title: "Feature Coming Soon",
-      description: "Position-based bulk role assignment will be implemented once the database structure is updated",
-      variant: "default"
-    });
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('bulk_position_rules')
+        .insert([
+          {
+            position: selectedPosition,
+            permission_group_id: selectedPermissionGroupId
+          }
+        ])
+        .select();
+
+      if (error) {
+        console.error('Error creating bulk rule:', error);
+        if (error.code === '23505') { // Unique constraint violation
+          toast({
+            title: "Rule Already Exists",
+            description: "A rule for this position and permission group combination already exists",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to create position rule",
+            variant: "destructive"
+          });
+        }
+      } else {
+        console.log('Created bulk rule:', data);
+        toast({
+          title: "Success",
+          description: "Position rule created successfully",
+        });
+        
+        // Reset form
+        setSelectedPosition('');
+        setSelectedPermissionGroupId('');
+        
+        // Reload rules
+        loadBulkRules();
+      }
+    } catch (error) {
+      console.error('Exception creating bulk rule:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create position rule",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeleteRule = async (ruleId: string) => {
-    // Placeholder for delete functionality
-    toast({
-      title: "Feature Coming Soon",
-      description: "Delete functionality will be available once the database structure is updated",
-      variant: "default"
-    });
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('bulk_position_rules')
+        .delete()
+        .eq('id', ruleId);
+
+      if (error) {
+        console.error('Error deleting bulk rule:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete position rule",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Position rule deleted successfully",
+        });
+        
+        // Reload rules
+        loadBulkRules();
+      }
+    } catch (error) {
+      console.error('Exception deleting bulk rule:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete position rule",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -188,7 +283,8 @@ const BulkRoleManager = () => {
         <CardHeader>
           <CardTitle>Active Position-Based Rules</CardTitle>
           <CardDescription>
-            These rules automatically assign permission groups when users are assigned to positions
+            These rules automatically assign permission groups when users are assigned to positions.
+            {bulkRules.length > 0 && ` Currently ${bulkRules.length} rule${bulkRules.length === 1 ? '' : 's'} configured.`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -196,7 +292,7 @@ const BulkRoleManager = () => {
             {bulkRules.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p className="mb-2">No position-based rules configured yet.</p>
-                <p className="text-sm">Database structure needs to be updated to support position-based bulk assignments.</p>
+                <p className="text-sm">Create a rule above to automatically assign permission groups based on employee positions.</p>
               </div>
             ) : (
               bulkRules.map(rule => (
@@ -208,7 +304,7 @@ const BulkRoleManager = () => {
                         <span className="font-medium">{rule.position}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">gets assigned</span>
+                        <span className="text-sm text-muted-foreground">automatically gets assigned</span>
                         <Badge variant="secondary">{rule.permission_groups.name}</Badge>
                       </div>
                     </div>

@@ -89,6 +89,35 @@ export type Database = {
           },
         ]
       }
+      bulk_position_rules: {
+        Row: {
+          created_at: string
+          id: string
+          permission_group_id: string
+          position: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          permission_group_id: string
+          position: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          permission_group_id?: string
+          position?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_position_rules_permission_group_id_fkey"
+            columns: ["permission_group_id"]
+            isOneToOne: false
+            referencedRelation: "permission_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       career_history: {
         Row: {
           contract_type: string | null
