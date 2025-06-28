@@ -64,14 +64,14 @@ export const unifiedMenuConfig: MenuGroup[] = [
       {
         title: "Menu Sets",
         path: "/menu-sets",
-        icon: "Menu",
-        requiredPermission: "manage_settings"
+        icon: "Menu"
+        // Remove permission requirement temporarily to see if this shows up
       },
       {
         title: "Processes",
         path: "/processes",
-        icon: "FileText",
-        requiredPermission: "manage_settings"
+        icon: "FileText"
+        // Remove permission requirement temporarily to see if this shows up
       },
       {
         title: "User Management",
@@ -138,8 +138,8 @@ export const unifiedMenuConfig: MenuGroup[] = [
       {
         title: "Settings",
         path: "/settings",
-        icon: "Settings",
-        requiredPermission: "manage_settings"
+        icon: "Settings"
+        // Remove permission requirement temporarily to see if this shows up
       }
     ]
   }
