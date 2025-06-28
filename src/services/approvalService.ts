@@ -140,26 +140,31 @@ export const approvalService = {
       .single();
 
     if (profile) {
-      // Create notification for the employee
-      const templateData = {
-        start_date: holidayRequest.start_date,
-        end_date: holidayRequest.end_date,
-        approver_name: user.email || 'HR Team',
-        rejection_reason: approval.comments || 'No reason provided'
-      };
+      // Get templates by trigger event
+      const templates = await notificationService.getTemplatesByEvent(
+        approval.action === 'approve' ? 'holiday_approved' : 'holiday_rejected'
+      );
 
-      const triggerEvent = approval.action === 'approve' ? 'holiday_approved' : 'holiday_rejected';
-      
-      try {
-        await notificationService.createFromTemplate(
-          profile.id,
-          triggerEvent,
-          templateData
-        );
-        console.log(`Notification created for ${approval.action} holiday request`);
-      } catch (notificationError) {
-        console.error('Error creating notification:', notificationError);
-        // Don't throw here as the approval was successful
+      if (templates.length > 0) {
+        // Create notification using the first matching template
+        const templateData = {
+          start_date: holidayRequest.start_date,
+          end_date: holidayRequest.end_date,
+          approver_name: user.email || 'HR Team',
+          rejection_reason: approval.comments || 'No reason provided'
+        };
+
+        try {
+          await notificationService.createNotificationFromTemplate(
+            templates[0].id,
+            profile.id,
+            templateData
+          );
+          console.log(`Notification created for ${approval.action} holiday request`);
+        } catch (notificationError) {
+          console.error('Error creating notification:', notificationError);
+          // Don't throw here as the approval was successful
+        }
       }
     }
   },
