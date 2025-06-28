@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +9,7 @@ import HolidayTrendsWidget from "@/components/reporting/HolidayTrendsWidget";
 import UpcomingHolidaysWidget from "@/components/reporting/UpcomingHolidaysWidget";
 import TeamAvailabilityWidget from "@/components/reporting/TeamAvailabilityWidget";
 import HolidayBalanceWidget from "@/components/reporting/HolidayBalanceWidget";
+import HoursAnalysisReport from "@/components/reporting/HoursAnalysisReport";
 
 const Reports = () => {
   const { hasPermission } = usePermissions();
@@ -23,7 +23,7 @@ const Reports = () => {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
@@ -35,6 +35,10 @@ const Reports = () => {
           <TabsTrigger value="staff" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Staff
+          </TabsTrigger>
+          <TabsTrigger value="hours" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Hours
           </TabsTrigger>
           <TabsTrigger value="trends" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -71,6 +75,10 @@ const Reports = () => {
             <StaffOverviewWidget />
             <TeamAvailabilityWidget />
           </div>
+        </TabsContent>
+
+        <TabsContent value="hours" className="space-y-6">
+          <HoursAnalysisReport />
         </TabsContent>
 
         <TabsContent value="trends" className="space-y-6">
