@@ -47,6 +47,17 @@ interface LocationData {
   employment_type?: string;
 }
 
+interface GroupedEmployee {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  department: string;
+  phone_number?: string;
+  hire_date?: string;
+  locations: Record<string, LocationData>;
+}
+
 const Employees = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -97,7 +108,7 @@ const Employees = () => {
     }
     
     return acc;
-  }, {} as Record<string, any>);
+  }, {} as Record<string, GroupedEmployee>);
 
   const employees = Object.values(groupedEmployees);
 
@@ -107,9 +118,9 @@ const Employees = () => {
     employee.department?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleEmployeeClick = (employee: any) => {
+  const handleEmployeeClick = (employee: GroupedEmployee) => {
     // Convert back to the expected format for EmployeeDetails
-    const employeeForDetails = {
+    const employeeForDetails: Employee = {
       id: employee.id,
       first_name: employee.first_name,
       last_name: employee.last_name,
@@ -236,7 +247,7 @@ const Employees = () => {
                     <div className="text-sm font-medium text-gray-700 border-b pb-1">
                       Current Positions
                     </div>
-                    {Object.entries(employee.locations).map(([locationKey, locationData]: [string, any]) => (
+                    {Object.entries(employee.locations).map(([locationKey, locationData]) => (
                       <div key={locationKey} className="space-y-2">
                         <div className="flex items-center space-x-2">
                           <MapPin className="w-4 h-4 text-gray-500" />
