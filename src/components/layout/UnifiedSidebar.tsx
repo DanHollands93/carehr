@@ -10,6 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { unifiedMenuConfig } from "@/config/menuConfig";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const iconMap = {
   Home,
@@ -37,9 +39,10 @@ const UnifiedSidebar = ({
 }: UnifiedSidebarProps) => {
   const { signOut, userRole } = useAuth();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const isMobile = useIsMobile();
 
   const closeMobileSidebar = () => {
-    if (window.innerWidth < 768) {
+    if (isMobile) {
       setIsMobileOpen(false);
     }
   };
@@ -67,65 +70,83 @@ const UnifiedSidebar = ({
 
   const visibleGroups = getVisibleGroups();
 
+  const sidebarContent = (
+    <>
+      <div className="p-6 border-b bg-blue-50">
+        <h2 className="text-xl font-bold text-blue-900">
+          {userRole === 'admin' ? 'Admin Portal' : 'HR System'}
+        </h2>
+        <p className="text-sm text-blue-700">
+          {userRole === 'admin' ? 'System Administration' : 'Employee Portal'}
+        </p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {permissionsLoading ? (
+          <div className="p-4 text-center text-muted-foreground">
+            Loading menu...
+          </div>
+        ) : (
+          visibleGroups.map(group => (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {group.items.map(item => {
+                    const IconComponent = iconMap[item.icon as keyof typeof iconMap] || FileText;
+                    return (
+                      <SidebarMenuItem key={item.path}>
+                        <SidebarMenuButton asChild>
+                          <NavLink 
+                            to={item.path} 
+                            onClick={closeMobileSidebar} 
+                            className={({ isActive }) => 
+                              cn("flex items-center gap-3 w-full", isActive && "font-semibold text-sidebar-primary")
+                            }
+                          >
+                            <IconComponent className="w-5 h-5" />
+                            <span>{item.title}</span>
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))
+        )}
+      </div>
+
+      <div className="p-4 border-t">
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          onClick={handleSignOut}
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+        <SheetContent side="left" className="w-80 p-0">
+          <div className="flex h-full w-full flex-col">
+            {sidebarContent}
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
   return (
     <Sidebar>
       <SidebarContent>
-        <div className="p-6 border-b bg-blue-50">
-          <h2 className="text-xl font-bold text-blue-900">
-            {userRole === 'admin' ? 'Admin Portal' : 'HR System'}
-          </h2>
-          <p className="text-sm text-blue-700">
-            {userRole === 'admin' ? 'System Administration' : 'Employee Portal'}
-          </p>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {permissionsLoading ? (
-            <div className="p-4 text-center text-muted-foreground">
-              Loading menu...
-            </div>
-          ) : (
-            visibleGroups.map(group => (
-              <SidebarGroup key={group.label}>
-                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {group.items.map(item => {
-                      const IconComponent = iconMap[item.icon as keyof typeof iconMap] || FileText;
-                      return (
-                        <SidebarMenuItem key={item.path}>
-                          <SidebarMenuButton asChild>
-                            <NavLink 
-                              to={item.path} 
-                              onClick={closeMobileSidebar} 
-                              className={({ isActive }) => 
-                                cn("flex items-center gap-3 w-full", isActive && "font-semibold text-sidebar-primary")
-                              }
-                            >
-                              <IconComponent className="w-5 h-5" />
-                              <span>{item.title}</span>
-                            </NavLink>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            ))
-          )}
-        </div>
-
-        <div className="p-4 border-t">
-          <Button
-            variant="outline"
-            className="w-full justify-start"
-            onClick={handleSignOut}
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
-        </div>
+        {sidebarContent}
       </SidebarContent>
     </Sidebar>
   );
