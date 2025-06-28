@@ -97,7 +97,7 @@ export const usePermissions = () => {
     // Transform role-based permissions
     const rolePermissions: UserPermission[] = [];
     if (roleData) {
-      roleData.forEach(roleAssignment => {
+      roleData.forEach((roleAssignment: any) => {
         const permissionGroup = roleAssignment.permission_groups;
         if (permissionGroup && permissionGroup.permission_group_permissions) {
           permissionGroup.permission_group_permissions.forEach((pgp: any) => {
