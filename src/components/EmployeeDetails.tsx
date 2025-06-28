@@ -174,19 +174,22 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
   };
 
   const handleAddAddress = async (addressData: any) => {
-    // Mark current address as not current
+    // Mark current address as not current and set end date to day before new start date
+    const newStartDate = new Date(addressData.start_date);
+    const endDate = new Date(newStartDate);
+    endDate.setDate(endDate.getDate() - 1);
+    
     const updatedHistory = addressHistory.map(addr => ({
       ...addr,
       is_current: false,
-      end_date: new Date().toISOString().split('T')[0]
+      end_date: endDate.toISOString().split('T')[0]
     }));
 
     // Add new address
     const newAddress: AddressHistoryEntry = {
       id: Date.now().toString(),
       ...addressData,
-      is_current: true,
-      start_date: new Date().toISOString().split('T')[0]
+      is_current: true
     };
 
     setAddressHistory([newAddress, ...updatedHistory]);
@@ -688,12 +691,13 @@ const AddressForm = ({ onClose, onSave }: { onClose: () => void; onSave: (data: 
     line_2: '',
     city: '',
     postcode: '',
-    country: 'United Kingdom'
+    country: 'United Kingdom',
+    start_date: new Date().toISOString().split('T')[0]
   });
 
   const handleSave = () => {
-    if (!addressData.line_1 || !addressData.city || !addressData.postcode) {
-      toast.error("Please fill in required fields (Address Line 1, City, Postcode)");
+    if (!addressData.line_1 || !addressData.city || !addressData.postcode || !addressData.start_date) {
+      toast.error("Please fill in required fields (Address Line 1, City, Postcode, Start Date)");
       return;
     }
     onSave(addressData);
@@ -739,13 +743,24 @@ const AddressForm = ({ onClose, onSave }: { onClose: () => void; onSave: (data: 
             />
           </div>
         </div>
-        <div>
-          <Label htmlFor="country">Country</Label>
-          <Input
-            id="country"
-            value={addressData.country}
-            onChange={(e) => setAddressData({...addressData, country: e.target.value})}
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="country">Country</Label>
+            <Input
+              id="country"
+              value={addressData.country}
+              onChange={(e) => setAddressData({...addressData, country: e.target.value})}
+            />
+          </div>
+          <div>
+            <Label htmlFor="start_date">Start Date *</Label>
+            <Input
+              id="start_date"
+              type="date"
+              value={addressData.start_date}
+              onChange={(e) => setAddressData({...addressData, start_date: e.target.value})}
+            />
+          </div>
         </div>
         <div className="flex justify-end space-x-2 pt-4">
           <Button variant="outline" onClick={onClose}>
