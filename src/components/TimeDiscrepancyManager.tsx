@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +32,19 @@ interface TimeClockRecord {
   };
 }
 
+interface Employee {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+interface Shift {
+  id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+}
+
 interface DiscrepancyApproval {
   clock_in_action?: string;
   clock_in_notes?: string;
@@ -51,14 +63,10 @@ const TimeDiscrepancyManager = () => {
     queryFn: async () => {
       console.log('Fetching discrepancy records...');
       
-      // Get discrepancy records with employee and shift data
+      // First, get the discrepancy records
       const { data: records, error: recordsError } = await supabase
         .from('time_clock_records')
-        .select(`
-          *,
-          employees!inner(first_name, last_name),
-          shifts!inner(date, start_time, end_time)
-        `)
+        .select('*')
         .eq('status', 'discrepancy')
         .eq('approval_status', 'pending')
         .order('created_at', { ascending: false });
@@ -70,15 +78,49 @@ const TimeDiscrepancyManager = () => {
       
       console.log('Found discrepancy records:', records);
       
-      // Transform the data structure to match our interface
-      const transformedRecords = records?.map(record => ({
-        ...record,
-        employee: record.employees,
-        shift: record.shifts
-      })) || [];
+      if (!records || records.length === 0) {
+        return [];
+      }
       
-      console.log('Transformed records:', transformedRecords);
-      return transformedRecords as TimeClockRecord[];
+      // Get unique employee IDs and shift IDs
+      const employeeIds = [...new Set(records.map(r => r.employee_id))];
+      const shiftIds = [...new Set(records.map(r => r.shift_id).filter(Boolean))];
+      
+      // Fetch employees
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
+        .select('id, first_name, last_name')
+        .in('id', employeeIds);
+      
+      if (employeesError) {
+        console.error('Error fetching employees:', employeesError);
+        throw employeesError;
+      }
+      
+      // Fetch shifts
+      const { data: shifts, error: shiftsError } = await supabase
+        .from('shifts')
+        .select('id, date, start_time, end_time')
+        .in('id', shiftIds);
+      
+      if (shiftsError) {
+        console.error('Error fetching shifts:', shiftsError);
+        throw shiftsError;
+      }
+      
+      // Create lookup maps
+      const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
+      const shiftMap = new Map(shifts?.map(shift => [shift.id, shift]) || []);
+      
+      // Combine the data
+      const transformedRecords = records.map(record => ({
+        ...record,
+        employee: employeeMap.get(record.employee_id),
+        shift: shiftMap.get(record.shift_id || '')
+      })) as TimeClockRecord[];
+      
+      console.log('Transformed records with employee and shift data:', transformedRecords);
+      return transformedRecords;
     }
   });
 
@@ -218,7 +260,10 @@ const TimeDiscrepancyManager = () => {
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg">
-                      {record.employee?.first_name} {record.employee?.last_name}
+                      {record.employee ? 
+                        `${record.employee.first_name} ${record.employee.last_name}` : 
+                        'Unknown Employee'
+                      }
                     </CardTitle>
                     <div className="flex space-x-2">
                       <Badge variant="destructive">Discrepancy</Badge>
@@ -232,7 +277,9 @@ const TimeDiscrepancyManager = () => {
                   <div className="grid grid-cols-1 gap-4 text-sm">
                     <div className="flex items-center space-x-2">
                       <Clock className="w-4 h-4" />
-                      <span>Scheduled: {record.shift?.start_time || 'N/A'} - {record.shift?.end_time || 'N/A'}</span>
+                      <span>
+                        Scheduled: {record.shift?.start_time || 'N/A'} - {record.shift?.end_time || 'N/A'}
+                      </span>
                     </div>
                     
                     {/* Clock In Section */}
