@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,25 +27,18 @@ interface EmailLog {
 
 const EmailLogs = () => {
   const { toast } = useToast();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
 
-  // Debug permission check
-  useEffect(() => {
-    console.log('Email Logs - checking permission view_email_logs:', hasPermission('view_email_logs'));
-  }, [hasPermission]);
-
-  useEffect(() => {
-    if (hasPermission('view_email_logs')) {
-      loadEmailLogs();
+  const loadEmailLogs = useCallback(async () => {
+    if (!hasPermission('view_email_logs') || permissionsLoading) {
+      return;
     }
-  }, [hasPermission]);
 
-  const loadEmailLogs = async () => {
     setLoading(true);
     try {
       let query = supabase
@@ -88,9 +81,27 @@ const EmailLogs = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [hasPermission, permissionsLoading, statusFilter, typeFilter, searchTerm, toast]);
 
-  // Check if user has permission to view email logs - moved after all hooks
+  // Load email logs when permissions are ready and user has access
+  useEffect(() => {
+    if (!permissionsLoading && hasPermission('view_email_logs')) {
+      loadEmailLogs();
+    }
+  }, [permissionsLoading, hasPermission, loadEmailLogs]);
+
+  // Check if user has permission to view email logs
+  if (permissionsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+          <p className="mt-4">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!hasPermission('view_email_logs')) {
     return (
       <div className="min-h-screen flex items-center justify-center">
