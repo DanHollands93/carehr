@@ -1,4 +1,3 @@
-
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -39,7 +38,7 @@ const UnifiedSidebar = ({
   setIsMobileOpen
 }: UnifiedSidebarProps) => {
   const { signOut, userRole } = useAuth();
-  const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, loading: permissionsLoading, permissions } = usePermissions();
   const isMobile = useIsMobile();
 
   const closeMobileSidebar = () => {
@@ -53,15 +52,14 @@ const UnifiedSidebar = ({
   };
 
   const isMenuItemVisible = (item: any) => {
-    // Debug logging for specific items
-    if (item.title === 'My Shifts') {
-      console.log('Checking My Shifts visibility:', {
-        title: item.title,
-        requiredPermission: item.requiredPermission,
-        hasPermission: hasPermission(item.requiredPermission, item.location),
-        location: item.location
-      });
-    }
+    // Debug logging for ALL items to see what's happening
+    console.log('Checking visibility for:', {
+      title: item.title,
+      requiredPermission: item.requiredPermission,
+      location: item.location,
+      hasPermissionResult: hasPermission(item.requiredPermission, item.location),
+      allUserPermissions: permissions.map(p => p.permission.name)
+    });
 
     // If no permission required, show to everyone
     if (!item.requiredPermission) {
@@ -73,14 +71,15 @@ const UnifiedSidebar = ({
   };
 
   const getVisibleGroups = () => {
+    console.log('Getting visible groups. All permissions:', permissions);
+    console.log('Permission names:', permissions.map(p => p.permission.name));
+    
     const visibleGroups = unifiedMenuConfig.map(group => ({
       ...group,
       items: group.items.filter(isMenuItemVisible)
     })).filter(group => group.items.length > 0);
 
-    // Debug logging for Roster & Time group
-    const rosterGroup = visibleGroups.find(group => group.label === 'Roster & Time');
-    console.log('Roster & Time group:', rosterGroup);
+    console.log('Visible groups:', visibleGroups);
     
     return visibleGroups;
   };
