@@ -1,10 +1,9 @@
-
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { 
   Home, Calendar, User, FileText, Bell, LogOut, Settings, Users, 
-  Clock, CheckCircle, BarChart3, Menu, UserPlus
+  Clock, CheckCircle, BarChart3, Menu, UserPlus, Mail
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -25,7 +24,8 @@ const iconMap = {
   CheckCircle,
   BarChart3,
   Menu,
-  UserPlus
+  UserPlus,
+  Mail
 };
 
 interface UnifiedSidebarProps {
