@@ -12,6 +12,7 @@ import { ArrowLeft, Edit, Plus, MapPin, Phone, Mail, Calendar, Briefcase, PoundS
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CareerHistoryForm from "@/components/CareerHistoryForm";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Employee {
   id: string;
@@ -92,6 +93,8 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
     visa_expiry: '',
     right_to_work_status: 'verified'
   });
+
+  const { hasPermission } = usePermissions();
 
   const { data: fullEmployee, refetch: refetchEmployee } = useQuery({
     queryKey: ['employee', employee.id],
@@ -232,7 +235,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                     <CardTitle>Personal Information</CardTitle>
                     <CardDescription>Basic personal details and identification</CardDescription>
                   </div>
-                  {!editingPersonal && (
+                  {!editingPersonal && hasPermission('edit_employees') && (
                     <Button variant="outline" size="sm" onClick={() => {
                       setEditingPersonal(true);
                       setPersonalFormData({
@@ -254,47 +257,53 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 {editingPersonal ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="first_name">First Name</Label>
-                        <Input
-                          id="first_name"
-                          value={personalFormData.first_name}
-                          onChange={(e) => setPersonalFormData({...personalFormData, first_name: e.target.value})}
-                        />
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Basic Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="first_name">First Name *</Label>
+                          <Input
+                            id="first_name"
+                            value={personalFormData.first_name}
+                            onChange={(e) => setPersonalFormData({...personalFormData, first_name: e.target.value})}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="last_name">Last Name *</Label>
+                          <Input
+                            id="last_name"
+                            value={personalFormData.last_name}
+                            onChange={(e) => setPersonalFormData({...personalFormData, last_name: e.target.value})}
+                            required
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <Label htmlFor="last_name">Last Name</Label>
-                        <Input
-                          id="last_name"
-                          value={personalFormData.last_name}
-                          onChange={(e) => setPersonalFormData({...personalFormData, last_name: e.target.value})}
-                        />
-                      </div>
-                    </div>
 
-                    <div>
-                      <Label htmlFor="email">Email Address</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={personalFormData.email}
-                        onChange={(e) => setPersonalFormData({...personalFormData, email: e.target.value})}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="phone_number">Phone Number</Label>
-                        <Input
-                          id="phone_number"
-                          value={personalFormData.phone_number}
-                          onChange={(e) => setPersonalFormData({...personalFormData, phone_number: e.target.value})}
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="email">Email Address *</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={personalFormData.email}
+                            onChange={(e) => setPersonalFormData({...personalFormData, email: e.target.value})}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="phone_number">Phone Number</Label>
+                          <Input
+                            id="phone_number"
+                            value={personalFormData.phone_number}
+                            onChange={(e) => setPersonalFormData({...personalFormData, phone_number: e.target.value})}
+                          />
+                        </div>
                       </div>
+
                       <div>
                         <Label htmlFor="date_of_birth">Date of Birth</Label>
                         <Input
@@ -306,65 +315,72 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="national_insurance_number">National Insurance Number</Label>
-                        <Input
-                          id="national_insurance_number"
-                          value={personalFormData.national_insurance_number}
-                          onChange={(e) => setPersonalFormData({...personalFormData, national_insurance_number: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="tax_code">Tax Code</Label>
-                        <Input
-                          id="tax_code"
-                          value={personalFormData.tax_code}
-                          onChange={(e) => setPersonalFormData({...personalFormData, tax_code: e.target.value})}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <Label htmlFor="passport_number">Passport Number</Label>
-                        <Input
-                          id="passport_number"
-                          value={personalFormData.passport_number}
-                          onChange={(e) => setPersonalFormData({...personalFormData, passport_number: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="visa_expiry">Visa Expiry</Label>
-                        <Input
-                          id="visa_expiry"
-                          type="date"
-                          value={personalFormData.visa_expiry}
-                          onChange={(e) => setPersonalFormData({...personalFormData, visa_expiry: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="right_to_work_status">Right to Work Status</Label>
-                        <Select
-                          value={personalFormData.right_to_work_status}
-                          onValueChange={(value) => setPersonalFormData({...personalFormData, right_to_work_status: value})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="verified">Verified</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="expired">Expired</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Government & Tax Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="national_insurance_number">National Insurance Number</Label>
+                          <Input
+                            id="national_insurance_number"
+                            value={personalFormData.national_insurance_number}
+                            onChange={(e) => setPersonalFormData({...personalFormData, national_insurance_number: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="tax_code">Tax Code</Label>
+                          <Input
+                            id="tax_code"
+                            value={personalFormData.tax_code}
+                            onChange={(e) => setPersonalFormData({...personalFormData, tax_code: e.target.value})}
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-end space-x-2 pt-4">
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Immigration & Work Authorization</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor="passport_number">Passport Number</Label>
+                          <Input
+                            id="passport_number"
+                            value={personalFormData.passport_number}
+                            onChange={(e) => setPersonalFormData({...personalFormData, passport_number: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="visa_expiry">Visa Expiry Date</Label>
+                          <Input
+                            id="visa_expiry"
+                            type="date"
+                            value={personalFormData.visa_expiry}
+                            onChange={(e) => setPersonalFormData({...personalFormData, visa_expiry: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="right_to_work_status">Right to Work Status</Label>
+                          <Select
+                            value={personalFormData.right_to_work_status}
+                            onValueChange={(value) => setPersonalFormData({...personalFormData, right_to_work_status: value})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="verified">Verified</SelectItem>
+                              <SelectItem value="pending">Pending Verification</SelectItem>
+                              <SelectItem value="expired">Expired</SelectItem>
+                              <SelectItem value="not_required">Not Required (UK/EU Citizen)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end space-x-2 pt-6 border-t">
                       <Button variant="outline" onClick={() => setEditingPersonal(false)}>
                         <X className="w-4 h-4 mr-2" />
-                        Cancel
+                        Cancel Changes
                       </Button>
                       <Button onClick={handlePersonalSave}>
                         <Check className="w-4 h-4 mr-2" />
@@ -373,80 +389,96 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-sm text-gray-600">First Name:</span>
-                        <div>{fullEmployee.first_name}</div>
-                      </div>
-                      <div>
-                        <span className="text-sm text-gray-600">Last Name:</span>
-                        <div>{fullEmployee.last_name}</div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="text-sm text-gray-600">Email Address:</span>
-                      <div className="flex items-center space-x-3">
-                        <Mail className="w-4 h-4 text-gray-500" />
-                        <span>{fullEmployee.email}</span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      {fullEmployee.phone_number && (
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Basic Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                          <span className="text-sm text-gray-600">Phone Number:</span>
-                          <div className="flex items-center space-x-3">
-                            <Phone className="w-4 h-4 text-gray-500" />
-                            <span>{fullEmployee.phone_number}</span>
+                          <span className="text-sm font-medium text-gray-600">First Name</span>
+                          <div className="text-gray-900 mt-1">{fullEmployee.first_name || 'Not provided'}</div>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Last Name</span>
+                          <div className="text-gray-900 mt-1">{fullEmployee.last_name || 'Not provided'}</div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Email Address</span>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Mail className="w-4 h-4 text-gray-500" />
+                            <span className="text-gray-900">{fullEmployee.email}</span>
                           </div>
                         </div>
-                      )}
-                      {fullEmployee.date_of_birth && (
                         <div>
-                          <span className="text-sm text-gray-600">Date of Birth:</span>
-                          <div>{formatDate(fullEmployee.date_of_birth)}</div>
+                          <span className="text-sm font-medium text-gray-600">Phone Number</span>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Phone className="w-4 h-4 text-gray-500" />
+                            <span className="text-gray-900">{fullEmployee.phone_number || 'Not provided'}</span>
+                          </div>
                         </div>
-                      )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Date of Birth</span>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Calendar className="w-4 h-4 text-gray-500" />
+                            <span className="text-gray-900">
+                              {fullEmployee.date_of_birth ? formatDate(fullEmployee.date_of_birth) : 'Not provided'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      {fullEmployee.national_insurance_number && (
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Government & Tax Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                          <span className="text-sm text-gray-600">National Insurance Number:</span>
-                          <div>{fullEmployee.national_insurance_number}</div>
+                          <span className="text-sm font-medium text-gray-600">National Insurance Number</span>
+                          <div className="text-gray-900 mt-1">{fullEmployee.national_insurance_number || 'Not provided'}</div>
                         </div>
-                      )}
-                      {fullEmployee.tax_code && (
                         <div>
-                          <span className="text-sm text-gray-600">Tax Code:</span>
-                          <div>{fullEmployee.tax_code}</div>
+                          <span className="text-sm font-medium text-gray-600">Tax Code</span>
+                          <div className="text-gray-900 mt-1">{fullEmployee.tax_code || 'Not provided'}</div>
                         </div>
-                      )}
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      {fullEmployee.passport_number && (
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">Immigration & Work Authorization</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
-                          <span className="text-sm text-gray-600">Passport Number:</span>
-                          <div>{fullEmployee.passport_number}</div>
+                          <span className="text-sm font-medium text-gray-600">Passport Number</span>
+                          <div className="text-gray-900 mt-1">{fullEmployee.passport_number || 'Not provided'}</div>
                         </div>
-                      )}
-                      {fullEmployee.visa_expiry && (
                         <div>
-                          <span className="text-sm text-gray-600">Visa Expiry:</span>
-                          <div>{formatDate(fullEmployee.visa_expiry)}</div>
+                          <span className="text-sm font-medium text-gray-600">Visa Expiry Date</span>
+                          <div className="text-gray-900 mt-1">
+                            {fullEmployee.visa_expiry ? formatDate(fullEmployee.visa_expiry) : 'Not applicable'}
+                          </div>
                         </div>
-                      )}
-                      {fullEmployee.right_to_work_status && (
                         <div>
-                          <span className="text-sm text-gray-600">Right to Work Status:</span>
-                          <Badge variant="outline" className="mt-1">
-                            {fullEmployee.right_to_work_status}
-                          </Badge>
+                          <span className="text-sm font-medium text-gray-600">Right to Work Status</span>
+                          <div className="mt-1">
+                            <Badge 
+                              variant={
+                                fullEmployee.right_to_work_status === 'verified' ? 'default' :
+                                fullEmployee.right_to_work_status === 'pending' ? 'secondary' :
+                                fullEmployee.right_to_work_status === 'expired' ? 'destructive' : 'outline'
+                              }
+                            >
+                              {fullEmployee.right_to_work_status === 'verified' ? 'Verified' :
+                               fullEmployee.right_to_work_status === 'pending' ? 'Pending Verification' :
+                               fullEmployee.right_to_work_status === 'expired' ? 'Expired' :
+                               fullEmployee.right_to_work_status === 'not_required' ? 'Not Required' :
+                               'Not Set'}
+                            </Badge>
+                          </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 )}
