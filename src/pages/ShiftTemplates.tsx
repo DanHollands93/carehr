@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,10 +24,11 @@ interface ShiftTemplate {
   created_at: string;
 }
 
-interface Position {
+interface LookupItem {
   id: string;
-  name: string;
-  department: string;
+  category: string;
+  value: string;
+  is_active: boolean;
 }
 
 const ShiftTemplates = () => {
@@ -34,9 +36,6 @@ const ShiftTemplates = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isAddingPosition, setIsAddingPosition] = useState(false);
-  const [newPositionName, setNewPositionName] = useState("");
-  const [newPositionDepartment, setNewPositionDepartment] = useState("");
   const [editingTemplate, setEditingTemplate] = useState<ShiftTemplate | null>(null);
   
   const [formData, setFormData] = useState({
@@ -67,16 +66,19 @@ const ShiftTemplates = () => {
   const totalHours = calculateTotalHours(formData.start_time, formData.end_time);
   const payHours = Math.max(0, totalHours - formData.unpaid_break);
 
+  // Fetch positions from lookup_lists
   const { data: positions } = useQuery({
-    queryKey: ['positions'],
+    queryKey: ['lookup-positions'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('positions')
+        .from('lookup_lists')
         .select('*')
-        .order('name');
+        .eq('category', 'positions')
+        .eq('is_active', true)
+        .order('value');
       
       if (error) throw error;
-      return data as Position[];
+      return data as LookupItem[];
     }
   });
 
@@ -162,30 +164,6 @@ const ShiftTemplates = () => {
     }
   });
 
-  const createPositionMutation = useMutation({
-    mutationFn: async (data: { name: string; department: string }) => {
-      const { error } = await supabase
-        .from('positions')
-        .insert([data]);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['positions'] });
-      setIsAddingPosition(false);
-      setNewPositionName("");
-      setNewPositionDepartment("");
-      toast({ title: "Position added successfully" });
-    },
-    onError: (error) => {
-      toast({ 
-        title: "Error adding position", 
-        description: error.message,
-        variant: "destructive" 
-      });
-    }
-  });
-
   const resetForm = () => {
     setFormData({
       name: "",
@@ -196,15 +174,6 @@ const ShiftTemplates = () => {
       unpaid_break: 0
     });
     setEditingTemplate(null);
-  };
-
-  const handleAddPosition = () => {
-    if (newPositionName.trim()) {
-      createPositionMutation.mutate({
-        name: newPositionName.trim(),
-        department: newPositionDepartment.trim() || "General"
-      });
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -253,6 +222,15 @@ const ShiftTemplates = () => {
       </div>
     );
   }
+
+  // Group shift templates by position
+  const groupedTemplates = shiftTemplates?.reduce((acc, template) => {
+    if (!acc[template.position]) {
+      acc[template.position] = [];
+    }
+    acc[template.position].push(template);
+    return acc;
+  }, {} as Record<string, ShiftTemplate[]>) || {};
 
   return (
     <div className="space-y-6">
@@ -317,70 +295,21 @@ const ShiftTemplates = () => {
               
               <div>
                 <Label htmlFor="position">Position</Label>
-                <div className="space-y-2">
-                  <Select 
-                    value={formData.position} 
-                    onValueChange={(value) => setFormData({ ...formData, position: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a position" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {positions?.map((position) => (
-                        <SelectItem key={position.id} value={position.name}>
-                          {position.name} {position.department && `(${position.department})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  {!isAddingPosition ? (
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setIsAddingPosition(true)}
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Add New Position
-                    </Button>
-                  ) : (
-                    <div className="space-y-2 p-3 border rounded">
-                      <Input
-                        placeholder="Position name"
-                        value={newPositionName}
-                        onChange={(e) => setNewPositionName(e.target.value)}
-                      />
-                      <Input
-                        placeholder="Department (optional)"
-                        value={newPositionDepartment}
-                        onChange={(e) => setNewPositionDepartment(e.target.value)}
-                      />
-                      <div className="flex gap-2">
-                        <Button 
-                          type="button" 
-                          size="sm" 
-                          onClick={handleAddPosition}
-                          disabled={!newPositionName.trim()}
-                        >
-                          Add
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setIsAddingPosition(false);
-                            setNewPositionName("");
-                            setNewPositionDepartment("");
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <Select 
+                  value={formData.position} 
+                  onValueChange={(value) => setFormData({ ...formData, position: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a position" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {positions?.map((position) => (
+                      <SelectItem key={position.id} value={position.value}>
+                        {position.value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="grid grid-cols-2 gap-4">

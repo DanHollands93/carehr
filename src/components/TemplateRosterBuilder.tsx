@@ -37,6 +37,13 @@ interface TemplateShift {
   shift_template_id: string;
 }
 
+interface LookupItem {
+  id: string;
+  category: string;
+  value: string;
+  is_active: boolean;
+}
+
 interface TemplateRosterBuilderProps {
   templateId: string;
   templateName: string;
@@ -100,6 +107,22 @@ const TemplateRosterBuilder = ({
       
       if (error) throw error;
       return data as Employee[];
+    }
+  });
+
+  // Fetch positions from lookup_lists for grouping
+  const { data: positions } = useQuery({
+    queryKey: ['lookup-positions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lookup_lists')
+        .select('*')
+        .eq('category', 'positions')
+        .eq('is_active', true)
+        .order('value');
+      
+      if (error) throw error;
+      return data as LookupItem[];
     }
   });
 

@@ -27,7 +27,7 @@ const LOOKUP_CATEGORIES = [
   { key: 'pay_types', label: 'Pay Types', description: 'Salary, Hourly, Commission, etc.' },
   { key: 'contract_types', label: 'Contract Types', description: 'Permanent, Temporary, Fixed-term, etc.' },
   { key: 'currencies', label: 'Currencies', description: 'Currency codes (USD, GBP, EUR, etc.)' },
-  { key: 'positions', label: 'Positions', description: 'Job positions for shifts' }
+  { key: 'positions', label: 'Positions', description: 'Job positions for shifts and roles' }
 ];
 
 const LookupListsManager = () => {
@@ -61,6 +61,10 @@ const LookupListsManager = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lookup-items', selectedCategory] });
+      // Also invalidate positions query used by shift templates
+      if (selectedCategory === 'positions') {
+        queryClient.invalidateQueries({ queryKey: ['lookup-positions'] });
+      }
       setNewValue("");
       toast({
         title: "Item added",
@@ -88,6 +92,10 @@ const LookupListsManager = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lookup-items', selectedCategory] });
+      // Also invalidate positions query used by shift templates
+      if (selectedCategory === 'positions') {
+        queryClient.invalidateQueries({ queryKey: ['lookup-positions'] });
+      }
       toast({
         title: "Item updated",
         description: "Item status has been updated successfully"
