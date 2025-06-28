@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -438,7 +437,7 @@ const TemplateForm = ({ template, onSave, onCancel }: {
               <Save className="w-4 h-4 mr-2" />
               Save Template
             </Button>
-            </div>
+          </div>
         </form>
       </CardContent>
     </Card>
