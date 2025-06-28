@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User, UserPlus, Mail, Lock, Unlock, Shield, AlertCircle } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface Employee {
@@ -63,13 +62,12 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
   const createUserAccount = async () => {
     setLoading(true);
     try {
-      // Create the user account via Supabase Admin API (this would typically be done via an edge function)
-      const { data, error } = await supabase.auth.admin.createUser({
-        email: employee.email,
-        email_confirm: true,
-        user_metadata: {
-          first_name: employee.first_name,
-          last_name: employee.last_name
+      const { data, error } = await supabase.functions.invoke('create-user-account', {
+        body: {
+          email: employee.email,
+          firstName: employee.first_name,
+          lastName: employee.last_name,
+          employeeId: employee.id
         }
       });
 
@@ -77,20 +75,17 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
         console.error('Error creating user account:', error);
         toast({
           title: "Error",
-          description: "Failed to create user account. This requires admin privileges.",
+          description: error.message || "Failed to create user account",
+          variant: "destructive"
+        });
+      } else if (data?.error) {
+        console.error('Server error creating user account:', data.error);
+        toast({
+          title: "Error",
+          description: data.error,
           variant: "destructive"
         });
       } else {
-        // Update the profile to link to the employee
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ employee_id: employee.id })
-          .eq('id', data.user.id);
-
-        if (profileError) {
-          console.error('Error linking profile to employee:', profileError);
-        }
-
         toast({
           title: "Success",
           description: "User account created successfully",
