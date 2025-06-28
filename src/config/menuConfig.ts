@@ -1,5 +1,5 @@
 
-export interface MenuItem {
+interface MenuItem {
   title: string;
   path: string;
   icon: string;
@@ -7,104 +7,107 @@ export interface MenuItem {
   location?: string;
 }
 
-export interface MenuGroup {
+interface MenuGroup {
   label: string;
   items: MenuItem[];
 }
 
 export const unifiedMenuConfig: MenuGroup[] = [
   {
+    label: "Personal",
+    items: [
+      {
+        title: "Personal Details",
+        path: "/hr/profile",
+        icon: "User",
+        requiredPermission: "view_personal"
+      }
+    ]
+  },
+  {
     label: "Overview",
     items: [
       {
-        title: "Dashboard", 
+        title: "Dashboard",
         path: "/",
         icon: "Home"
       }
     ]
   },
   {
-    label: "Employee Management",
+    label: "Employee Services",
     items: [
       {
-        title: "View Employees",
-        path: "/employees",
-        icon: "Users",
-        requiredPermission: "view_employees"
+        title: "Holiday Requests",
+        path: "/hr/holidays",
+        icon: "Calendar",
+        requiredPermission: "manage_holidays"
       },
       {
-        title: "Add Employee",
-        path: "/employees/new",
-        icon: "UserPlus",
-        requiredPermission: "create_employees"
+        title: "Documents",
+        path: "/hr/documents",
+        icon: "FileText",
+        requiredPermission: "view_documents"
+      },
+      {
+        title: "Notifications",
+        path: "/hr/notifications",
+        icon: "Bell",
+        requiredPermission: "view_notifications"
       }
     ]
   },
   {
-    label: "Roster Management",
+    label: "Management",
     items: [
       {
-        title: "View Roster",
+        title: "Menu Sets",
+        path: "/menu-sets",
+        icon: "Menu",
+        requiredPermission: "manage_menu_sets"
+      },
+      {
+        title: "Processes",
+        path: "/processes",
+        icon: "FileText",
+        requiredPermission: "manage_processes"
+      },
+      {
+        title: "User Management",
+        path: "/admin/users",
+        icon: "Users",
+        requiredPermission: "manage_users"
+      }
+    ]
+  },
+  {
+    label: "Rostering",
+    items: [
+      {
+        title: "Weekly Roster",
         path: "/roster",
         icon: "Calendar",
-        requiredPermission: "view_roster"
+        requiredPermission: "manage_roster"
       },
       {
         title: "Roster Templates",
         path: "/roster-templates",
-        icon: "FileText",
-        requiredPermission: "edit_roster"
+        icon: "CalendarDays",
+        requiredPermission: "manage_roster_templates"
       },
       {
         title: "Shift Templates",
         path: "/shift-templates",
         icon: "Clock",
-        requiredPermission: "edit_roster"
+        requiredPermission: "manage_shifts"
       }
     ]
   },
   {
-    label: "Holiday Management",
+    label: "Reports",
     items: [
       {
-        title: "My Holiday Requests",
-        path: "/hr/holidays",
-        icon: "Calendar",
-        requiredPermission: "submit_holidays"
-      },
-      {
-        title: "Holiday Approvals",
-        path: "/holidays/approvals",
-        icon: "CheckCircle",
-        requiredPermission: "approve_holidays"
-      }
-    ]
-  },
-  {
-    label: "Personal",
-    items: [
-      {
-        title: "My Profile",
-        path: "/hr/profile",
-        icon: "User"
-      },
-      {
-        title: "My Documents",
-        path: "/hr/documents",
-        icon: "FileText"
-      },
-      {
-        title: "Notifications",
-        path: "/hr/notifications",
-        icon: "Bell"
-      }
-    ]
-  },
-  {
-    label: "Reports & Analytics",
-    items: [
-      {
-        title: "View Reports",
+        title: "Analytics",
         path: "/reports",
         icon: "BarChart3",
         requiredPermission: "view_reports"
@@ -112,31 +115,13 @@ export const unifiedMenuConfig: MenuGroup[] = [
     ]
   },
   {
-    label: "System Administration",
+    label: "Administration",
     items: [
       {
-        title: "Menu Sets",
-        path: "/menu-sets",
-        icon: "Menu",
-        requiredPermission: "edit_settings"
-      },
-      {
-        title: "Processes",
-        path: "/processes",
-        icon: "Settings",
-        requiredPermission: "edit_settings"
-      },
-      {
-        title: "System Settings",
+        title: "Settings",
         path: "/settings",
         icon: "Settings",
-        requiredPermission: "edit_settings"
-      },
-      {
-        title: "User Management",
-        path: "/admin/users",
-        icon: "Users",
-        requiredPermission: "manage_users"
+        requiredPermission: "manage_settings"
       }
     ]
   }

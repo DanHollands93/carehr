@@ -67,7 +67,7 @@ const PermissionGroupManager: React.FC<PermissionGroupManagerProps> = ({
         permissions!inner(*)
       `)
       .eq('permission_group_id', permissionGroup.id)
-      .is('location', null); // Only get global permissions (no location-specific ones)
+      .is('location', null);
     
     if (error) {
       console.error('Error loading group permissions:', error);
@@ -117,7 +117,7 @@ const PermissionGroupManager: React.FC<PermissionGroupManagerProps> = ({
         .insert({
           permission_group_id: permissionGroup.id,
           permission_id: permissionId,
-          location: null // Global permission
+          location: null
         });
       
       if (error) {
@@ -139,6 +139,15 @@ const PermissionGroupManager: React.FC<PermissionGroupManagerProps> = ({
     setLoading(false);
   };
 
+  const formatPermissionName = (name: string) => {
+    return name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const formatCategoryName = (category: string) => {
+    return category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  // Sort permissions with personal at the top
   const permissionsByCategory = permissions.reduce((acc, permission) => {
     if (!acc[permission.category]) {
       acc[permission.category] = [];
@@ -146,6 +155,13 @@ const PermissionGroupManager: React.FC<PermissionGroupManagerProps> = ({
     acc[permission.category].push(permission);
     return acc;
   }, {} as Record<string, Permission[]>);
+
+  // Ensure personal category comes first
+  const sortedCategories = Object.keys(permissionsByCategory).sort((a, b) => {
+    if (a === 'personal') return -1;
+    if (b === 'personal') return 1;
+    return a.localeCompare(b);
+  });
 
   return (
     <Card>
@@ -160,10 +176,10 @@ const PermissionGroupManager: React.FC<PermissionGroupManagerProps> = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {Object.entries(permissionsByCategory).map(([category, categoryPermissions]) => (
+          {sortedCategories.map((category) => (
             <div key={category} className="space-y-4">
-              <h4 className="font-medium capitalize">{category} Permissions</h4>
-              {categoryPermissions.map(permission => {
+              <h4 className="font-medium">{formatCategoryName(category)} Permissions</h4>
+              {permissionsByCategory[category].map(permission => {
                 const isActive = hasPermission(permission.id);
                 
                 return (
@@ -171,7 +187,7 @@ const PermissionGroupManager: React.FC<PermissionGroupManagerProps> = ({
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
                         <div>
-                          <p className="font-medium">{permission.name}</p>
+                          <p className="font-medium">{formatPermissionName(permission.name)}</p>
                           <p className="text-sm text-muted-foreground">{permission.description}</p>
                         </div>
                       </div>
