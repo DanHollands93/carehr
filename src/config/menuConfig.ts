@@ -1,3 +1,4 @@
+
 import { LucideIcon } from "lucide-react";
 import {
   BarChart3,
@@ -9,6 +10,7 @@ import {
   UserCheck,
   Users,
   Workflow,
+  Clock,
 } from "lucide-react";
 
 interface MenuItem {
@@ -159,3 +161,157 @@ export const menuConfig: MenuConfig = {
     }
   }
 };
+
+// Unified menu structure for the sidebar
+interface UnifiedMenuItem {
+  title: string;
+  path: string;
+  icon: string;
+  requiredPermission?: string;
+  location?: string;
+}
+
+interface UnifiedMenuGroup {
+  label: string;
+  items: UnifiedMenuItem[];
+}
+
+export const unifiedMenuConfig: UnifiedMenuGroup[] = [
+  {
+    label: "Main",
+    items: [
+      {
+        title: "Dashboard",
+        path: "/",
+        icon: "Home"
+      }
+    ]
+  },
+  {
+    label: "Employee Management",
+    items: [
+      {
+        title: "All Employees",
+        path: "/employees",
+        icon: "Users",
+        requiredPermission: "view_employees"
+      },
+      {
+        title: "Add Employee",
+        path: "/employees/new",
+        icon: "UserPlus",
+        requiredPermission: "create_employees"
+      }
+    ]
+  },
+  {
+    label: "Roster & Time",
+    items: [
+      {
+        title: "Weekly Roster",
+        path: "/roster",
+        icon: "Calendar",
+        requiredPermission: "view_roster"
+      },
+      {
+        title: "My Shifts",
+        path: "/staff/shifts",
+        icon: "Clock",
+        requiredPermission: "view_staff_shifts"
+      },
+      {
+        title: "Shift Templates",
+        path: "/shift-templates",
+        icon: "Calendar",
+        requiredPermission: "edit_roster"
+      },
+      {
+        title: "Roster Templates",
+        path: "/roster-templates",
+        icon: "Calendar",
+        requiredPermission: "edit_roster"
+      },
+      {
+        title: "Time Discrepancies",
+        path: "/time/discrepancies",
+        icon: "CheckCircle",
+        requiredPermission: "manage_time_records"
+      }
+    ]
+  },
+  {
+    label: "HR & Personal",
+    items: [
+      {
+        title: "My Holidays",
+        path: "/hr/holidays",
+        icon: "Calendar",
+        requiredPermission: "submit_holidays"
+      },
+      {
+        title: "Holiday Approvals",
+        path: "/holidays/approvals",
+        icon: "CheckCircle",
+        requiredPermission: "approve_holidays"
+      },
+      {
+        title: "My Profile",
+        path: "/hr/profile",
+        icon: "User"
+      },
+      {
+        title: "Documents",
+        path: "/hr/documents",
+        icon: "FileText"
+      },
+      {
+        title: "Notifications",
+        path: "/hr/notifications",
+        icon: "Bell"
+      }
+    ]
+  },
+  {
+    label: "System",
+    items: [
+      {
+        title: "Processes",
+        path: "/processes",
+        icon: "Settings"
+      },
+      {
+        title: "Menu Sets",
+        path: "/menu-sets",
+        icon: "Menu"
+      },
+      {
+        title: "Settings",
+        path: "/settings",
+        icon: "Settings"
+      },
+      {
+        title: "Reports",
+        path: "/reports",
+        icon: "BarChart3",
+        requiredPermission: "view_reports"
+      }
+    ]
+  },
+  {
+    label: "Administration",
+    items: [
+      {
+        title: "User Management",
+        path: "/admin/users",
+        icon: "Users",
+        requiredPermission: "manage_users"
+      },
+      {
+        title: "Email Logs",
+        path: "/admin/email-logs",
+        icon: "Mail",
+        requiredPermission: "view_email_logs"
+      }
+    ]
+  }
+];

@@ -147,7 +147,7 @@ const PermissionGroupManager: React.FC<PermissionGroupManagerProps> = ({
     return category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  // Sort permissions with personal at the top
+  // Sort permissions with personal at the top, then time_management
   const permissionsByCategory = permissions.reduce((acc, permission) => {
     if (!acc[permission.category]) {
       acc[permission.category] = [];
@@ -156,10 +156,12 @@ const PermissionGroupManager: React.FC<PermissionGroupManagerProps> = ({
     return acc;
   }, {} as Record<string, Permission[]>);
 
-  // Ensure personal category comes first
+  // Ensure personal and time_management categories come first
   const sortedCategories = Object.keys(permissionsByCategory).sort((a, b) => {
     if (a === 'personal') return -1;
     if (b === 'personal') return 1;
+    if (a === 'time_management') return -1;
+    if (b === 'time_management') return 1;
     return a.localeCompare(b);
   });
 
