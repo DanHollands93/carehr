@@ -98,8 +98,9 @@ export const usePermissions = () => {
     const rolePermissions: UserPermission[] = [];
     if (roleData) {
       roleData.forEach(roleAssignment => {
-        if (roleAssignment.permission_groups?.permission_group_permissions) {
-          roleAssignment.permission_groups.permission_group_permissions.forEach((pgp: any) => {
+        const permissionGroup = roleAssignment.permission_groups;
+        if (permissionGroup && permissionGroup.permission_group_permissions) {
+          permissionGroup.permission_group_permissions.forEach((pgp: any) => {
             if (pgp.permissions) {
               rolePermissions.push({
                 id: `role-${roleAssignment.id}-${pgp.permission_id}`,
