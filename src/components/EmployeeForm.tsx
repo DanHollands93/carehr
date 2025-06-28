@@ -97,6 +97,30 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
     setIsSubmitting(true);
     
     try {
+      // Validate required fields
+      if (!data.pay_rate || data.pay_rate <= 0) {
+        toast.error("Pay rate is required and must be greater than 0");
+        return;
+      }
+
+      // Check if email already exists
+      const { data: existingEmployee, error: checkError } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('email', data.email)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking email:', checkError);
+        toast.error("Error checking email availability");
+        return;
+      }
+
+      if (existingEmployee) {
+        toast.error("An employee with this email address already exists");
+        return;
+      }
+
       // Create employee record
       const { data: employee, error: employeeError } = await supabase
         .from('employees')
@@ -144,14 +168,14 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
           employee_id: employee.id,
           job_title: data.job_title,
           location: data.location,
-          pay_rate: data.pay_rate,
+          pay_rate: Number(data.pay_rate),
           pay_type: data.pay_type,
-          hours_per_week: data.hours_per_week,
+          hours_per_week: data.hours_per_week || 40,
           employment_type: data.employment_type,
           contract_type: data.contract_type,
           start_date: data.start_date,
           probation_end_date: data.probation_end_date || null,
-          notice_period_weeks: data.notice_period_weeks,
+          notice_period_weeks: data.notice_period_weeks || 4,
           currency: 'GBP'
         });
 
@@ -435,6 +459,7 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
                         id="hours_per_week"
                         type="number"
                         step="0.5"
+                        defaultValue="40"
                         {...register("hours_per_week", { valueAsNumber: true })}
                       />
                     </div>
@@ -461,6 +486,7 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
                       <Input
                         id="notice_period_weeks"
                         type="number"
+                        defaultValue="4"
                         {...register("notice_period_weeks", { valueAsNumber: true })}
                       />
                     </div>
@@ -477,7 +503,7 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="pay_type">Pay Type</Label>
+                      <Label htmlFor="pay_type">Pay Type *</Label>
                       <Select onValueChange={(value) => setValue('pay_type', value as any)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select pay type" />
@@ -493,14 +519,22 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
                     </div>
                     <div>
                       <Label htmlFor="pay_rate">
-                        {payType === 'hourly' ? 'Hourly Rate (£)' : 'Annual Salary (£)'}
+                        {payType === 'hourly' ? 'Hourly Rate (£) *' : 'Annual Salary (£) *'}
                       </Label>
                       <Input
                         id="pay_rate"
                         type="number"
                         step="0.01"
-                        {...register("pay_rate", { valueAsNumber: true })}
+                        min="0.01"
+                        {...register("pay_rate", { 
+                          required: "Pay rate is required",
+                          valueAsNumber: true,
+                          min: { value: 0.01, message: "Pay rate must be greater than 0" }
+                        })}
                       />
+                      {errors.pay_rate && (
+                        <p className="text-sm text-red-600 mt-1">{errors.pay_rate.message}</p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
