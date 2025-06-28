@@ -15,22 +15,38 @@ const ResetPassword = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [validToken, setValidToken] = useState<boolean | null>(null);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const accessToken = searchParams.get('access_token');
-  const refreshToken = searchParams.get('refresh_token');
-
   useEffect(() => {
-    // If we have tokens in the URL, set the session
-    if (accessToken && refreshToken) {
-      supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-    }
-  }, [accessToken, refreshToken]);
+    // Check if we have auth session from Supabase redirect
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session error:', error);
+          setValidToken(false);
+          return;
+        }
+        
+        if (session) {
+          console.log('Valid session found for password reset');
+          setValidToken(true);
+        } else {
+          console.log('No valid session found');
+          setValidToken(false);
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+        setValidToken(false);
+      }
+    };
+
+    checkSession();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +77,7 @@ const ResetPassword = () => {
       });
 
       if (error) {
+        console.error('Password update error:', error);
         toast({
           title: "Password Reset Failed",
           description: error.message,
@@ -71,6 +88,9 @@ const ResetPassword = () => {
           title: "Password Reset Successful",
           description: "Your password has been updated successfully.",
         });
+        
+        // Sign out the user after password reset
+        await supabase.auth.signOut();
         
         // Redirect to login page after success
         setTimeout(() => {
@@ -89,8 +109,24 @@ const ResetPassword = () => {
     }
   };
 
-  // If no tokens in URL, show error
-  if (!accessToken || !refreshToken) {
+  // Show loading state while checking token
+  if (validToken === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Loading...</CardTitle>
+            <CardDescription>
+              Verifying your password reset link...
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error if token is invalid
+  if (!validToken) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Card className="w-full max-w-md">

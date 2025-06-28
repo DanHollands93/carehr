@@ -38,6 +38,9 @@ serve(async (req) => {
     const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/') || 'http://localhost:3000';
     const resetUrl = redirectTo || `${origin}/reset-password`;
 
+    console.log('Sending password reset email to:', email);
+    console.log('Redirect URL:', resetUrl);
+
     // Generate a password reset token
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
@@ -68,6 +71,8 @@ serve(async (req) => {
         }
       );
     }
+
+    console.log('Generated reset link:', data.properties.action_link);
 
     // Send email using Resend
     const emailResponse = await resend.emails.send({
