@@ -323,7 +323,7 @@ const TemplateForm = ({ template, onSave, onCancel }: {
               rows={3}
             />
             <p className="text-sm text-gray-500 mt-1">
-              Use {{variable_name}} for dynamic content (e.g., {{start_date}}, {{approver_name}})
+              Use double curly braces for dynamic content (e.g., start_date, approver_name)
             </p>
           </div>
 
