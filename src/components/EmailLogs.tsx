@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,21 +39,11 @@ const EmailLogs = () => {
     console.log('Email Logs - checking permission view_email_logs:', hasPermission('view_email_logs'));
   }, [hasPermission]);
 
-  // Check if user has permission to view email logs
-  if (!hasPermission('view_email_logs')) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-          <p className="text-gray-600">You don't have permission to view email logs.</p>
-        </div>
-      </div>
-    );
-  }
-
   useEffect(() => {
-    loadEmailLogs();
-  }, []);
+    if (hasPermission('view_email_logs')) {
+      loadEmailLogs();
+    }
+  }, [hasPermission]);
 
   const loadEmailLogs = async () => {
     setLoading(true);
@@ -98,6 +89,18 @@ const EmailLogs = () => {
       setLoading(false);
     }
   };
+
+  // Check if user has permission to view email logs - moved after all hooks
+  if (!hasPermission('view_email_logs')) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to view email logs.</p>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
