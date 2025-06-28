@@ -42,13 +42,45 @@ export const usePermissions = () => {
 
     console.log('Loading permissions for user:', user.id);
 
-    const { data, error } = await supabase
+    // Load permissions from role assignments (permission groups)
+    const { data: roleData, error: roleError } = await supabase
+      .from('user_role_assignments')
+      .select(`
+        id,
+        user_id,
+        permission_group_id,
+        location,
+        permission_groups!inner(
+          id,
+          name,
+          permission_group_permissions(
+            permission_id,
+            location,
+            permissions!inner(
+              id,
+              name,
+              description,
+              category
+            )
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true);
+
+    if (roleError) {
+      console.error('Error loading role permissions:', roleError);
+    }
+
+    // Also load direct user permission overrides
+    const { data: directData, error: directError } = await supabase
       .from('user_permissions')
       .select(`
         id,
         user_id,
         permission_id,
         location,
+        override_type,
         permissions!inner(
           id,
           name,
@@ -58,23 +90,50 @@ export const usePermissions = () => {
       `)
       .eq('user_id', user.id);
 
-    if (error) {
-      console.error('Error loading user permissions:', error);
-    } else {
-      // Transform the data to match our interface
-      const transformedData = data?.map(item => ({
+    if (directError) {
+      console.error('Error loading direct permissions:', directError);
+    }
+
+    // Transform role-based permissions
+    const rolePermissions: UserPermission[] = [];
+    if (roleData) {
+      roleData.forEach(roleAssignment => {
+        if (roleAssignment.permission_groups?.permission_group_permissions) {
+          roleAssignment.permission_groups.permission_group_permissions.forEach((pgp: any) => {
+            if (pgp.permissions) {
+              rolePermissions.push({
+                id: `role-${roleAssignment.id}-${pgp.permission_id}`,
+                user_id: user.id,
+                permission_id: pgp.permission_id,
+                location: pgp.location || roleAssignment.location,
+                permission: pgp.permissions
+              });
+            }
+          });
+        }
+      });
+    }
+
+    // Transform direct permissions
+    const directPermissions: UserPermission[] = (directData || [])
+      .filter(item => item.override_type === 'grant') // Only include grants
+      .map(item => ({
         id: item.id,
         user_id: item.user_id,
         permission_id: item.permission_id,
         location: item.location,
         permission: Array.isArray(item.permissions) ? item.permissions[0] : item.permissions
-      })) || [];
-      
-      console.log('Loaded user permissions:', transformedData);
-      console.log('Permission names:', transformedData.map(p => p.permission.name));
-      
-      setPermissions(transformedData);
-    }
+      }));
+
+    // Combine all permissions
+    const allPermissions = [...rolePermissions, ...directPermissions];
+    
+    console.log('Loaded role permissions:', rolePermissions);
+    console.log('Loaded direct permissions:', directPermissions);
+    console.log('All permissions:', allPermissions);
+    console.log('Permission names:', allPermissions.map(p => p.permission.name));
+    
+    setPermissions(allPermissions);
     setLoading(false);
   };
 
