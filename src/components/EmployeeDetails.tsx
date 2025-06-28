@@ -99,11 +99,16 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
 
   // Get the correct employee ID - could be 'id' or 'employee_id' depending on the data source
   const employeeId = employee.id || employee.employee_id;
+  
+  console.log('Employee data:', employee);
+  console.log('Resolved employee ID:', employeeId);
 
   const { data: fullEmployee, refetch: refetchEmployee } = useQuery({
     queryKey: ['employee', employeeId],
     queryFn: async () => {
       if (!employeeId) return null;
+      
+      console.log('Fetching employee with ID:', employeeId);
       
       const { data, error } = await supabase
         .from('employees')
@@ -111,7 +116,12 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
         .eq('id', employeeId)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching employee:', error);
+        throw error;
+      }
+      
+      console.log('Fetched employee data:', data);
       return data;
     },
     enabled: !!employeeId
@@ -174,14 +184,22 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
       return;
     }
 
+    console.log('Saving personal data for employee ID:', employeeId);
+    console.log('Personal form data:', personalFormData);
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('employees')
         .update(personalFormData)
-        .eq('id', employeeId);
+        .eq('id', employeeId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating employee:', error);
+        throw error;
+      }
 
+      console.log('Successfully updated employee:', data);
       toast.success("Personal details updated successfully!");
       setEditingPersonal(false);
       refetchEmployee();
