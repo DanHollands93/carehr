@@ -23,7 +23,16 @@ interface BulkRoleRule {
   position: string;
   permission_group_id: string;
   created_at: string;
-  permission_groups: PermissionGroup;
+  permission_groups: PermissionGroup; // This will be transformed from the array
+}
+
+// Raw interface from Supabase (before transformation)
+interface RawBulkRoleRule {
+  id: string;
+  position: string;
+  permission_group_id: string;
+  created_at: string;
+  permission_groups: PermissionGroup[];
 }
 
 const BulkRoleManager = () => {
@@ -93,7 +102,7 @@ const BulkRoleManager = () => {
           position,
           permission_group_id,
           created_at,
-          permission_groups!inner(
+          permission_groups(
             id,
             name,
             description
@@ -110,7 +119,16 @@ const BulkRoleManager = () => {
         });
       } else {
         console.log('Loaded bulk rules:', data);
-        setBulkRules(data || []);
+        
+        // Transform the raw data to match our interface
+        const transformedData: BulkRoleRule[] = (data as RawBulkRuleRule[])?.map(rule => ({
+          ...rule,
+          permission_groups: Array.isArray(rule.permission_groups) 
+            ? rule.permission_groups[0] 
+            : rule.permission_groups
+        })) || [];
+        
+        setBulkRules(transformedData);
       }
     } catch (error) {
       console.error('Exception loading bulk rules:', error);
