@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, User, Briefcase } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Plus, Search, User, Briefcase, MapPin, PoundSterling, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import EmployeeForm from "@/components/EmployeeForm";
 import EmployeeDetails from "@/components/EmployeeDetails";
@@ -61,6 +62,23 @@ const Employees = () => {
     refetch();
   };
 
+  const formatCurrency = (amount: number, type: string) => {
+    const formatted = new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP'
+    }).format(amount);
+    
+    return type === 'hourly' ? `${formatted}/hour` : `${formatted}/year`;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-GB', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   if (isLoading) {
     return <div className="p-6">Loading employees...</div>;
   }
@@ -89,20 +107,35 @@ const Employees = () => {
         </TabsList>
 
         <TabsContent value="list" className="space-y-6">
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search employees..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Badge variant="outline" className="text-sm">
-              {filteredEmployees.length} employees
-            </Badge>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Search & Filter</CardTitle>
+              <CardDescription>Find employees by name, email, or department</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="relative flex-1 max-w-md">
+                  <Label htmlFor="search">Search Employees</Label>
+                  <div className="relative mt-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      id="search"
+                      placeholder="Search employees..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Label>Total Employees:</Label>
+                  <Badge variant="outline" className="text-sm">
+                    {filteredEmployees.length}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredEmployees.map((employee) => (
@@ -112,58 +145,126 @@ const Employees = () => {
                 onClick={() => handleEmployeeClick(employee)}
               >
                 <CardHeader className="pb-3">
-                  <div className="flex items-center space-x-3">
+                  <CardTitle className="flex items-center space-x-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                       <User className="w-5 h-5 text-blue-600" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <CardTitle className="text-lg">
+                      <div className="text-lg font-semibold">
                         {employee.first_name} {employee.last_name}
-                      </CardTitle>
+                      </div>
                       <CardDescription className="break-words text-sm">
                         {employee.email}
                       </CardDescription>
                     </div>
-                  </div>
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
+                <CardContent className="space-y-4">
+                  {/* Position Details Section */}
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-gray-700 border-b pb-1">
+                      Position Details
+                    </div>
                     {employee.job_title && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Briefcase className="w-4 h-4 mr-2 flex-shrink-0" />
-                        <span className="break-words">{employee.job_title}</span>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <Label className="text-gray-600">Job Title:</Label>
+                        <div className="col-span-2 flex items-center">
+                          <Briefcase className="w-4 h-4 mr-2 text-gray-500" />
+                          <span className="break-words">{employee.job_title}</span>
+                        </div>
                       </div>
                     )}
                     {employee.department && (
-                      <Badge variant="secondary" className="text-xs">
-                        {employee.department}
-                      </Badge>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <Label className="text-gray-600">Department:</Label>
+                        <div className="col-span-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {employee.department}
+                          </Badge>
+                        </div>
+                      </div>
                     )}
                     {employee.location && (
-                      <div className="text-sm text-gray-500 break-words">
-                        📍 {employee.location}
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <Label className="text-gray-600">Location:</Label>
+                        <div className="col-span-2 flex items-center">
+                          <MapPin className="w-4 h-4 mr-2 text-gray-500" />
+                          <span className="break-words">{employee.location}</span>
+                        </div>
+                      </div>
+                    )}
+                    {employee.employment_type && (
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <Label className="text-gray-600">Type:</Label>
+                        <div className="col-span-2">
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {employee.employment_type.replace('_', ' ')}
+                          </Badge>
+                        </div>
                       </div>
                     )}
                   </div>
+
+                  {/* Financial Details Section */}
+                  {employee.pay_rate && (
+                    <div className="space-y-3 pt-3 border-t">
+                      <div className="text-sm font-medium text-gray-700 border-b pb-1">
+                        Financial Details
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <Label className="text-gray-600">Pay Rate:</Label>
+                        <div className="col-span-2 flex items-center">
+                          <PoundSterling className="w-4 h-4 mr-2 text-gray-500" />
+                          <span className="font-semibold">
+                            {formatCurrency(employee.pay_rate, employee.pay_type || 'salary')}
+                          </span>
+                        </div>
+                      </div>
+                      {employee.pay_type && (
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <Label className="text-gray-600">Pay Type:</Label>
+                          <div className="col-span-2">
+                            <Badge variant="outline" className="text-xs capitalize">
+                              {employee.pay_type}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Employment Status */}
+                  {employee.hire_date && (
+                    <div className="pt-3 border-t">
+                      <div className="flex items-center text-xs text-gray-500">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        <span>Joined {formatDate(employee.hire_date)}</span>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
           </div>
 
           {filteredEmployees.length === 0 && (
-            <div className="text-center py-12">
-              <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
-              <p className="text-gray-600 mb-4">
-                {searchTerm ? "Try adjusting your search terms" : "Get started by adding your first employee"}
-              </p>
-              {!searchTerm && (
-                <Button onClick={() => setShowCreateForm(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Employee
-                </Button>
-              )}
-            </div>
+            <Card>
+              <CardContent className="text-center py-12">
+                <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <CardTitle className="text-lg font-medium text-gray-900 mb-2">
+                  No employees found
+                </CardTitle>
+                <CardDescription className="mb-4">
+                  {searchTerm ? "Try adjusting your search terms" : "Get started by adding your first employee"}
+                </CardDescription>
+                {!searchTerm && (
+                  <Button onClick={() => setShowCreateForm(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Employee
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
