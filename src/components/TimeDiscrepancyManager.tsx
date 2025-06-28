@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,28 +42,61 @@ const TimeDiscrepancyManager = () => {
   const { data: discrepancyRecords, isLoading } = useQuery({
     queryKey: ['time-discrepancies'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      console.log('Fetching discrepancy records...');
+      
+      // First, let's get all discrepancy records
+      const { data: records, error: recordsError } = await supabase
         .from('time_clock_records')
-        .select(`
-          *,
-          shifts!inner(
-            date,
-            start_time,
-            end_time,
-            employees!inner(first_name, last_name)
-          )
-        `)
+        .select('*')
         .eq('status', 'discrepancy')
         .eq('approval_status', 'pending')
         .order('created_at', { ascending: false });
       
-      if (error) {
-        console.error('Error fetching discrepancy records:', error);
-        throw error;
+      if (recordsError) {
+        console.error('Error fetching time clock records:', recordsError);
+        throw recordsError;
       }
       
-      console.log('Fetched discrepancy records:', data);
-      return data as TimeClockRecord[];
+      console.log('Found discrepancy records:', records);
+      
+      if (!records || records.length === 0) {
+        return [];
+      }
+      
+      // Now get the shift information for each record
+      const recordsWithShifts = [];
+      
+      for (const record of records) {
+        if (record.shift_id) {
+          const { data: shift, error: shiftError } = await supabase
+            .from('shifts')
+            .select(`
+              date,
+              start_time,
+              end_time,
+              employees!inner(first_name, last_name)
+            `)
+            .eq('id', record.shift_id)
+            .single();
+          
+          if (shiftError) {
+            console.error('Error fetching shift for record:', record.id, shiftError);
+            // Include record even if shift fetch fails
+            recordsWithShifts.push(record);
+          } else {
+            recordsWithShifts.push({
+              ...record,
+              shifts: shift
+            });
+          }
+        } else {
+          // Include record even without shift_id
+          recordsWithShifts.push(record);
+        }
+      }
+      
+      console.log('Final records with shifts:', recordsWithShifts);
+      return recordsWithShifts as TimeClockRecord[];
     }
   });
 
@@ -195,7 +227,8 @@ const TimeDiscrepancyManager = () => {
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg">
-                      {record.shifts?.employees?.first_name} {record.shifts?.employees?.last_name}
+                      {record.shifts?.employees?.first_name} {record.shifts?.employees?.last_name} 
+                      {!record.shifts && ' (Employee data unavailable)'}
                     </CardTitle>
                     <div className="flex space-x-2">
                       <Badge 
@@ -214,7 +247,7 @@ const TimeDiscrepancyManager = () => {
                     <div className="space-y-1">
                       <div className="flex items-center space-x-2">
                         <Clock className="w-4 h-4" />
-                        <span>Scheduled: {record.shifts?.start_time} - {record.shifts?.end_time}</span>
+                        <span>Scheduled: {record.shifts?.start_time || 'N/A'} - {record.shifts?.end_time || 'N/A'}</span>
                       </div>
                       {record.clock_in_time && (
                         <div className="flex items-center space-x-2 text-green-600">
