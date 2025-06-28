@@ -48,6 +48,15 @@ interface Shift {
   job_role_id: string;
 }
 
+interface ShiftWithTimeRecord extends Shift {
+  time_record?: {
+    id: string;
+    status: 'scheduled' | 'clocked_in' | 'completed' | 'discrepancy';
+    clock_in_time: string | null;
+    clock_out_time: string | null;
+  };
+}
+
 const Roster = () => {
   const { userRole } = useAuth();
   const { hasPermission } = usePermissions();
@@ -141,16 +150,24 @@ const Roster = () => {
     }
   });
 
-  // Update the shifts query to include weekends
+  // Update the shifts query to include time clock records
   const { data: shifts } = useQuery({
     queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedCategoryId],
     queryFn: async () => {
       const startDate = format(weekStart, 'yyyy-MM-dd');
-      const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd'); // Changed from 4 to 6 for full week
+      const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
       
       let query = supabase
         .from('shifts')
-        .select('*')
+        .select(`
+          *,
+          time_clock_records!left(
+            id,
+            status,
+            clock_in_time,
+            clock_out_time
+          )
+        `)
         .gte('date', startDate)
         .lte('date', endDate);
 
@@ -160,7 +177,12 @@ const Roster = () => {
       
       const { data, error } = await query;
       if (error) throw error;
-      return data as Shift[];
+      
+      // Transform the data to include time records
+      return (data || []).map(shift => ({
+        ...shift,
+        time_record: shift.time_clock_records?.[0] || null
+      })) as ShiftWithTimeRecord[];
     }
   });
 
@@ -257,6 +279,40 @@ const Roster = () => {
       });
     }
   });
+
+  const getShiftStatusColor = (shift: ShiftWithTimeRecord) => {
+    if (!shift.time_record) return null;
+    
+    switch (shift.time_record.status) {
+      case 'scheduled':
+        return '#9CA3AF'; // Gray
+      case 'clocked_in':
+        return '#F59E0B'; // Amber
+      case 'completed':
+        return '#10B981'; // Green
+      case 'discrepancy':
+        return '#EF4444'; // Red
+      default:
+        return null;
+    }
+  };
+
+  const getShiftStatusText = (shift: ShiftWithTimeRecord) => {
+    if (!shift.time_record) return '';
+    
+    switch (shift.time_record.status) {
+      case 'scheduled':
+        return 'Scheduled';
+      case 'clocked_in':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      case 'discrepancy':
+        return 'Needs Review';
+      default:
+        return '';
+    }
+  };
 
   const handleDragStart = (template: ShiftTemplate) => {
     if (!canEditRoster || isMobile) return;
@@ -671,12 +727,15 @@ const Roster = () => {
                               <div className="text-sm text-gray-500">{employee.department}</div>
                             </td>
                             {weekDays.map((day) => {
-                              const shift = getShiftForEmployeeAndDate(employee.id, day.toISOString());
+                              const shift = getShiftForEmployeeAndDate(employee.id, day.toISOString()) as ShiftWithTimeRecord;
                               const template = shiftTemplates?.find(t => 
                                 shift && t.position === shift.position && 
                                 t.start_time === shift.start_time && 
                                 t.end_time === shift.end_time
                               );
+                              const statusColor = shift ? getShiftStatusColor(shift) : null;
+                              const statusText = shift ? getShiftStatusText(shift) : '';
+                              
                               return (
                                 <td
                                   key={day.toISOString()}
@@ -706,19 +765,28 @@ const Roster = () => {
                                         onDragStart={canEditRoster && !isMobile ? () => handleShiftDragStart(shift) : undefined}
                                         onDragEnd={canEditRoster && !isMobile ? handleDragEnd : undefined}
                                         className={cn(
-                                          "p-2 rounded text-xs transition-shadow",
+                                          "p-2 rounded text-xs transition-shadow relative",
                                           canEditRoster ? "cursor-pointer hover:shadow-md" : "cursor-default",
                                           !isMobile && canEditRoster && "hover:cursor-move"
                                         )}
                                         style={{ 
                                           backgroundColor: template?.color + '20' || '#3B82F6' + '20',
-                                          borderColor: template?.color || '#3B82F6'
+                                          borderColor: template?.color || '#3B82F6',
+                                          borderLeft: statusColor ? `4px solid ${statusColor}` : undefined
                                         }}
                                         onDoubleClick={canEditRoster && !isMobile ? () => deleteShiftMutation.mutate(shift.id) : undefined}
                                         title={canEditRoster ? (isMobile ? "Tap to edit or remove" : "Drag to move, click to edit, or double-click to delete") : "View only"}
                                       >
                                         <div className="font-medium">{shift.position}</div>
                                         <div>{shift.start_time} - {shift.end_time}</div>
+                                        {statusText && (
+                                          <div className="text-xs mt-1 font-medium" style={{ color: statusColor }}>
+                                            {statusText}
+                                          </div>
+                                        )}
+                                        {shift.time_record?.status === 'discrepancy' && (
+                                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                                        )}
                                       </div>
                                     ) : (
                                       canEditRoster && (

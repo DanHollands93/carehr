@@ -1,152 +1,161 @@
+import { LucideIcon } from "lucide-react";
+import {
+  BarChart3,
+  Calendar,
+  Home,
+  Menu,
+  Settings,
+  Shield,
+  UserCheck,
+  Users,
+  Workflow,
+} from "lucide-react";
 
 interface MenuItem {
-  title: string;
-  path: string;
-  icon: string;
-  requiredPermission?: string;
-  location?: string;
-}
-
-interface MenuGroup {
   label: string;
-  items: MenuItem[];
+  icon: LucideIcon;
+  href: string;
+  permissions: string[];
+  children?: {
+    [key: string]: Omit<MenuItem, "icon" | "children">;
+  };
 }
 
-export const unifiedMenuConfig: MenuGroup[] = [
-  {
-    label: "Personal",
-    items: [
-      {
-        title: "Personal Details",
-        path: "/hr/profile",
-        icon: "User",
-        requiredPermission: "view_personal"
-      }
-    ]
+interface MenuConfig {
+  [key: string]: MenuItem;
+}
+
+export const menuConfig: MenuConfig = {
+  dashboard: {
+    label: "Dashboard",
+    icon: Home,
+    href: "/",
+    permissions: []
   },
-  {
-    label: "Overview",
-    items: [
-      {
-        title: "Dashboard",
-        path: "/",
-        icon: "Home"
-        // No permission required - everyone can see dashboard
+  employees: {
+    label: "Employees", 
+    icon: Users,
+    href: "/employees",
+    permissions: ["view_employees"],
+    children: {
+      all_employees: {
+        label: "All Employees",
+        href: "/employees",
+        permissions: ["view_employees"]
+      },
+      add_employee: {
+        label: "Add Employee", 
+        href: "/employees/new",
+        permissions: ["create_employees"]
       }
-    ]
+    }
   },
-  {
-    label: "Employee Services",
-    items: [
-      {
-        title: "Holiday Requests",
-        path: "/hr/holidays",
-        icon: "Calendar",
-        requiredPermission: "submit_holidays"
+  roster: {
+    label: "Roster Management",
+    icon: Calendar,
+    href: "/roster",
+    permissions: ["view_roster"],
+    children: {
+      roster: {
+        label: "Weekly Roster",
+        href: "/roster", 
+        permissions: ["view_roster"]
       },
-      {
-        title: "Documents",
-        path: "/hr/documents",
-        icon: "FileText",
-        requiredPermission: "view_documents"
+      staff_shifts: {
+        label: "My Shifts",
+        href: "/staff/shifts",
+        permissions: ["view_staff_shifts"]
       },
-      {
-        title: "Notifications",
-        path: "/hr/notifications",
-        icon: "Bell",
-        requiredPermission: "view_notifications"
+      shift_templates: {
+        label: "Shift Templates",
+        href: "/shift-templates",
+        permissions: ["edit_roster"]
+      },
+      roster_templates: {
+        label: "Roster Templates", 
+        href: "/roster-templates",
+        permissions: ["edit_roster"]
+      },
+      time_discrepancies: {
+        label: "Time Discrepancies",
+        href: "/time/discrepancies",
+        permissions: ["manage_time_records"]
       }
-    ]
+    }
   },
-  {
-    label: "Management",
-    items: [
-      {
-        title: "Menu Sets",
-        path: "/menu-sets",
-        icon: "Menu"
-        // Remove permission requirement temporarily to see if this shows up
+  hr: {
+    label: "HR",
+    icon: UserCheck, 
+    href: "/hr/holidays",
+    permissions: ["submit_holidays"],
+    children: {
+      holidays: {
+        label: "My Holidays",
+        href: "/hr/holidays",
+        permissions: ["submit_holidays"]
       },
-      {
-        title: "Processes",
-        path: "/processes",
-        icon: "FileText"
-        // Remove permission requirement temporarily to see if this shows up
+      holiday_approvals: {
+        label: "Holiday Approvals",
+        href: "/holidays/approvals", 
+        permissions: ["approve_holidays"]
       },
-      {
-        title: "User Management",
-        path: "/admin/users",
-        icon: "Users",
-        requiredPermission: "manage_users"
+      profile: {
+        label: "My Profile",
+        href: "/hr/profile",
+        permissions: []
       },
-      {
-        title: "Employees",
-        path: "/employees",
-        icon: "UserPlus",
-        requiredPermission: "view_employees"
+      documents: {
+        label: "Documents",
+        href: "/hr/documents", 
+        permissions: []
+      },
+      notifications: {
+        label: "Notifications",
+        href: "/hr/notifications",
+        permissions: []
       }
-    ]
+    }
   },
-  {
-    label: "Rostering",
-    items: [
-      {
-        title: "Weekly Roster",
-        path: "/roster",
-        icon: "Calendar",
-        requiredPermission: "view_roster"
-      },
-      {
-        title: "Roster Templates",
-        path: "/roster-templates",
-        icon: "CalendarDays",
-        requiredPermission: "edit_roster"
-      },
-      {
-        title: "Shift Templates",
-        path: "/shift-templates",
-        icon: "Clock",
-        requiredPermission: "edit_roster"
-      }
-    ]
+  processes: {
+    label: "Processes",
+    icon: Workflow,
+    href: "/processes", 
+    permissions: []
   },
-  {
-    label: "Holiday Management",
-    items: [
-      {
-        title: "Holiday Approvals",
-        path: "/holidays/approvals",
-        icon: "CheckCircle",
-        requiredPermission: "approve_holidays"
-      }
-    ]
+  menu_sets: {
+    label: "Menu Sets",
+    icon: Menu,
+    href: "/menu-sets",
+    permissions: []
   },
-  {
+  settings: {
+    label: "Settings", 
+    icon: Settings,
+    href: "/settings",
+    permissions: []
+  },
+  reports: {
     label: "Reports",
-    items: [
-      {
-        title: "Analytics",
-        path: "/reports",
-        icon: "BarChart3",
-        requiredPermission: "view_reports"
-      }
-    ]
+    icon: BarChart3,
+    href: "/reports",
+    permissions: ["view_reports"]
   },
-  {
-    label: "Administration",
-    items: [
-      {
-        title: "Settings",
-        path: "/settings",
-        icon: "Settings"
-        // Remove permission requirement temporarily to see if this shows up
+  admin: {
+    label: "Admin",
+    icon: Shield,
+    href: "/admin/users",
+    permissions: ["manage_users"],
+    children: {
+      users: {
+        label: "User Management",
+        href: "/admin/users",
+        permissions: ["manage_users"]
       },
-      {
-        title: "Email Logs",
-        path: "/admin/email-logs",
-        icon: "Mail",
-        requiredPermission: "view_email_logs"
+      email_logs: {
+        label: "Email Logs", 
+        href: "/admin/email-logs",
+        permissions: ["view_email_logs"]
       }
-    ]
+    }
   }
-];
+};

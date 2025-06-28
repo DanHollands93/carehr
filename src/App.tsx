@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,6 +28,8 @@ import Roster from "./pages/Roster";
 import RosterTemplates from "./pages/RosterTemplates";
 import HolidayApprovals from "./pages/HolidayApprovals";
 import EmailLogs from "./pages/EmailLogs";
+import StaffShifts from "./pages/StaffShifts";
+import TimeDiscrepancyManager from "./components/TimeDiscrepancyManager";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,20 @@ const App = () => (
               <Route path="shift-templates" element={
                 <ProtectedRoute requiredPermission="edit_roster">
                   <ShiftTemplates />
+                </ProtectedRoute>
+              } />
+              
+              {/* Staff Shifts Route */}
+              <Route path="staff/shifts" element={
+                <ProtectedRoute requiredPermission="view_staff_shifts">
+                  <StaffShifts />
+                </ProtectedRoute>
+              } />
+              
+              {/* Time Management Routes */}
+              <Route path="time/discrepancies" element={
+                <ProtectedRoute requiredPermission="manage_time_records">
+                  <TimeDiscrepancyManager />
                 </ProtectedRoute>
               } />
               
