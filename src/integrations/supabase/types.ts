@@ -9,6 +9,51 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      address_history: {
+        Row: {
+          city: string
+          country: string
+          created_at: string
+          employee_id: string
+          end_date: string | null
+          id: string
+          is_current: boolean
+          line_1: string
+          line_2: string | null
+          postcode: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          city: string
+          country?: string
+          created_at?: string
+          employee_id: string
+          end_date?: string | null
+          id?: string
+          is_current?: boolean
+          line_1: string
+          line_2?: string | null
+          postcode: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          country?: string
+          created_at?: string
+          employee_id?: string
+          end_date?: string | null
+          id?: string
+          is_current?: boolean
+          line_1?: string
+          line_2?: string | null
+          postcode?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       applied_roster_templates: {
         Row: {
           applied_at: string | null

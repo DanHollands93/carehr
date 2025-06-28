@@ -144,21 +144,26 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
     enabled: !!employeeId
   });
 
-  // Mock address history - in real implementation, this would come from a separate addresses table
-  const [addressHistory, setAddressHistory] = useState<AddressHistoryEntry[]>(() => {
-    if (fullEmployee?.address && Object.keys(fullEmployee.address).length > 0) {
-      return [{
-        id: '1',
-        line_1: fullEmployee.address.line_1 || '',
-        line_2: fullEmployee.address.line_2 || '',
-        city: fullEmployee.address.city || '',
-        postcode: fullEmployee.address.postcode || '',
-        country: fullEmployee.address.country || 'United Kingdom',
-        start_date: fullEmployee.hire_date || new Date().toISOString().split('T')[0],
-        is_current: true
-      }];
-    }
-    return [];
+  // Fetch address history from database
+  const { data: addressHistory = [], refetch: refetchAddresses } = useQuery({
+    queryKey: ['address-history', employeeId],
+    queryFn: async () => {
+      if (!employeeId) return [];
+      
+      const { data, error } = await supabase
+        .from('address_history')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .order('start_date', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching address history:', error);
+        throw error;
+      }
+      
+      return data as AddressHistoryEntry[];
+    },
+    enabled: !!employeeId
   });
 
   const formatCurrency = (amount: number, type: string) => {
@@ -226,27 +231,58 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
   };
 
   const handleAddAddress = async (addressData: any) => {
-    // Mark current address as not current and set end date to day before new start date
-    const newStartDate = new Date(addressData.start_date);
-    const endDate = new Date(newStartDate);
-    endDate.setDate(endDate.getDate() - 1);
-    
-    const updatedHistory = addressHistory.map(addr => ({
-      ...addr,
-      is_current: false,
-      end_date: endDate.toISOString().split('T')[0]
-    }));
+    if (!employeeId) {
+      toast.error("Employee ID not found");
+      return;
+    }
 
-    // Add new address
-    const newAddress: AddressHistoryEntry = {
-      id: Date.now().toString(),
-      ...addressData,
-      is_current: true
-    };
+    try {
+      // First, mark all current addresses as not current and set end dates
+      const newStartDate = new Date(addressData.start_date);
+      const endDate = new Date(newStartDate);
+      endDate.setDate(endDate.getDate() - 1);
+      
+      if (addressHistory.some(addr => addr.is_current)) {
+        const { error: updateError } = await supabase
+          .from('address_history')
+          .update({ 
+            is_current: false, 
+            end_date: endDate.toISOString().split('T')[0],
+            updated_at: new Date().toISOString()
+          })
+          .eq('employee_id', employeeId)
+          .eq('is_current', true);
 
-    setAddressHistory([newAddress, ...updatedHistory]);
-    setShowAddressDialog(false);
-    toast.success("New address added successfully!");
+        if (updateError) {
+          console.error('Error updating existing addresses:', updateError);
+          throw updateError;
+        }
+      }
+
+      // Add new address to database
+      const { data, error } = await supabase
+        .from('address_history')
+        .insert({
+          employee_id: employeeId,
+          ...addressData,
+          is_current: true
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding address:', error);
+        throw error;
+      }
+
+      console.log('Successfully added address:', data);
+      toast.success("New address added successfully!");
+      setShowAddressDialog(false);
+      refetchAddresses();
+    } catch (error) {
+      console.error('Error adding address:', error);
+      toast.error("Failed to add address");
+    }
   };
 
   // Use the passed employee data or fullEmployee data, prioritizing fullEmployee when available
