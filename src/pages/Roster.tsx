@@ -93,6 +93,7 @@ const Roster = () => {
   // Get assigned employees for selected category
   const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
 
+  // Get all employees
   const { data: allEmployees } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
@@ -217,6 +218,7 @@ const Roster = () => {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Invalidate and refetch the shifts query to update the UI
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast({ title: "Shift added successfully" });
     },
@@ -246,6 +248,7 @@ const Roster = () => {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Invalidate and refetch the shifts query to update the UI
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast({ title: "Shift moved successfully" });
     },
@@ -268,6 +271,7 @@ const Roster = () => {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Invalidate and refetch the shifts query to update the UI
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast({ title: "Shift removed successfully" });
     },
@@ -328,38 +332,50 @@ const Roster = () => {
     setShowDeleteBin(true);
   };
 
-  const handleDrop = (employeeId: string, date: string) => {
+  const handleDrop = async (employeeId: string, date: string) => {
     if (!canEditRoster || isMobile) return;
-    if (draggedTemplate) {
-      createShiftMutation.mutate({
-        employeeId,
-        date: format(new Date(date), 'yyyy-MM-dd'),
-        shiftData: {
-          start_time: draggedTemplate.start_time,
-          end_time: draggedTemplate.end_time,
-          position: draggedTemplate.position,
-          pay_value: draggedTemplate.pay_value,
-          color: draggedTemplate.color
-        }
-      });
-      setDraggedTemplate(null);
-    } else if (draggedShift) {
-      updateShiftMutation.mutate({
-        shiftId: draggedShift.id,
-        employeeId,
-        date
-      });
-      setDraggedShift(null);
+    
+    try {
+      if (draggedTemplate) {
+        await createShiftMutation.mutateAsync({
+          employeeId,
+          date: format(new Date(date), 'yyyy-MM-dd'),
+          shiftData: {
+            start_time: draggedTemplate.start_time,
+            end_time: draggedTemplate.end_time,
+            position: draggedTemplate.position,
+            pay_value: draggedTemplate.pay_value,
+            color: draggedTemplate.color
+          }
+        });
+        setDraggedTemplate(null);
+      } else if (draggedShift) {
+        await updateShiftMutation.mutateAsync({
+          shiftId: draggedShift.id,
+          employeeId,
+          date
+        });
+        setDraggedShift(null);
+      }
+    } catch (error) {
+      console.error('Drop operation failed:', error);
     }
+    
     setShowDeleteBin(false);
   };
 
-  const handleDeleteDrop = () => {
+  const handleDeleteDrop = async () => {
     if (!canEditRoster || isMobile) return;
-    if (draggedShift) {
-      deleteShiftMutation.mutate(draggedShift.id);
-      setDraggedShift(null);
+    
+    try {
+      if (draggedShift) {
+        await deleteShiftMutation.mutateAsync(draggedShift.id);
+        setDraggedShift(null);
+      }
+    } catch (error) {
+      console.error('Delete operation failed:', error);
     }
+    
     setShowDeleteBin(false);
   };
 
@@ -740,8 +756,13 @@ const Roster = () => {
                                 <td
                                   key={day.toISOString()}
                                   className="p-2 border-r border-l min-w-32"
-                                  onDrop={canEditRoster && !isMobile ? () => handleDrop(employee.id, day.toISOString()) : undefined}
-                                  onDragOver={canEditRoster && !isMobile ? handleDragOver : undefined}
+                                  onDrop={canEditRoster && !isMobile ? (e) => {
+                                    e.preventDefault();
+                                    handleDrop(employee.id, day.toISOString());
+                                  } : undefined}
+                                  onDragOver={canEditRoster && !isMobile ? (e) => {
+                                    e.preventDefault();
+                                  } : undefined}
                                 >
                                   <div 
                                     className={cn(
