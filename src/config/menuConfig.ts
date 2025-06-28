@@ -31,6 +31,7 @@ export const unifiedMenuConfig: MenuGroup[] = [
         title: "Dashboard",
         path: "/",
         icon: "Home"
+        // No permission required - everyone can see dashboard
       }
     ]
   },
@@ -41,7 +42,7 @@ export const unifiedMenuConfig: MenuGroup[] = [
         title: "Holiday Requests",
         path: "/hr/holidays",
         icon: "Calendar",
-        requiredPermission: "manage_holidays"
+        requiredPermission: "submit_holidays"
       },
       {
         title: "Documents",
@@ -64,19 +65,25 @@ export const unifiedMenuConfig: MenuGroup[] = [
         title: "Menu Sets",
         path: "/menu-sets",
         icon: "Menu",
-        requiredPermission: "manage_menu_sets"
+        requiredPermission: "manage_settings"
       },
       {
         title: "Processes",
         path: "/processes",
         icon: "FileText",
-        requiredPermission: "manage_processes"
+        requiredPermission: "manage_settings"
       },
       {
         title: "User Management",
         path: "/admin/users",
         icon: "Users",
         requiredPermission: "manage_users"
+      },
+      {
+        title: "Employees",
+        path: "/employees",
+        icon: "UserPlus",
+        requiredPermission: "view_employees"
       }
     ]
   },
@@ -87,19 +94,30 @@ export const unifiedMenuConfig: MenuGroup[] = [
         title: "Weekly Roster",
         path: "/roster",
         icon: "Calendar",
-        requiredPermission: "manage_roster"
+        requiredPermission: "view_roster"
       },
       {
         title: "Roster Templates",
         path: "/roster-templates",
         icon: "CalendarDays",
-        requiredPermission: "manage_roster_templates"
+        requiredPermission: "edit_roster"
       },
       {
         title: "Shift Templates",
         path: "/shift-templates",
         icon: "Clock",
-        requiredPermission: "manage_shifts"
+        requiredPermission: "edit_roster"
+      }
+    ]
+  },
+  {
+    label: "Holiday Management",
+    items: [
+      {
+        title: "Holiday Approvals",
+        path: "/holidays/approvals",
+        icon: "CheckCircle",
+        requiredPermission: "approve_holidays"
       }
     ]
   },
