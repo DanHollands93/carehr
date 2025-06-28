@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
-import { useEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ShiftTemplate {
   id: string;
@@ -28,6 +29,13 @@ interface Shift {
   job_role_id: string;
 }
 
+interface CareerHistoryRole {
+  id: string;
+  job_title: string;
+  pay_rate: number;
+  currency: string;
+}
+
 interface ShiftCreationPopupProps {
   isOpen: boolean;
   onClose: () => void;
@@ -35,9 +43,8 @@ interface ShiftCreationPopupProps {
     start_time: string;
     end_time: string;
     position: string;
-    pay_value?: number;
-    color?: string;
-    job_role_id?: string;
+    job_role_id: string;
+    pay_rate: number;
   }) => void;
   onDeleteShift?: () => void;
   shiftTemplates: ShiftTemplate[];
@@ -63,10 +70,25 @@ const ShiftCreationPopup = ({
   const [endTime, setEndTime] = useState('17:00');
   const [position, setPosition] = useState('');
   const [selectedJobRole, setSelectedJobRole] = useState<string>('');
-  const [payValue, setPayValue] = useState<number>(0);
 
-  // Get employee job roles for role selection
-  const { data: employeeJobRoles } = useEmployeeJobRoles(employeeId);
+  // Get employee's current career history/job roles
+  const { data: careerHistory } = useQuery({
+    queryKey: ['employee-career-history', employeeId],
+    queryFn: async () => {
+      if (!employeeId) return [];
+      
+      const { data, error } = await supabase
+        .from('career_history')
+        .select('id, job_title, pay_rate, currency')
+        .eq('employee_id', employeeId)
+        .is('end_date', null) // Only current positions
+        .order('start_date', { ascending: false });
+      
+      if (error) throw error;
+      return data as CareerHistoryRole[];
+    },
+    enabled: !!employeeId
+  });
 
   useEffect(() => {
     if (existingShift) {
@@ -83,7 +105,6 @@ const ShiftCreationPopup = ({
       );
       if (matchingTemplate) {
         setSelectedTemplate(matchingTemplate.id);
-        setPayValue(matchingTemplate.pay_value || 0);
       }
     } else {
       // Reset form for new shift
@@ -92,9 +113,13 @@ const ShiftCreationPopup = ({
       setEndTime('17:00');
       setPosition('');
       setSelectedJobRole('');
-      setPayValue(0);
+      
+      // Auto-select job role if employee has only one
+      if (careerHistory && careerHistory.length === 1) {
+        setSelectedJobRole(careerHistory[0].id);
+      }
     }
-  }, [existingShift, shiftTemplates, isOpen]);
+  }, [existingShift, shiftTemplates, isOpen, careerHistory]);
 
   const handleTemplateSelect = (templateId: string) => {
     const template = shiftTemplates.find(t => t.id === templateId);
@@ -103,20 +128,21 @@ const ShiftCreationPopup = ({
       setStartTime(template.start_time);
       setEndTime(template.end_time);
       setPosition(template.position);
-      setPayValue(template.pay_value || 0);
     }
   };
 
   const handleSubmit = () => {
-    if (!startTime || !endTime || !position) return;
+    if (!startTime || !endTime || !position || !selectedJobRole) return;
+
+    const selectedRole = careerHistory?.find(role => role.id === selectedJobRole);
+    if (!selectedRole) return;
 
     onCreateShift({
       start_time: startTime,
       end_time: endTime,
       position: position,
-      pay_value: payValue,
-      color: selectedTemplate ? shiftTemplates.find(t => t.id === selectedTemplate)?.color : '#3B82F6',
-      job_role_id: selectedJobRole
+      job_role_id: selectedJobRole,
+      pay_rate: selectedRole.pay_rate
     });
   };
 
@@ -126,9 +152,10 @@ const ShiftCreationPopup = ({
     setEndTime('17:00');
     setPosition('');
     setSelectedJobRole('');
-    setPayValue(0);
     onClose();
   };
+
+  const selectedRole = careerHistory?.find(role => role.id === selectedJobRole);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -162,7 +189,7 @@ const ShiftCreationPopup = ({
           </div>
 
           {/* Job Role Selection */}
-          {employeeJobRoles && employeeJobRoles.length > 0 && (
+          {careerHistory && careerHistory.length > 0 && (
             <div className="space-y-2">
               <Label>Job Role *</Label>
               <Select value={selectedJobRole} onValueChange={setSelectedJobRole}>
@@ -170,14 +197,18 @@ const ShiftCreationPopup = ({
                   <SelectValue placeholder="Select job role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employeeJobRoles.map((ejr) => (
-                    <SelectItem key={ejr.job_role_id} value={ejr.job_role_id}>
-                      {ejr.job_roles?.title} - £{ejr.pay_rate.toFixed(2)}/hr
-                      {ejr.is_primary && ' (Primary)'}
+                  {careerHistory.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.job_title} - £{role.pay_rate.toFixed(2)}/hr
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {selectedRole && (
+                <div className="text-sm text-gray-600">
+                  Pay Rate: £{selectedRole.pay_rate.toFixed(2)}/hr ({selectedRole.currency})
+                </div>
+              )}
             </div>
           )}
 
@@ -208,18 +239,6 @@ const ShiftCreationPopup = ({
               value={position}
               onChange={(e) => setPosition(e.target.value)}
               placeholder="Enter position"
-            />
-          </div>
-
-          {/* Pay Value */}
-          <div className="space-y-2">
-            <Label>Pay Rate (£/hour)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={payValue}
-              onChange={(e) => setPayValue(parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
             />
           </div>
 

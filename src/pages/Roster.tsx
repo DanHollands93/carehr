@@ -215,8 +215,8 @@ const Roster = () => {
         start_time: string;
         end_time: string;
         position: string;
-        pay_value?: number;
-        color?: string;
+        job_role_id: string;
+        pay_rate: number;
       };
     }) => {
       // Check for overlapping shifts
@@ -233,7 +233,9 @@ const Roster = () => {
           start_time: shiftData.start_time,
           end_time: shiftData.end_time,
           position: shiftData.position,
-          job_role_id: '00000000-0000-0000-0000-000000000000',
+          job_role_id: shiftData.job_role_id,
+          actual_job_role_id: shiftData.job_role_id,
+          pay_rate: shiftData.pay_rate,
           category_id: selectedCategoryId
         }]);
       
@@ -368,8 +370,8 @@ const Roster = () => {
             start_time: draggedTemplate.start_time,
             end_time: draggedTemplate.end_time,
             position: draggedTemplate.position,
-            pay_value: draggedTemplate.pay_value,
-            color: draggedTemplate.color
+            job_role_id: '00000000-0000-0000-0000-000000000000', // default placeholder, will be set in popup
+            pay_rate: draggedTemplate.pay_value
           }
         });
         setDraggedTemplate(null);
@@ -466,8 +468,8 @@ const Roster = () => {
     start_time: string;
     end_time: string;
     position: string;
-    pay_value?: number;
-    color?: string;
+    job_role_id: string;
+    pay_rate: number;
   }) => {
     if (!canEditRoster) return;
     const formattedDate = format(new Date(shiftPopup.date), 'yyyy-MM-dd');
@@ -476,14 +478,15 @@ const Roster = () => {
       date: formattedDate,
       shiftData
     });
+    setShiftPopup(prev => ({ ...prev, isOpen: false }));
   };
 
   const handleUpdateShiftFromPopup = (shiftData: {
     start_time: string;
     end_time: string;
     position: string;
-    pay_value?: number;
-    color?: string;
+    job_role_id: string;
+    pay_rate: number;
   }) => {
     if (!canEditRoster || !shiftPopup.existingShift) return;
     
@@ -505,6 +508,7 @@ const Roster = () => {
       date: format(new Date(shiftPopup.date), 'yyyy-MM-dd'),
       shiftData
     });
+    setShiftPopup(prev => ({ ...prev, isOpen: false }));
   };
 
   const handleDeleteShiftFromPopup = () => {

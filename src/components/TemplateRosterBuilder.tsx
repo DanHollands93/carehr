@@ -437,8 +437,8 @@ const TemplateRosterBuilder = ({
     start_time: string;
     end_time: string;
     position: string;
-    pay_value?: number;
-    color?: string;
+    job_role_id: string;
+    pay_rate: number;
   }) => {
     // Find or create a shift template that matches this data
     const matchingTemplate = shiftTemplates?.find(t => 
@@ -450,7 +450,9 @@ const TemplateRosterBuilder = ({
     const newShift: TemplateShift = {
       employee_id: shiftPopup.employeeId,
       day_index: shiftPopup.dayIndex,
-      shift_template_id: matchingTemplate?.id || shiftTemplates?.[0]?.id || ''
+      shift_template_id: matchingTemplate?.id || shiftTemplates?.[0]?.id || '',
+      job_role_id: shiftData.job_role_id,
+      pay_rate: shiftData.pay_rate
     };
     
     setTemplateShifts(prev => [...prev, newShift]);
@@ -461,8 +463,8 @@ const TemplateRosterBuilder = ({
     start_time: string;
     end_time: string;
     position: string;
-    pay_value?: number;
-    color?: string;
+    job_role_id: string;
+    pay_rate: number;
   }) => {
     if (!shiftPopup.existingShift) return;
     
@@ -476,7 +478,12 @@ const TemplateRosterBuilder = ({
     setTemplateShifts(prev => 
       prev.map(shift => 
         shift === shiftPopup.existingShift 
-          ? { ...shift, shift_template_id: matchingTemplate?.id || shift.shift_template_id }
+          ? { 
+              ...shift, 
+              shift_template_id: matchingTemplate?.id || shift.shift_template_id,
+              job_role_id: shiftData.job_role_id,
+              pay_rate: shiftData.pay_rate
+            }
           : shift
       )
     );
