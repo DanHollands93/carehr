@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -58,16 +57,127 @@ interface EmployeeFormData {
   sort_code: string;
 }
 
+interface Employee {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  department: string;
+  phone_number?: string;
+  national_insurance_number?: string;
+  hire_date?: string;
+  job_title?: string;
+  location?: string;
+  pay_rate?: number;
+  pay_type?: string;
+  employment_type?: string;
+  date_of_birth?: string;
+  tax_code?: string;
+  passport_number?: string;
+  visa_expiry?: string;
+  right_to_work_status?: string;
+  address?: any;
+  emergency_contact?: any;
+  bank_details?: any;
+}
+
 interface EmployeeFormProps {
   onClose: () => void;
   onSuccess: () => void;
+  employee?: Employee; // Optional prop for editing
 }
 
-const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
+const EmployeeForm = ({ onClose, onSuccess, employee }: EmployeeFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<EmployeeFormData>();
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<EmployeeFormData>();
+  const isEditMode = !!employee;
 
   const payType = watch('pay_type');
+
+  // Fetch full employee data if editing
+  const { data: fullEmployee } = useQuery({
+    queryKey: ['employee-full', employee?.id],
+    queryFn: async () => {
+      if (!employee?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('id', employee.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: isEditMode
+  });
+
+  // Fetch current career history if editing
+  const { data: currentCareer } = useQuery({
+    queryKey: ['current-career', employee?.id],
+    queryFn: async () => {
+      if (!employee?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('career_history')
+        .select('*')
+        .eq('employee_id', employee.id)
+        .is('end_date', null)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+    enabled: isEditMode
+  });
+
+  // Populate form when editing
+  useEffect(() => {
+    if (isEditMode && fullEmployee && currentCareer) {
+      // Personal details
+      setValue('first_name', fullEmployee.first_name || '');
+      setValue('last_name', fullEmployee.last_name || '');
+      setValue('email', fullEmployee.email || '');
+      setValue('phone_number', fullEmployee.phone_number || '');
+      setValue('date_of_birth', fullEmployee.date_of_birth || '');
+      setValue('national_insurance_number', fullEmployee.national_insurance_number || '');
+      setValue('tax_code', fullEmployee.tax_code || '');
+      setValue('passport_number', fullEmployee.passport_number || '');
+      setValue('visa_expiry', fullEmployee.visa_expiry || '');
+      setValue('right_to_work_status', fullEmployee.right_to_work_status || '');
+
+      // Address
+      setValue('address_line_1', fullEmployee.address?.line_1 || '');
+      setValue('address_line_2', fullEmployee.address?.line_2 || '');
+      setValue('city', fullEmployee.address?.city || '');
+      setValue('postcode', fullEmployee.address?.postcode || '');
+      setValue('country', fullEmployee.address?.country || 'United Kingdom');
+
+      // Emergency contact
+      setValue('emergency_name', fullEmployee.emergency_contact?.name || '');
+      setValue('emergency_phone', fullEmployee.emergency_contact?.phone || '');
+      setValue('emergency_relationship', fullEmployee.emergency_contact?.relationship || '');
+
+      // Employment details
+      setValue('job_title', currentCareer.job_title || '');
+      setValue('department', fullEmployee.department || '');
+      setValue('location', currentCareer.location || '');
+      setValue('pay_rate', currentCareer.pay_rate || 0);
+      setValue('pay_type', currentCareer.pay_type || 'salary');
+      setValue('hours_per_week', currentCareer.hours_per_week || 40);
+      setValue('employment_type', currentCareer.employment_type || 'permanent');
+      setValue('contract_type', currentCareer.contract_type || 'full_time');
+      setValue('start_date', currentCareer.start_date?.split('T')[0] || '');
+      setValue('probation_end_date', currentCareer.probation_end_date || '');
+      setValue('notice_period_weeks', currentCareer.notice_period_weeks || 4);
+
+      // Bank details
+      setValue('bank_name', fullEmployee.bank_details?.bank_name || '');
+      setValue('account_holder_name', fullEmployee.bank_details?.account_holder_name || '');
+      setValue('account_number', fullEmployee.bank_details?.account_number || '');
+      setValue('sort_code', fullEmployee.bank_details?.sort_code || '');
+    }
+  }, [isEditMode, fullEmployee, currentCareer, setValue]);
 
   // Fetch lookup lists from settings
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
@@ -103,95 +213,160 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
         return;
       }
 
-      // Check if email already exists
-      const { data: existingEmployee, error: checkError } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('email', data.email)
-        .maybeSingle();
+      if (isEditMode && employee) {
+        // Update existing employee
+        const { error: updateError } = await supabase
+          .from('employees')
+          .update({
+            first_name: data.first_name,
+            last_name: data.last_name,
+            email: data.email,
+            phone_number: data.phone_number,
+            date_of_birth: data.date_of_birth,
+            national_insurance_number: data.national_insurance_number,
+            tax_code: data.tax_code,
+            passport_number: data.passport_number,
+            visa_expiry: data.visa_expiry || null,
+            right_to_work_status: data.right_to_work_status,
+            department: data.department,
+            hire_date: data.start_date,
+            address: {
+              line_1: data.address_line_1,
+              line_2: data.address_line_2,
+              city: data.city,
+              postcode: data.postcode,
+              country: data.country
+            },
+            bank_details: {
+              bank_name: data.bank_name,
+              account_holder_name: data.account_holder_name,
+              account_number: data.account_number,
+              sort_code: data.sort_code
+            },
+            emergency_contact: {
+              name: data.emergency_name,
+              phone: data.emergency_phone,
+              relationship: data.emergency_relationship
+            }
+          })
+          .eq('id', employee.id);
 
-      if (checkError) {
-        console.error('Error checking email:', checkError);
-        toast.error("Error checking email availability");
-        return;
+        if (updateError) throw updateError;
+
+        // Update current career history
+        if (currentCareer) {
+          const { error: careerUpdateError } = await supabase
+            .from('career_history')
+            .update({
+              job_title: data.job_title,
+              location: data.location,
+              pay_rate: Number(data.pay_rate),
+              pay_type: data.pay_type,
+              hours_per_week: data.hours_per_week || 40,
+              employment_type: data.employment_type,
+              contract_type: data.contract_type,
+              start_date: data.start_date,
+              probation_end_date: data.probation_end_date || null,
+              notice_period_weeks: data.notice_period_weeks || 4,
+            })
+            .eq('id', currentCareer.id);
+
+          if (careerUpdateError) throw careerUpdateError;
+        }
+
+        toast.success("Employee updated successfully!");
+      } else {
+        // Check if email already exists (for new employees)
+        const { data: existingEmployee, error: checkError } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('email', data.email)
+          .maybeSingle();
+
+        if (checkError) {
+          console.error('Error checking email:', checkError);
+          toast.error("Error checking email availability");
+          return;
+        }
+
+        if (existingEmployee) {
+          toast.error("An employee with this email address already exists");
+          return;
+        }
+
+        // Create employee record
+        const { data: newEmployee, error: employeeError } = await supabase
+          .from('employees')
+          .insert({
+            first_name: data.first_name,
+            last_name: data.last_name,
+            email: data.email,
+            phone_number: data.phone_number,
+            date_of_birth: data.date_of_birth,
+            national_insurance_number: data.national_insurance_number,
+            tax_code: data.tax_code,
+            passport_number: data.passport_number,
+            visa_expiry: data.visa_expiry || null,
+            right_to_work_status: data.right_to_work_status,
+            department: data.department,
+            hire_date: data.start_date,
+            address: {
+              line_1: data.address_line_1,
+              line_2: data.address_line_2,
+              city: data.city,
+              postcode: data.postcode,
+              country: data.country
+            },
+            bank_details: {
+              bank_name: data.bank_name,
+              account_holder_name: data.account_holder_name,
+              account_number: data.account_number,
+              sort_code: data.sort_code
+            },
+            emergency_contact: {
+              name: data.emergency_name,
+              phone: data.emergency_phone,
+              relationship: data.emergency_relationship
+            }
+          })
+          .select()
+          .single();
+
+        if (employeeError) throw employeeError;
+
+        // Create career history record
+        const { error: careerError } = await supabase
+          .from('career_history')
+          .insert({
+            employee_id: newEmployee.id,
+            job_title: data.job_title,
+            location: data.location,
+            pay_rate: Number(data.pay_rate),
+            pay_type: data.pay_type,
+            hours_per_week: data.hours_per_week || 40,
+            employment_type: data.employment_type,
+            contract_type: data.contract_type,
+            start_date: data.start_date,
+            probation_end_date: data.probation_end_date || null,
+            notice_period_weeks: data.notice_period_weeks || 4,
+            currency: 'GBP'
+          });
+
+        if (careerError) throw careerError;
+
+        toast.success("Employee created successfully!");
       }
-
-      if (existingEmployee) {
-        toast.error("An employee with this email address already exists");
-        return;
-      }
-
-      // Create employee record
-      const { data: employee, error: employeeError } = await supabase
-        .from('employees')
-        .insert({
-          first_name: data.first_name,
-          last_name: data.last_name,
-          email: data.email,
-          phone_number: data.phone_number,
-          date_of_birth: data.date_of_birth,
-          national_insurance_number: data.national_insurance_number,
-          tax_code: data.tax_code,
-          passport_number: data.passport_number,
-          visa_expiry: data.visa_expiry || null,
-          right_to_work_status: data.right_to_work_status,
-          department: data.department,
-          hire_date: data.start_date,
-          address: {
-            line_1: data.address_line_1,
-            line_2: data.address_line_2,
-            city: data.city,
-            postcode: data.postcode,
-            country: data.country
-          },
-          bank_details: {
-            bank_name: data.bank_name,
-            account_holder_name: data.account_holder_name,
-            account_number: data.account_number,
-            sort_code: data.sort_code
-          },
-          emergency_contact: {
-            name: data.emergency_name,
-            phone: data.emergency_phone,
-            relationship: data.emergency_relationship
-          }
-        })
-        .select()
-        .single();
-
-      if (employeeError) throw employeeError;
-
-      // Create career history record
-      const { error: careerError } = await supabase
-        .from('career_history')
-        .insert({
-          employee_id: employee.id,
-          job_title: data.job_title,
-          location: data.location,
-          pay_rate: Number(data.pay_rate),
-          pay_type: data.pay_type,
-          hours_per_week: data.hours_per_week || 40,
-          employment_type: data.employment_type,
-          contract_type: data.contract_type,
-          start_date: data.start_date,
-          probation_end_date: data.probation_end_date || null,
-          notice_period_weeks: data.notice_period_weeks || 4,
-          currency: 'GBP'
-        });
-
-      if (careerError) throw careerError;
-
-      toast.success("Employee created successfully!");
+      
       onSuccess();
     } catch (error) {
-      console.error('Error creating employee:', error);
-      toast.error("Failed to create employee. Please try again.");
+      console.error('Error saving employee:', error);
+      toast.error(`Failed to ${isEditMode ? 'update' : 'create'} employee. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoadingLookups) {
+  if (isLoadingLookups || (isEditMode && (!fullEmployee || !currentCareer))) {
     return (
       <Dialog open={true} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -207,7 +382,7 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Employee</DialogTitle>
+          <DialogTitle>{isEditMode ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -573,7 +748,7 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Employee"}
+              {isSubmitting ? (isEditMode ? "Updating..." : "Creating...") : (isEditMode ? "Update Employee" : "Create Employee")}
             </Button>
           </div>
         </form>

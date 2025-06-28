@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Edit, Plus, MapPin, Phone, Mail, Calendar, Briefcase, PoundSterling } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import CareerHistoryForm from "@/components/CareerHistoryForm";
+import EmployeeForm from "@/components/EmployeeForm";
 
 interface Employee {
   id: string;
@@ -49,6 +49,7 @@ interface EmployeeDetailsProps {
 
 const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) => {
   const [showCareerForm, setShowCareerForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
 
   const { data: fullEmployee } = useQuery({
     queryKey: ['employee', employee.id],
@@ -110,7 +111,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
             <p className="text-gray-600">{employee.job_title}</p>
           </div>
         </div>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => setShowEditForm(true)}>
           <Edit className="w-4 h-4 mr-2" />
           Edit Employee
         </Button>
@@ -403,6 +404,17 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
           onSuccess={() => {
             setShowCareerForm(false);
             refetchCareer();
+            onUpdate();
+          }}
+        />
+      )}
+
+      {showEditForm && (
+        <EmployeeForm
+          employee={employee}
+          onClose={() => setShowEditForm(false)}
+          onSuccess={() => {
+            setShowEditForm(false);
             onUpdate();
           }}
         />
