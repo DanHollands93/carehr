@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,6 +40,8 @@ export const usePermissions = () => {
   const loadUserPermissions = async () => {
     if (!user) return;
 
+    console.log('Loading permissions for user:', user.id);
+
     const { data, error } = await supabase
       .from('user_permissions')
       .select(`
@@ -66,6 +69,10 @@ export const usePermissions = () => {
         location: item.location,
         permission: Array.isArray(item.permissions) ? item.permissions[0] : item.permissions
       })) || [];
+      
+      console.log('Loaded user permissions:', transformedData);
+      console.log('Permission names:', transformedData.map(p => p.permission.name));
+      
       setPermissions(transformedData);
     }
     setLoading(false);
@@ -87,10 +94,16 @@ export const usePermissions = () => {
   };
 
   const hasPermission = (permissionName: string, location?: string) => {
-    return permissions.some(up => 
+    console.log('Checking permission:', permissionName, 'for location:', location);
+    console.log('Available permissions:', permissions.map(p => ({ name: p.permission.name, location: p.location })));
+    
+    const result = permissions.some(up => 
       up.permission.name === permissionName && 
       (up.location === null || up.location === location || !location)
     );
+    
+    console.log('Permission check result:', result);
+    return result;
   };
 
   const hasLocationAccess = (location: string) => {
