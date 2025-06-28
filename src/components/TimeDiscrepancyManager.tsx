@@ -54,11 +54,16 @@ const TimeDiscrepancyManager = () => {
             employees!inner(first_name, last_name)
           )
         `)
-        .eq('approval_status', 'pending')
         .eq('status', 'discrepancy')
-        .order('clock_in_time', { ascending: false });
+        .eq('approval_status', 'pending')
+        .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching discrepancy records:', error);
+        throw error;
+      }
+      
+      console.log('Fetched discrepancy records:', data);
       return data as TimeClockRecord[];
     }
   });
@@ -96,19 +101,40 @@ const TimeDiscrepancyManager = () => {
     }
   });
 
+  const formatDiscrepancyType = (type: string) => {
+    if (!type) return 'Unknown discrepancy';
+    
+    return type
+      .split(',')
+      .map(t => t.trim())
+      .map(t => {
+        switch (t) {
+          case 'early_clock_in':
+            return 'Early clock in';
+          case 'late_clock_in':
+            return 'Late clock in';
+          case 'early_clock_out':
+            return 'Early clock out';
+          case 'late_clock_out':
+            return 'Late clock out';
+          default:
+            return t.replace(/_/g, ' ');
+        }
+      })
+      .join(', ');
+  };
+
   const getDiscrepancyInfo = (record: TimeClockRecord) => {
     if (!record.discrepancy_type) {
       return { type: 'Unknown discrepancy', severity: 'medium' };
     }
 
     const types = record.discrepancy_type.split(',');
-    const descriptions: string[] = [];
     let maxSeverity = 'low';
 
     types.forEach(type => {
       switch (type.trim()) {
         case 'early_clock_in':
-          descriptions.push('Early clock in');
           if (record.clock_in_time && record.shifts) {
             const clockIn = parseISO(record.clock_in_time);
             const shiftStart = parseISO(`${record.shifts.date}T${record.shifts.start_time}`);
@@ -118,22 +144,19 @@ const TimeDiscrepancyManager = () => {
           }
           break;
         case 'late_clock_in':
-          descriptions.push('Late clock in');
           maxSeverity = 'high';
           break;
         case 'early_clock_out':
-          descriptions.push('Early clock out');
           maxSeverity = 'medium';
           break;
         case 'late_clock_out':
-          descriptions.push('Late clock out');
           if (maxSeverity !== 'high') maxSeverity = 'medium';
           break;
       }
     });
 
     return {
-      type: descriptions.join(', '),
+      type: formatDiscrepancyType(record.discrepancy_type),
       severity: maxSeverity
     };
   };

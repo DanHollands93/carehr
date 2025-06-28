@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +57,29 @@ const StaffShiftCard = ({
     type: 'clock_in' | 'clock_out';
     minutesDiff: number;
   } | null>(null);
+
+  const formatDiscrepancyType = (type: string) => {
+    if (!type) return '';
+    
+    return type
+      .split(',')
+      .map(t => t.trim())
+      .map(t => {
+        switch (t) {
+          case 'early_clock_in':
+            return 'Early clock in';
+          case 'late_clock_in':
+            return 'Late clock in';
+          case 'early_clock_out':
+            return 'Early clock out';
+          case 'late_clock_out':
+            return 'Late clock out';
+          default:
+            return t.replace(/_/g, ' ');
+        }
+      })
+      .join(', ');
+  };
 
   const getStatusBadge = () => {
     switch (record.status) {
@@ -172,7 +196,7 @@ const StaffShiftCard = ({
           {record.discrepancy_type && (
             <div className="flex items-center space-x-2 text-sm text-red-600">
               <AlertCircle className="w-4 h-4" />
-              <span>Discrepancy: {record.discrepancy_type.replace('_', ' ')}</span>
+              <span>Discrepancy: {formatDiscrepancyType(record.discrepancy_type)}</span>
             </div>
           )}
 
