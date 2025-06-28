@@ -15,8 +15,8 @@ import CareerHistoryForm from "@/components/CareerHistoryForm";
 import { usePermissions } from "@/hooks/usePermissions";
 import UserAccountManager from "./UserAccountManager";
 
-interface Employee {
-  id?: string;
+interface EmployeeData {
+  id: string;
   employee_id?: string;
   first_name: string;
   last_name: string;
@@ -30,6 +30,12 @@ interface Employee {
   pay_rate?: number;
   pay_type?: string;
   employment_type?: string;
+  date_of_birth?: string;
+  tax_code?: string;
+  passport_number?: string;
+  visa_expiry?: string;
+  right_to_work_status?: string;
+  emergency_contact?: any;
 }
 
 interface CareerHistoryEntry {
@@ -74,7 +80,7 @@ interface PersonalFormData {
 }
 
 interface EmployeeDetailsProps {
-  employee: Employee;
+  employee: EmployeeData;
   onUpdate: () => void;
   onBack: () => void;
 }

@@ -84,38 +84,38 @@ const BulkRoleManager = () => {
     }
   };
 
-const loadBulkRules = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('bulk_position_rules')
-      .select(`
-        id,
-        position,
-        permission_group_id,
-        created_at,
-        permission_groups!inner(
+  const loadBulkRules = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bulk_position_rules')
+        .select(`
           id,
-          name,
-          description
-        )
-      `)
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Error loading bulk rules:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load position rules",
-        variant: "destructive"
-      });
-    } else {
-      console.log('Loaded bulk rules:', data);
-      setBulkRules(data || []);
+          position,
+          permission_group_id,
+          created_at,
+          permission_groups(
+            id,
+            name,
+            description
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error loading bulk rules:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load position rules",
+          variant: "destructive"
+        });
+      } else {
+        console.log('Loaded bulk rules:', data);
+        setBulkRules(data || []);
+      }
+    } catch (error) {
+      console.error('Exception loading bulk rules:', error);
     }
-  } catch (error) {
-    console.error('Exception loading bulk rules:', error);
-  }
-};
+  };
 
   const handleCreateRule = async () => {
     if (!selectedPosition || !selectedPermissionGroupId) {
