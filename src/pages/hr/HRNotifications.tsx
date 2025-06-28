@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,10 +11,15 @@ import { format } from 'date-fns';
 import NotificationTemplateManager from '@/components/NotificationTemplateManager';
 
 const HRNotifications = () => {
-  const { notifications, loading, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, loading, unseenCount, markAsRead, markAllAsRead, markAllAsSeen } = useNotifications();
   const { hasPermission } = usePermissions();
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // Automatically mark all notifications as seen when the page loads
+  useEffect(() => {
+    if (!loading && notifications.length > 0) {
+      markAllAsSeen();
+    }
+  }, [loading, notifications.length, markAllAsSeen]);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -43,18 +48,20 @@ const HRNotifications = () => {
     }
   };
 
-  const getNotificationBg = (type: string, read: boolean) => {
-    if (read) return 'bg-white';
-    
-    switch (type) {
-      case 'success':
-        return 'bg-green-50 border-green-200';
-      case 'warning':
-        return 'bg-orange-50 border-orange-200';
-      case 'info':
-      default:
-        return 'bg-blue-50 border-blue-200';
+  const getNotificationBg = (notification: any) => {
+    // Show different background for unread notifications
+    if (!notification.read) {
+      switch (notification.type) {
+        case 'success':
+          return 'bg-green-50 border-green-200';
+        case 'warning':
+          return 'bg-orange-50 border-orange-200';
+        case 'info':
+        default:
+          return 'bg-blue-50 border-blue-200';
+      }
     }
+    return 'bg-white';
   };
 
   if (loading) {
@@ -64,6 +71,8 @@ const HRNotifications = () => {
       </div>
     );
   }
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <div className="space-y-6">
@@ -124,7 +133,7 @@ const HRNotifications = () => {
             {notifications.map((notification) => (
               <Card 
                 key={notification.id}
-                className={`transition-all hover:shadow-md ${getNotificationBg(notification.type, notification.read)}`}
+                className={`transition-all hover:shadow-md ${getNotificationBg(notification)}`}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start space-x-4">
@@ -148,6 +157,11 @@ const HRNotifications = () => {
                             <span className="text-xs text-gray-500">
                               {format(new Date(notification.created_at), 'MMM d, yyyy \'at\' HH:mm')}
                             </span>
+                            {notification.seen_at && (
+                              <span className="text-xs text-gray-400">
+                                Seen: {format(new Date(notification.seen_at), 'MMM d, HH:mm')}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center space-x-2 ml-4">
@@ -162,6 +176,11 @@ const HRNotifications = () => {
                             >
                               Mark as read
                             </Button>
+                          )}
+                          {notification.read && notification.marked_read_at && (
+                            <span className="text-xs text-green-600">
+                              Read: {format(new Date(notification.marked_read_at), 'MMM d, HH:mm')}
+                            </span>
                           )}
                         </div>
                       </div>

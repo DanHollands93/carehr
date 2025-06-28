@@ -13,10 +13,8 @@ interface HRHeaderProps {
 
 const HRHeader = ({ isMobileOpen, setIsMobileOpen }: HRHeaderProps) => {
   const { user } = useAuth();
-  const { notifications } = useNotifications();
+  const { unseenCount } = useNotifications();
   const navigate = useNavigate();
-
-  const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleNotificationClick = () => {
     navigate('/hr/notifications');
@@ -42,14 +40,14 @@ const HRHeader = ({ isMobileOpen, setIsMobileOpen }: HRHeaderProps) => {
             onClick={handleNotificationClick}
             className="hover:bg-gray-100"
           >
-            <Bell className={`h-5 w-5 ${unreadCount > 0 ? 'text-red-600' : 'text-black'}`} />
+            <Bell className={`h-5 w-5 ${unseenCount > 0 ? 'text-red-600' : 'text-black'}`} />
           </Button>
-          {unreadCount > 0 && (
+          {unseenCount > 0 && (
             <Badge 
               variant="destructive" 
               className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-red-600 hover:bg-red-600"
             >
-              {unreadCount > 9 ? '9+' : unreadCount}
+              {unseenCount > 9 ? '9+' : unseenCount}
             </Badge>
           )}
         </div>

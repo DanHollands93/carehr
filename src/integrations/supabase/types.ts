@@ -523,8 +523,10 @@ export type Database = {
           category: string
           created_at: string
           id: string
+          marked_read_at: string | null
           message: string
           read: boolean
+          seen_at: string | null
           title: string
           type: string
           updated_at: string
@@ -534,8 +536,10 @@ export type Database = {
           category: string
           created_at?: string
           id?: string
+          marked_read_at?: string | null
           message: string
           read?: boolean
+          seen_at?: string | null
           title: string
           type?: string
           updated_at?: string
@@ -545,8 +549,10 @@ export type Database = {
           category?: string
           created_at?: string
           id?: string
+          marked_read_at?: string | null
           message?: string
           read?: boolean
+          seen_at?: string | null
           title?: string
           type?: string
           updated_at?: string

@@ -11,6 +11,8 @@ interface Notification {
   type: 'success' | 'warning' | 'info';
   category: string;
   read: boolean;
+  seen_at: string | null;
+  marked_read_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -72,41 +74,84 @@ export const useNotifications = () => {
     }
   };
 
-  const markAsRead = async (notificationId: string) => {
+  const markAllAsSeen = async () => {
+    if (!user) return;
+
     const { error } = await supabase
       .from('notifications')
-      .update({ read: true, updated_at: new Date().toISOString() })
+      .update({ 
+        seen_at: new Date().toISOString(),
+        updated_at: new Date().toISOString() 
+      })
+      .eq('user_id', user.id)
+      .is('seen_at', null);
+
+    if (error) {
+      console.error('Error marking notifications as seen:', error);
+    } else {
+      setNotifications(prev => 
+        prev.map(n => 
+          n.seen_at === null ? { ...n, seen_at: new Date().toISOString() } : n
+        )
+      );
+    }
+  };
+
+  const markAsRead = async (notificationId: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('notifications')
+      .update({ 
+        read: true, 
+        marked_read_at: new Date().toISOString(),
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', notificationId)
-      .eq('user_id', user?.id);
+      .eq('user_id', user.id);
 
     if (error) {
       console.error('Error marking notification as read:', error);
     } else {
       setNotifications(prev => 
         prev.map(n => 
-          n.id === notificationId ? { ...n, read: true } : n
+          n.id === notificationId ? { 
+            ...n, 
+            read: true, 
+            marked_read_at: new Date().toISOString() 
+          } : n
         )
       );
     }
   };
 
   const markAllAsRead = async () => {
+    if (!user) return;
+
     const { error } = await supabase
       .from('notifications')
-      .update({ read: true, updated_at: new Date().toISOString() })
-      .eq('user_id', user?.id)
+      .update({ 
+        read: true, 
+        marked_read_at: new Date().toISOString(),
+        updated_at: new Date().toISOString() 
+      })
+      .eq('user_id', user.id)
       .eq('read', false);
 
     if (error) {
       console.error('Error marking all notifications as read:', error);
     } else {
       setNotifications(prev => 
-        prev.map(n => ({ ...n, read: true }))
+        prev.map(n => ({ 
+          ...n, 
+          read: true, 
+          marked_read_at: new Date().toISOString() 
+        }))
       );
     }
   };
 
-  const createNotification = async (notification: Omit<Notification, 'id' | 'user_id' | 'read' | 'created_at' | 'updated_at'>) => {
+  const createNotification = async (notification: Omit<Notification, 'id' | 'user_id' | 'read' | 'seen_at' | 'marked_read_at' | 'created_at' | 'updated_at'>) => {
     if (!user) return;
 
     const { error } = await supabase
@@ -124,12 +169,17 @@ export const useNotifications = () => {
     }
   };
 
+  // Count unseen notifications (not read and not seen)
+  const unseenCount = notifications.filter(n => !n.read && !n.seen_at).length;
+
   return {
     notifications,
     templates,
     loading,
+    unseenCount,
     markAsRead,
     markAllAsRead,
+    markAllAsSeen,
     createNotification,
     refetch: loadNotifications
   };
