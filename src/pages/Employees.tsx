@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, User, Briefcase, MapPin, PoundSterling, Calendar } from "lucide-react";
+import { Plus, Search, User, Briefcase, MapPin, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import EmployeeForm from "@/components/EmployeeForm";
 import EmployeeDetails from "@/components/EmployeeDetails";
@@ -27,14 +28,27 @@ interface Employee {
   employment_type?: string;
 }
 
+interface EmployeePosition {
+  employee_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  department: string;
+  phone_number?: string;
+  hire_date?: string;
+  job_title: string;
+  location: string;
+  employment_type?: string;
+}
+
 const Employees = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeTab, setActiveTab] = useState("list");
 
-  const { data: employees = [], isLoading, refetch } = useQuery({
-    queryKey: ['employees'],
+  const { data: employeePositions = [], isLoading, refetch } = useQuery({
+    queryKey: ['employee-positions'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('current_employee_positions')
@@ -42,9 +56,44 @@ const Employees = () => {
         .order('first_name');
       
       if (error) throw error;
-      return data as Employee[];
+      return data as EmployeePosition[];
     }
   });
+
+  // Group positions by employee and location
+  const groupedEmployees = employeePositions.reduce((acc, position) => {
+    const employeeKey = position.employee_id;
+    
+    if (!acc[employeeKey]) {
+      acc[employeeKey] = {
+        id: position.employee_id,
+        first_name: position.first_name,
+        last_name: position.last_name,
+        email: position.email,
+        department: position.department,
+        phone_number: position.phone_number,
+        hire_date: position.hire_date,
+        locations: {}
+      };
+    }
+    
+    const locationKey = position.location;
+    if (!acc[employeeKey].locations[locationKey]) {
+      acc[employeeKey].locations[locationKey] = {
+        location: position.location,
+        job_titles: [],
+        employment_type: position.employment_type
+      };
+    }
+    
+    if (position.job_title && !acc[employeeKey].locations[locationKey].job_titles.includes(position.job_title)) {
+      acc[employeeKey].locations[locationKey].job_titles.push(position.job_title);
+    }
+    
+    return acc;
+  }, {} as Record<string, any>);
+
+  const employees = Object.values(groupedEmployees);
 
   const filteredEmployees = employees.filter(employee =>
     `${employee.first_name} ${employee.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -52,23 +101,27 @@ const Employees = () => {
     employee.department?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleEmployeeClick = (employee: Employee) => {
-    setSelectedEmployee(employee);
+  const handleEmployeeClick = (employee: any) => {
+    // Convert back to the expected format for EmployeeDetails
+    const employeeForDetails = {
+      id: employee.id,
+      first_name: employee.first_name,
+      last_name: employee.last_name,
+      email: employee.email,
+      department: employee.department,
+      phone_number: employee.phone_number,
+      hire_date: employee.hire_date,
+      // Use the first location's first job title as the primary job title
+      job_title: Object.values(employee.locations)[0]?.job_titles[0] || '',
+      location: Object.keys(employee.locations)[0] || ''
+    };
+    setSelectedEmployee(employeeForDetails);
     setActiveTab("details");
   };
 
   const handleCreateSuccess = () => {
     setShowCreateForm(false);
     refetch();
-  };
-
-  const formatCurrency = (amount: number, type: string) => {
-    const formatted = new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP'
-    }).format(amount);
-    
-    return type === 'hourly' ? `${formatted}/hour` : `${formatted}/year`;
   };
 
   const formatDate = (dateString: string) => {
@@ -160,78 +213,38 @@ const Employees = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Position Details Section */}
-                  <div className="space-y-3">
-                    <div className="text-sm font-medium text-gray-700 border-b pb-1">
-                      Position Details
-                    </div>
-                    {employee.job_title && (
-                      <div className="grid grid-cols-3 gap-2 text-sm">
-                        <Label className="text-gray-600">Job Title:</Label>
-                        <div className="col-span-2 flex items-center">
-                          <Briefcase className="w-4 h-4 mr-2 text-gray-500" />
-                          <span className="break-words">{employee.job_title}</span>
-                        </div>
-                      </div>
-                    )}
-                    {employee.department && (
-                      <div className="grid grid-cols-3 gap-2 text-sm">
-                        <Label className="text-gray-600">Department:</Label>
-                        <div className="col-span-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {employee.department}
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-                    {employee.location && (
-                      <div className="grid grid-cols-3 gap-2 text-sm">
-                        <Label className="text-gray-600">Location:</Label>
-                        <div className="col-span-2 flex items-center">
-                          <MapPin className="w-4 h-4 mr-2 text-gray-500" />
-                          <span className="break-words">{employee.location}</span>
-                        </div>
-                      </div>
-                    )}
-                    {employee.employment_type && (
-                      <div className="grid grid-cols-3 gap-2 text-sm">
-                        <Label className="text-gray-600">Type:</Label>
-                        <div className="col-span-2">
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {employee.employment_type.replace('_', ' ')}
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Financial Details Section */}
-                  {employee.pay_rate && (
-                    <div className="space-y-3 pt-3 border-t">
+                  {/* Department */}
+                  {employee.department && (
+                    <div className="space-y-2">
                       <div className="text-sm font-medium text-gray-700 border-b pb-1">
-                        Financial Details
+                        Department
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-sm">
-                        <Label className="text-gray-600">Pay Rate:</Label>
-                        <div className="col-span-2 flex items-center">
-                          <PoundSterling className="w-4 h-4 mr-2 text-gray-500" />
-                          <span className="font-semibold">
-                            {formatCurrency(employee.pay_rate, employee.pay_type || 'salary')}
-                          </span>
-                        </div>
-                      </div>
-                      {employee.pay_type && (
-                        <div className="grid grid-cols-3 gap-2 text-sm">
-                          <Label className="text-gray-600">Pay Type:</Label>
-                          <div className="col-span-2">
-                            <Badge variant="outline" className="text-xs capitalize">
-                              {employee.pay_type}
-                            </Badge>
-                          </div>
-                        </div>
-                      )}
+                      <Badge variant="secondary" className="text-xs">
+                        {employee.department}
+                      </Badge>
                     </div>
                   )}
+
+                  {/* Position Details by Location */}
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-gray-700 border-b pb-1">
+                      Current Positions
+                    </div>
+                    {Object.entries(employee.locations).map(([locationKey, locationData]: [string, any]) => (
+                      <div key={locationKey} className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="w-4 h-4 text-gray-500" />
+                          <span className="font-medium text-sm">{locationData.location}</span>
+                        </div>
+                        <div className="ml-6">
+                          <div className="flex items-center space-x-2">
+                            <Briefcase className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm">{locationData.job_titles.join(', ')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
                   {/* Employment Status */}
                   {employee.hire_date && (
