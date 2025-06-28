@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -30,11 +30,79 @@ interface CareerHistoryFormProps {
   onSuccess: () => void;
 }
 
+interface LookupItem {
+  id: string;
+  value: string;
+}
+
 const CareerHistoryForm = ({ employeeId, onClose, onSuccess }: CareerHistoryFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lookupData, setLookupData] = useState<{
+    positions: LookupItem[];
+    locations: LookupItem[];
+    employmentTypes: LookupItem[];
+    contractTypes: LookupItem[];
+    payTypes: LookupItem[];
+  }>({
+    positions: [],
+    locations: [],
+    employmentTypes: [],
+    contractTypes: [],
+    payTypes: []
+  });
+  
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CareerHistoryFormData>();
 
   const payType = watch('pay_type');
+
+  useEffect(() => {
+    const fetchLookupData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('lookup_lists')
+          .select('id, category, value')
+          .eq('is_active', true)
+          .in('category', ['positions', 'locations', 'employment_types', 'contract_types', 'pay_types']);
+
+        if (error) throw error;
+
+        const groupedData = {
+          positions: [],
+          locations: [],
+          employmentTypes: [],
+          contractTypes: [],
+          payTypes: []
+        };
+
+        data?.forEach(item => {
+          switch (item.category) {
+            case 'positions':
+              groupedData.positions.push({ id: item.id, value: item.value });
+              break;
+            case 'locations':
+              groupedData.locations.push({ id: item.id, value: item.value });
+              break;
+            case 'employment_types':
+              groupedData.employmentTypes.push({ id: item.id, value: item.value });
+              break;
+            case 'contract_types':
+              groupedData.contractTypes.push({ id: item.id, value: item.value });
+              break;
+            case 'pay_types':
+              groupedData.payTypes.push({ id: item.id, value: item.value });
+              break;
+          }
+        });
+
+        setLookupData(groupedData);
+      } catch (error) {
+        console.error('Error fetching lookup data:', error);
+        toast.error("Failed to load dropdown options");
+      }
+    };
+
+    fetchLookupData();
+  }, []);
 
   const onSubmit = async (data: CareerHistoryFormData) => {
     setIsSubmitting(true);
@@ -86,10 +154,18 @@ const CareerHistoryForm = ({ employeeId, onClose, onSuccess }: CareerHistoryForm
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="job_title">Job Title *</Label>
-                <Input
-                  id="job_title"
-                  {...register("job_title", { required: "Job title is required" })}
-                />
+                <Select onValueChange={(value) => setValue('job_title', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select job title" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lookupData.positions.map((position) => (
+                      <SelectItem key={position.id} value={position.value}>
+                        {position.value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {errors.job_title && (
                   <p className="text-sm text-red-600 mt-1">{errors.job_title.message}</p>
                 )}
@@ -97,7 +173,18 @@ const CareerHistoryForm = ({ employeeId, onClose, onSuccess }: CareerHistoryForm
 
               <div>
                 <Label htmlFor="location">Work Location</Label>
-                <Input id="location" {...register("location")} />
+                <Select onValueChange={(value) => setValue('location', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lookupData.locations.map((location) => (
+                      <SelectItem key={location.id} value={location.value}>
+                        {location.value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -108,10 +195,20 @@ const CareerHistoryForm = ({ employeeId, onClose, onSuccess }: CareerHistoryForm
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="permanent">Permanent</SelectItem>
-                      <SelectItem value="temporary">Temporary</SelectItem>
-                      <SelectItem value="contract">Contract</SelectItem>
-                      <SelectItem value="internship">Internship</SelectItem>
+                      {lookupData.employmentTypes.length > 0 ? (
+                        lookupData.employmentTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.value.toLowerCase().replace(' ', '_')}>
+                            {type.value}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <>
+                          <SelectItem value="permanent">Permanent</SelectItem>
+                          <SelectItem value="temporary">Temporary</SelectItem>
+                          <SelectItem value="contract">Contract</SelectItem>
+                          <SelectItem value="internship">Internship</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -122,9 +219,19 @@ const CareerHistoryForm = ({ employeeId, onClose, onSuccess }: CareerHistoryForm
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="full_time">Full Time</SelectItem>
-                      <SelectItem value="part_time">Part Time</SelectItem>
-                      <SelectItem value="zero_hours">Zero Hours</SelectItem>
+                      {lookupData.contractTypes.length > 0 ? (
+                        lookupData.contractTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.value.toLowerCase().replace(' ', '_')}>
+                            {type.value}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <>
+                          <SelectItem value="full_time">Full Time</SelectItem>
+                          <SelectItem value="part_time">Part Time</SelectItem>
+                          <SelectItem value="zero_hours">Zero Hours</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -147,8 +254,18 @@ const CareerHistoryForm = ({ employeeId, onClose, onSuccess }: CareerHistoryForm
                       <SelectValue placeholder="Select pay type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="salary">Salary (Annual)</SelectItem>
-                      <SelectItem value="hourly">Hourly Rate</SelectItem>
+                      {lookupData.payTypes.length > 0 ? (
+                        lookupData.payTypes.map((type) => (
+                          <SelectItem key={type.id} value={type.value.toLowerCase()}>
+                            {type.value}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <>
+                          <SelectItem value="salary">Salary (Annual)</SelectItem>
+                          <SelectItem value="hourly">Hourly Rate</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
