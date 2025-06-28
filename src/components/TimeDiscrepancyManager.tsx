@@ -15,18 +15,21 @@ import { Clock, User, AlertCircle, CheckCircle, XCircle } from "lucide-react";
 interface TimeClockRecord {
   id: string;
   employee_id: string;
-  shift_date: string;
-  shift_start_time: string;
-  shift_end_time: string;
+  shift_id: string;
   clock_in_time: string | null;
   clock_out_time: string | null;
   status: 'scheduled' | 'clocked_in' | 'completed' | 'discrepancy';
   discrepancy_type: string | null;
   approval_status: 'pending' | 'approved' | 'rejected';
   notes: string | null;
-  employees?: {
-    first_name: string;
-    last_name: string;
+  shifts?: {
+    date: string;
+    start_time: string;
+    end_time: string;
+    employees: {
+      first_name: string;
+      last_name: string;
+    };
   };
 }
 
@@ -44,11 +47,16 @@ const TimeDiscrepancyManager = () => {
         .from('time_clock_records')
         .select(`
           *,
-          employees!inner(first_name, last_name)
+          shifts!inner(
+            date,
+            start_time,
+            end_time,
+            employees!inner(first_name, last_name)
+          )
         `)
         .eq('approval_status', 'pending')
-        .or('status.eq.discrepancy,discrepancy_type.not.is.null')
-        .order('shift_date', { ascending: false });
+        .eq('status', 'discrepancy')
+        .order('clock_in_time', { ascending: false });
       
       if (error) throw error;
       return data as TimeClockRecord[];
@@ -89,29 +97,44 @@ const TimeDiscrepancyManager = () => {
   });
 
   const getDiscrepancyInfo = (record: TimeClockRecord) => {
-    if (!record.clock_in_time || !record.clock_out_time) {
-      return { type: 'Missing clock record', severity: 'high' };
+    if (!record.discrepancy_type) {
+      return { type: 'Unknown discrepancy', severity: 'medium' };
     }
 
-    const shiftStart = parseISO(`${record.shift_date}T${record.shift_start_time}`);
-    const shiftEnd = parseISO(`${record.shift_date}T${record.shift_end_time}`);
-    const clockIn = parseISO(record.clock_in_time);
-    const clockOut = parseISO(record.clock_out_time);
+    const types = record.discrepancy_type.split(',');
+    const descriptions: string[] = [];
+    let maxSeverity = 'low';
 
-    const clockInDiff = differenceInMinutes(clockIn, shiftStart);
-    const clockOutDiff = differenceInMinutes(clockOut, shiftEnd);
-
-    let issues = [];
-    if (Math.abs(clockInDiff) > 15) {
-      issues.push(`Clock in ${clockInDiff > 0 ? 'late' : 'early'} by ${Math.abs(clockInDiff)} min`);
-    }
-    if (Math.abs(clockOutDiff) > 15) {
-      issues.push(`Clock out ${clockOutDiff > 0 ? 'late' : 'early'} by ${Math.abs(clockOutDiff)} min`);
-    }
+    types.forEach(type => {
+      switch (type.trim()) {
+        case 'early_clock_in':
+          descriptions.push('Early clock in');
+          if (record.clock_in_time && record.shifts) {
+            const clockIn = parseISO(record.clock_in_time);
+            const shiftStart = parseISO(`${record.shifts.date}T${record.shifts.start_time}`);
+            const diff = Math.abs(differenceInMinutes(clockIn, shiftStart));
+            if (diff > 30) maxSeverity = 'high';
+            else if (diff > 15) maxSeverity = 'medium';
+          }
+          break;
+        case 'late_clock_in':
+          descriptions.push('Late clock in');
+          maxSeverity = 'high';
+          break;
+        case 'early_clock_out':
+          descriptions.push('Early clock out');
+          maxSeverity = 'medium';
+          break;
+        case 'late_clock_out':
+          descriptions.push('Late clock out');
+          if (maxSeverity !== 'high') maxSeverity = 'medium';
+          break;
+      }
+    });
 
     return {
-      type: issues.join(', ') || 'Unknown discrepancy',
-      severity: Math.max(Math.abs(clockInDiff), Math.abs(clockOutDiff)) > 30 ? 'high' : 'medium'
+      type: descriptions.join(', '),
+      severity: maxSeverity
     };
   };
 
@@ -149,16 +172,16 @@ const TimeDiscrepancyManager = () => {
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg">
-                      {record.employees?.first_name} {record.employees?.last_name}
+                      {record.shifts?.employees?.first_name} {record.shifts?.employees?.last_name}
                     </CardTitle>
                     <div className="flex space-x-2">
                       <Badge 
-                        variant={discrepancyInfo.severity === 'high' ? 'destructive' : 'secondary'}
+                        variant={discrepancyInfo.severity === 'high' ? 'destructive' : discrepancyInfo.severity === 'medium' ? 'default' : 'secondary'}
                       >
                         {discrepancyInfo.severity} priority
                       </Badge>
                       <Badge variant="outline">
-                        {format(parseISO(record.shift_date), 'MMM dd')}
+                        {record.shifts?.date ? format(parseISO(record.shifts.date), 'MMM dd') : 'Unknown date'}
                       </Badge>
                     </div>
                   </div>
@@ -168,7 +191,7 @@ const TimeDiscrepancyManager = () => {
                     <div className="space-y-1">
                       <div className="flex items-center space-x-2">
                         <Clock className="w-4 h-4" />
-                        <span>Scheduled: {record.shift_start_time} - {record.shift_end_time}</span>
+                        <span>Scheduled: {record.shifts?.start_time} - {record.shifts?.end_time}</span>
                       </div>
                       {record.clock_in_time && (
                         <div className="flex items-center space-x-2 text-green-600">

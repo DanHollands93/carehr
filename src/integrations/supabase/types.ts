@@ -1112,6 +1112,33 @@ export type Database = {
           },
         ]
       }
+      system_settings: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       template_shifts: {
         Row: {
           created_at: string | null
@@ -1150,31 +1177,43 @@ export type Database = {
       }
       time_clock_records: {
         Row: {
+          approval_status: string | null
+          approved_by: string | null
           clock_in_time: string | null
           clock_out_time: string | null
           created_at: string | null
+          discrepancy_type: string | null
           employee_id: string
           id: string
+          notes: string | null
           shift_id: string | null
           status: string
           updated_at: string | null
         }
         Insert: {
+          approval_status?: string | null
+          approved_by?: string | null
           clock_in_time?: string | null
           clock_out_time?: string | null
           created_at?: string | null
+          discrepancy_type?: string | null
           employee_id: string
           id?: string
+          notes?: string | null
           shift_id?: string | null
           status?: string
           updated_at?: string | null
         }
         Update: {
+          approval_status?: string | null
+          approved_by?: string | null
           clock_in_time?: string | null
           clock_out_time?: string | null
           created_at?: string | null
+          discrepancy_type?: string | null
           employee_id?: string
           id?: string
+          notes?: string | null
           shift_id?: string | null
           status?: string
           updated_at?: string | null

@@ -170,12 +170,37 @@ export const useTimeClockRecords = () => {
 
   const clockInMutation = useMutation({
     mutationFn: async (recordId: string) => {
+      const now = new Date();
+      const clockTime = now.toISOString();
+      
+      // Get the record to check for discrepancies
+      const record = todayRecords?.find(r => r.id === recordId);
+      if (!record) throw new Error('Record not found');
+      
+      // Check for discrepancies
+      const today = format(now, 'yyyy-MM-dd');
+      const shiftStartDateTime = parseISO(`${today}T${record.shift_start_time}`);
+      const minutesDiff = differenceInMinutes(now, shiftStartDateTime);
+      
+      let status: 'clocked_in' | 'discrepancy' = 'clocked_in';
+      let discrepancyType: string | null = null;
+      
+      if (Math.abs(minutesDiff) > 15) { // Using 15 minutes as tolerance
+        status = 'discrepancy';
+        if (minutesDiff < -15) {
+          discrepancyType = 'early_clock_in';
+        } else if (minutesDiff > 15) {
+          discrepancyType = 'late_clock_in';
+        }
+      }
+      
       const { error } = await supabase
         .from('time_clock_records')
         .update({
-          clock_in_time: new Date().toISOString(),
-          status: 'clocked_in',
-          updated_at: new Date().toISOString()
+          clock_in_time: clockTime,
+          status: status,
+          discrepancy_type: discrepancyType,
+          updated_at: now.toISOString()
         })
         .eq('id', recordId);
       
@@ -197,12 +222,37 @@ export const useTimeClockRecords = () => {
 
   const clockOutMutation = useMutation({
     mutationFn: async (recordId: string) => {
+      const now = new Date();
+      const clockTime = now.toISOString();
+      
+      // Get the record to check for discrepancies
+      const record = todayRecords?.find(r => r.id === recordId);
+      if (!record) throw new Error('Record not found');
+      
+      // Check for discrepancies
+      const today = format(now, 'yyyy-MM-dd');
+      const shiftEndDateTime = parseISO(`${today}T${record.shift_end_time}`);
+      const minutesDiff = differenceInMinutes(now, shiftEndDateTime);
+      
+      let status: 'completed' | 'discrepancy' = 'completed';
+      let discrepancyType: string | null = record.discrepancy_type;
+      
+      if (Math.abs(minutesDiff) > 15) { // Using 15 minutes as tolerance
+        status = 'discrepancy';
+        if (minutesDiff < -15) {
+          discrepancyType = discrepancyType ? `${discrepancyType},early_clock_out` : 'early_clock_out';
+        } else if (minutesDiff > 15) {
+          discrepancyType = discrepancyType ? `${discrepancyType},late_clock_out` : 'late_clock_out';
+        }
+      }
+      
       const { error } = await supabase
         .from('time_clock_records')
         .update({
-          clock_out_time: new Date().toISOString(),
-          status: 'completed',
-          updated_at: new Date().toISOString()
+          clock_out_time: clockTime,
+          status: status,
+          discrepancy_type: discrepancyType,
+          updated_at: now.toISOString()
         })
         .eq('id', recordId);
       
