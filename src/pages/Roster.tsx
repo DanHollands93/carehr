@@ -19,6 +19,7 @@ import StaffAssignmentManager from "@/components/StaffAssignmentManager";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import { useRosterCategories } from "@/hooks/useRosterCategories";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Employee {
   id: string;
@@ -52,6 +53,7 @@ const Roster = () => {
   const { hasPermission } = usePermissions();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
   const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
@@ -66,6 +68,7 @@ const Roster = () => {
     employeeId: string;
     employeeName: string;
     date: string;
+    existingShift?: Shift;
   }>({
     isOpen: false,
     employeeId: '',
@@ -256,21 +259,21 @@ const Roster = () => {
   });
 
   const handleDragStart = (template: ShiftTemplate) => {
-    if (!canEditRoster) return;
+    if (!canEditRoster || isMobile) return;
     setDraggedTemplate(template);
     setDraggedShift(null);
     setShowDeleteBin(false);
   };
 
   const handleShiftDragStart = (shift: Shift) => {
-    if (!canEditRoster) return;
+    if (!canEditRoster || isMobile) return;
     setDraggedShift(shift);
     setDraggedTemplate(null);
     setShowDeleteBin(true);
   };
 
   const handleDrop = (employeeId: string, date: string) => {
-    if (!canEditRoster) return;
+    if (!canEditRoster || isMobile) return;
     if (draggedTemplate) {
       createShiftMutation.mutate({
         employeeId,
@@ -296,7 +299,7 @@ const Roster = () => {
   };
 
   const handleDeleteDrop = () => {
-    if (!canEditRoster) return;
+    if (!canEditRoster || isMobile) return;
     if (draggedShift) {
       deleteShiftMutation.mutate(draggedShift.id);
       setDraggedShift(null);
@@ -305,10 +308,12 @@ const Roster = () => {
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (isMobile) return;
     e.preventDefault();
   };
 
   const handleDragEnd = () => {
+    if (isMobile) return;
     setShowDeleteBin(false);
   };
 
@@ -340,17 +345,15 @@ const Roster = () => {
     }
   };
 
-  const handleCellClick = (employeeId: string, employeeName: string, date: string) => {
+  const handleCellClick = (employeeId: string, employeeName: string, date: string, existingShift?: Shift) => {
     if (!canEditRoster) return;
-    // Don't open popup if there's already a shift for this employee and date
-    const existingShift = getShiftForEmployeeAndDate(employeeId, date);
-    if (existingShift) return;
-
+    
     setShiftPopup({
       isOpen: true,
       employeeId,
       employeeName,
-      date
+      date,
+      existingShift
     });
   };
 
@@ -367,6 +370,30 @@ const Roster = () => {
       date: format(new Date(shiftPopup.date), 'yyyy-MM-dd'),
       shiftData
     });
+  };
+
+  const handleUpdateShiftFromPopup = (shiftData: {
+    start_time: string;
+    end_time: string;
+    position: string;
+    pay_value?: number;
+    color?: string;
+  }) => {
+    if (!canEditRoster || !shiftPopup.existingShift) return;
+    
+    // Delete the old shift and create a new one with updated data
+    deleteShiftMutation.mutate(shiftPopup.existingShift.id);
+    createShiftMutation.mutate({
+      employeeId: shiftPopup.employeeId,
+      date: format(new Date(shiftPopup.date), 'yyyy-MM-dd'),
+      shiftData
+    });
+  };
+
+  const handleDeleteShiftFromPopup = () => {
+    if (!canEditRoster || !shiftPopup.existingShift) return;
+    deleteShiftMutation.mutate(shiftPopup.existingShift.id);
+    setShiftPopup(prev => ({ ...prev, isOpen: false }));
   };
 
   const handleCustomSort = (newOrder: string[]) => {
@@ -428,8 +455,8 @@ const Roster = () => {
 
   return (
     <div className="space-y-6" style={{ overscrollBehavior: 'none' }}>
-      {/* Delete Bin - only show if user can edit and is dragging a shift */}
-      {showDeleteBin && canEditRoster && (
+      {/* Delete Bin - only show if user can edit and is dragging a shift on desktop */}
+      {showDeleteBin && canEditRoster && !isMobile && (
         <div className="fixed top-20 right-8 z-50">
           <div
             className="p-4 bg-red-100 border-2 border-dashed border-red-400 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
@@ -442,15 +469,17 @@ const Roster = () => {
         </div>
       )}
 
-      {/* Shift Creation Popup - only show if user can edit */}
+      {/* Shift Creation/Edit Popup - only show if user can edit */}
       {canEditRoster && (
         <ShiftCreationPopup
           isOpen={shiftPopup.isOpen}
           onClose={() => setShiftPopup(prev => ({ ...prev, isOpen: false }))}
-          onCreateShift={handleCreateShiftFromPopup}
+          onCreateShift={shiftPopup.existingShift ? handleUpdateShiftFromPopup : handleCreateShiftFromPopup}
+          onDeleteShift={shiftPopup.existingShift ? handleDeleteShiftFromPopup : undefined}
           shiftTemplates={shiftTemplates || []}
           employeeName={shiftPopup.employeeName}
           date={shiftPopup.date}
+          existingShift={shiftPopup.existingShift}
         />
       )}
 
@@ -470,7 +499,10 @@ const Roster = () => {
         </h1>
         <p className="text-gray-600">
           {canEditRoster 
-            ? "Drag and drop shifts to assign staff or move shifts between staff and days, or click on empty cells to add shifts"
+            ? (isMobile 
+                ? "Tap on shifts to edit or remove them, or tap empty cells to add shifts"
+                : "Drag and drop shifts to assign staff or move shifts between staff and days, or click on empty cells to add shifts"
+              )
             : "View-only access - shifts cannot be modified"
           }
         </p>
@@ -532,8 +564,8 @@ const Roster = () => {
 
       {selectedCategoryId && (
         <div className="space-y-6">
-          {/* Shift Templates Panel - only show if user can edit */}
-          {canEditRoster && (
+          {/* Shift Templates Panel - only show if user can edit and not on mobile */}
+          {canEditRoster && !isMobile && (
             <Card>
               <CardHeader>
                 <CardTitle>Shift Templates</CardTitle>
@@ -586,7 +618,7 @@ const Roster = () => {
                 <CardTitle>
                   {selectedCategory?.name} Roster
                 </CardTitle>
-                {canEditRoster && (
+                {canEditRoster && !isMobile && (
                   <div className="flex items-center space-x-2">
                     <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
                       <SelectTrigger className="w-40">
@@ -649,8 +681,8 @@ const Roster = () => {
                                 <td
                                   key={day.toISOString()}
                                   className="p-2 border-r border-l min-w-32"
-                                  onDrop={canEditRoster ? () => handleDrop(employee.id, day.toISOString()) : undefined}
-                                  onDragOver={canEditRoster ? handleDragOver : undefined}
+                                  onDrop={canEditRoster && !isMobile ? () => handleDrop(employee.id, day.toISOString()) : undefined}
+                                  onDragOver={canEditRoster && !isMobile ? handleDragOver : undefined}
                                 >
                                   <div 
                                     className={cn(
@@ -659,29 +691,31 @@ const Roster = () => {
                                       !canEditRoster && "cursor-default"
                                     )}
                                     style={{
-                                      backgroundColor: (canEditRoster && (draggedTemplate || draggedShift)) ? '#f0f9ff' : 'transparent'
+                                      backgroundColor: (canEditRoster && !isMobile && (draggedTemplate || draggedShift)) ? '#f0f9ff' : 'transparent'
                                     }}
-                                    onClick={canEditRoster ? () => !shift && handleCellClick(
+                                    onClick={canEditRoster ? () => handleCellClick(
                                       employee.id, 
                                       `${employee.first_name} ${employee.last_name}`, 
-                                      day.toISOString()
+                                      day.toISOString(),
+                                      shift
                                     ) : undefined}
                                   >
                                     {shift ? (
                                       <div 
-                                        draggable={canEditRoster}
-                                        onDragStart={canEditRoster ? () => handleShiftDragStart(shift) : undefined}
-                                        onDragEnd={canEditRoster ? handleDragEnd : undefined}
+                                        draggable={canEditRoster && !isMobile}
+                                        onDragStart={canEditRoster && !isMobile ? () => handleShiftDragStart(shift) : undefined}
+                                        onDragEnd={canEditRoster && !isMobile ? handleDragEnd : undefined}
                                         className={cn(
                                           "p-2 rounded text-xs transition-shadow",
-                                          canEditRoster ? "cursor-move hover:shadow-md" : "cursor-default"
+                                          canEditRoster ? "cursor-pointer hover:shadow-md" : "cursor-default",
+                                          !isMobile && canEditRoster && "hover:cursor-move"
                                         )}
                                         style={{ 
                                           backgroundColor: template?.color + '20' || '#3B82F6' + '20',
                                           borderColor: template?.color || '#3B82F6'
                                         }}
-                                        onDoubleClick={canEditRoster ? () => deleteShiftMutation.mutate(shift.id) : undefined}
-                                        title={canEditRoster ? "Drag to move or delete, double-click to delete" : "View only"}
+                                        onDoubleClick={canEditRoster && !isMobile ? () => deleteShiftMutation.mutate(shift.id) : undefined}
+                                        title={canEditRoster ? (isMobile ? "Tap to edit or remove" : "Drag to move, click to edit, or double-click to delete") : "View only"}
                                       >
                                         <div className="font-medium">{shift.position}</div>
                                         <div>{shift.start_time} - {shift.end_time}</div>

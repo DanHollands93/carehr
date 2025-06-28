@@ -7,11 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, Save, Users, Trash2, ArrowUpDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, Users, Trash2, ArrowUpDown, Plus } from "lucide-react";
 import RosterCategoryManager from "@/components/RosterCategoryManager";
 import StaffAssignmentManager from "@/components/StaffAssignmentManager";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
+import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import { useRosterCategories } from "@/hooks/useRosterCategories";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Employee {
   id: string;
@@ -63,6 +65,7 @@ const TemplateRosterBuilder = ({
 }: TemplateRosterBuilderProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
   const [draggedShift, setDraggedShift] = useState<TemplateShift | null>(null);
   const [templateShifts, setTemplateShifts] = useState<TemplateShift[]>([]);
@@ -72,6 +75,18 @@ const TemplateRosterBuilder = ({
   const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'department' | 'custom'>('first_name');
   const [customOrder, setCustomOrder] = useState<string[]>([]);
   const [showSortDialog, setShowSortDialog] = useState(false);
+  const [shiftPopup, setShiftPopup] = useState<{
+    isOpen: boolean;
+    employeeId: string;
+    employeeName: string;
+    dayIndex: number;
+    existingShift?: TemplateShift;
+  }>({
+    isOpen: false,
+    employeeId: '',
+    employeeName: '',
+    dayIndex: 0
+  });
   
   const { categories, getAssignedEmployees } = useRosterCategories();
 
@@ -248,18 +263,21 @@ const TemplateRosterBuilder = ({
   });
 
   const handleDragStart = (template: ShiftTemplate) => {
+    if (isMobile) return;
     setDraggedTemplate(template);
     setDraggedShift(null);
     setShowDeleteBin(false);
   };
 
   const handleShiftDragStart = (shift: TemplateShift) => {
+    if (isMobile) return;
     setDraggedShift(shift);
     setDraggedTemplate(null);
     setShowDeleteBin(true);
   };
 
   const handleDrop = (employeeId: string, dayIndex: number) => {
+    if (isMobile) return;
     if (draggedTemplate) {
       const newShift: TemplateShift = {
         employee_id: employeeId,
@@ -283,6 +301,7 @@ const TemplateRosterBuilder = ({
   };
 
   const handleDeleteDrop = () => {
+    if (isMobile) return;
     if (draggedShift) {
       removeShift(draggedShift);
     }
@@ -290,10 +309,12 @@ const TemplateRosterBuilder = ({
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (isMobile) return;
     e.preventDefault();
   };
 
   const handleDragEnd = () => {
+    if (isMobile) return;
     setShowDeleteBin(false);
   };
 
@@ -334,10 +355,95 @@ const TemplateRosterBuilder = ({
     setShowSortDialog(false);
   };
 
+  const handleCellClick = (employeeId: string, employeeName: string, dayIndex: number) => {
+    const existingShift = getShiftForEmployeeAndDay(employeeId, dayIndex);
+    
+    setShiftPopup({
+      isOpen: true,
+      employeeId,
+      employeeName,
+      dayIndex,
+      existingShift
+    });
+  };
+
+  const handleCreateShiftFromPopup = (shiftData: {
+    start_time: string;
+    end_time: string;
+    position: string;
+    pay_value?: number;
+    color?: string;
+  }) => {
+    // Find or create a shift template that matches this data
+    const matchingTemplate = shiftTemplates?.find(t => 
+      t.start_time === shiftData.start_time &&
+      t.end_time === shiftData.end_time &&
+      t.position === shiftData.position
+    );
+
+    const newShift: TemplateShift = {
+      employee_id: shiftPopup.employeeId,
+      day_index: shiftPopup.dayIndex,
+      shift_template_id: matchingTemplate?.id || shiftTemplates?.[0]?.id || ''
+    };
+    
+    setTemplateShifts(prev => [...prev, newShift]);
+    setShiftPopup(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleUpdateShiftFromPopup = (shiftData: {
+    start_time: string;
+    end_time: string;
+    position: string;
+    pay_value?: number;
+    color?: string;
+  }) => {
+    if (!shiftPopup.existingShift) return;
+    
+    // Find a matching template
+    const matchingTemplate = shiftTemplates?.find(t => 
+      t.start_time === shiftData.start_time &&
+      t.end_time === shiftData.end_time &&
+      t.position === shiftData.position
+    );
+
+    setTemplateShifts(prev => 
+      prev.map(shift => 
+        shift === shiftPopup.existingShift 
+          ? { ...shift, shift_template_id: matchingTemplate?.id || shift.shift_template_id }
+          : shift
+      )
+    );
+    setShiftPopup(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleDeleteShiftFromPopup = () => {
+    if (shiftPopup.existingShift) {
+      removeShift(shiftPopup.existingShift);
+    }
+    setShiftPopup(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // Convert TemplateShift to look like a regular Shift for the popup
+  const convertTemplateShiftForPopup = (templateShift: TemplateShift) => {
+    const template = shiftTemplates?.find(t => t.id === templateShift.shift_template_id);
+    if (!template) return undefined;
+    
+    return {
+      id: templateShift.id || '',
+      employee_id: templateShift.employee_id,
+      date: '',
+      start_time: template.start_time,
+      end_time: template.end_time,
+      position: template.position,
+      job_role_id: ''
+    };
+  };
+
   return (
     <div className="space-y-6">
-      {/* Delete Bin - appears when dragging a shift */}
-      {showDeleteBin && (
+      {/* Delete Bin - appears when dragging a shift on desktop */}
+      {showDeleteBin && !isMobile && (
         <div className="fixed top-20 right-8 z-50">
           <div
             className="p-4 bg-red-100 border-2 border-dashed border-red-400 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
@@ -358,11 +464,23 @@ const TemplateRosterBuilder = ({
         onSave={handleCustomSort}
       />
 
+      {/* Shift Creation/Edit Popup */}
+      <ShiftCreationPopup
+        isOpen={shiftPopup.isOpen}
+        onClose={() => setShiftPopup(prev => ({ ...prev, isOpen: false }))}
+        onCreateShift={shiftPopup.existingShift ? handleUpdateShiftFromPopup : handleCreateShiftFromPopup}
+        onDeleteShift={shiftPopup.existingShift ? handleDeleteShiftFromPopup : undefined}
+        shiftTemplates={shiftTemplates || []}
+        employeeName={shiftPopup.employeeName}
+        date={`Day ${shiftPopup.dayIndex + 1}`}
+        existingShift={shiftPopup.existingShift ? convertTemplateShiftForPopup(shiftPopup.existingShift) : undefined}
+      />
+
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-gray-900">{templateName}</h2>
           <p className="text-gray-600">
-            Template Period: {periodDays} days ({repeatType.replace('_', ' ')}) - Drag shifts to move between staff and days
+            Template Period: {periodDays} days ({repeatType.replace('_', ' ')}) - {isMobile ? 'Tap shifts to edit or remove them' : 'Drag shifts to move between staff and days'}
           </p>
         </div>
         
@@ -433,44 +551,46 @@ const TemplateRosterBuilder = ({
 
       {selectedCategoryId && (
         <div className="space-y-6">
-          {/* Shift Templates Panel */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Shift Templates</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Accordion type="multiple" className="w-full">
-                {Object.entries(groupedTemplates).map(([position, templates]) => (
-                  <AccordionItem value={position} key={position}>
-                    <AccordionTrigger className="text-sm font-medium">
-                      {position}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="grid grid-cols-2 gap-2">
-                        {templates.map((template) => (
-                          <div
-                            key={template.id}
-                            draggable
-                            onDragStart={() => handleDragStart(template)}
-                            className="p-2 rounded border cursor-move hover:shadow-md transition-shadow text-xs"
-                            style={{ 
-                              backgroundColor: template.color + '20',
-                              borderColor: template.color 
-                            }}
-                          >
-                            <div className="font-medium truncate">{template.name}</div>
-                            <div className="text-xs text-gray-600 truncate">
-                              {template.start_time} - {template.end_time}
+          {/* Shift Templates Panel - only show on desktop */}
+          {!isMobile && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Shift Templates</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Accordion type="multiple" className="w-full">
+                  {Object.entries(groupedTemplates).map(([position, templates]) => (
+                    <AccordionItem value={position} key={position}>
+                      <AccordionTrigger className="text-sm font-medium">
+                        {position}
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid grid-cols-2 gap-2">
+                          {templates.map((template) => (
+                            <div
+                              key={template.id}
+                              draggable={!isMobile}
+                              onDragStart={() => handleDragStart(template)}
+                              className="p-2 rounded border cursor-move hover:shadow-md transition-shadow text-xs"
+                              style={{ 
+                                backgroundColor: template.color + '20',
+                                borderColor: template.color 
+                              }}
+                            >
+                              <div className="font-medium truncate">{template.name}</div>
+                              <div className="text-xs text-gray-600 truncate">
+                                {template.start_time} - {template.end_time}
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </CardContent>
-          </Card>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Current Week Roster Grid */}
           <Card>
@@ -479,27 +599,29 @@ const TemplateRosterBuilder = ({
                 <CardTitle>
                   {totalWeeks > 1 ? `Week ${currentWeek + 1} - ${selectedCategory?.name} Template` : `${selectedCategory?.name} Template`}
                 </CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Sort by..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="first_name">First Name</SelectItem>
-                      <SelectItem value="last_name">Last Name</SelectItem>
-                      <SelectItem value="department">Job Title</SelectItem>
-                      <SelectItem value="custom">Custom Order</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowSortDialog(true)}
-                  >
-                    <ArrowUpDown className="w-4 h-4 mr-2" />
-                    Custom Sort
-                  </Button>
-                </div>
+                {!isMobile && (
+                  <div className="flex items-center space-x-2">
+                    <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Sort by..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="first_name">First Name</SelectItem>
+                        <SelectItem value="last_name">Last Name</SelectItem>
+                        <SelectItem value="department">Job Title</SelectItem>
+                        <SelectItem value="custom">Custom Order</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSortDialog(true)}
+                    >
+                      <ArrowUpDown className="w-4 h-4 mr-2" />
+                      Custom Sort
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -536,30 +658,35 @@ const TemplateRosterBuilder = ({
                               <td
                                 key={dayIndex}
                                 className="p-2 border-r border-l"
-                                onDrop={() => handleDrop(employee.id, dayIndex)}
-                                onDragOver={handleDragOver}
+                                onDrop={!isMobile ? () => handleDrop(employee.id, dayIndex) : undefined}
+                                onDragOver={!isMobile ? handleDragOver : undefined}
                               >
                                 <div 
-                                  className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors"
+                                  className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors cursor-pointer"
                                   style={{
-                                    backgroundColor: (draggedTemplate || draggedShift) ? '#f0f9ff' : 'transparent'
+                                    backgroundColor: (!isMobile && (draggedTemplate || draggedShift)) ? '#f0f9ff' : 'transparent'
                                   }}
+                                  onClick={() => handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, dayIndex)}
                                 >
-                                  {shift && template && (
+                                  {shift && template ? (
                                     <div 
-                                      draggable
-                                      onDragStart={() => handleShiftDragStart(shift)}
-                                      onDragEnd={handleDragEnd}
-                                      className="p-2 rounded text-xs cursor-move hover:shadow-md transition-shadow"
+                                      draggable={!isMobile}
+                                      onDragStart={!isMobile ? () => handleShiftDragStart(shift) : undefined}
+                                      onDragEnd={!isMobile ? handleDragEnd : undefined}
+                                      className="p-2 rounded text-xs cursor-pointer hover:shadow-md transition-shadow"
                                       style={{ 
                                         backgroundColor: template.color + '20',
                                         borderColor: template.color
                                       }}
-                                      onDoubleClick={() => removeShift(shift)}
-                                      title="Drag to move or delete, double-click to remove"
+                                      onDoubleClick={!isMobile ? () => removeShift(shift) : undefined}
+                                      title={isMobile ? "Tap to edit or remove" : "Drag to move or delete, double-click to remove"}
                                     >
                                       <div className="font-medium">{template.position}</div>
                                       <div>{template.start_time} - {template.end_time}</div>
+                                    </div>
+                                  ) : (
+                                    <div className="opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center h-full">
+                                      <Plus className="w-4 h-4 text-gray-400" />
                                     </div>
                                   )}
                                 </div>
