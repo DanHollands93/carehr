@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArrowLeft, Edit, Plus, MapPin, Phone, Mail, Calendar, Briefcase, PoundSterling, Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -78,7 +79,7 @@ interface EmployeeDetailsProps {
 const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) => {
   const [showCareerForm, setShowCareerForm] = useState(false);
   const [editingPersonal, setEditingPersonal] = useState(false);
-  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [showAddressDialog, setShowAddressDialog] = useState(false);
   const [personalFormData, setPersonalFormData] = useState<PersonalFormData>({
     first_name: '',
     last_name: '',
@@ -193,7 +194,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
     };
 
     setAddressHistory([newAddress, ...updatedHistory]);
-    setShowAddressForm(false);
+    setShowAddressDialog(false);
     toast.success("New address added successfully!");
   };
 
@@ -490,7 +491,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
         <TabsContent value="address" className="space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Address History</h3>
-            <Button onClick={() => setShowAddressForm(true)}>
+            <Button onClick={() => setShowAddressDialog(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add New Address
             </Button>
@@ -531,7 +532,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                   <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No address history</h3>
                   <p className="text-gray-600 mb-4">Add the employee's address information</p>
-                  <Button onClick={() => setShowAddressForm(true)}>
+                  <Button onClick={() => setShowAddressDialog(true)}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add First Address
                   </Button>
@@ -539,13 +540,6 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
               </Card>
             )}
           </div>
-
-          {showAddressForm && (
-            <AddressForm
-              onClose={() => setShowAddressForm(false)}
-              onSave={handleAddAddress}
-            />
-          )}
         </TabsContent>
 
         <TabsContent value="career" className="space-y-6">
@@ -606,7 +600,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                 <CardContent className="text-center py-8">
                   <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No career history</h3>
-                  <p className="text-gray-600 mb-4">Add employment history for this employee</p>
+                  <p className="text-gray-600">Add employment history for this employee</p>
                   <Button onClick={() => setShowCareerForm(true)}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add First Position
@@ -680,11 +674,23 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
           }}
         />
       )}
+
+      <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Address</DialogTitle>
+          </DialogHeader>
+          <AddressForm
+            onClose={() => setShowAddressDialog(false)}
+            onSave={handleAddAddress}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
-// Simple address form component
+// Simple address form component - now without Card wrapper since it's in a dialog
 const AddressForm = ({ onClose, onSave }: { onClose: () => void; onSave: (data: any) => void }) => {
   const [addressData, setAddressData] = useState({
     line_1: '',
@@ -704,74 +710,69 @@ const AddressForm = ({ onClose, onSave }: { onClose: () => void; onSave: (data: 
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Add New Address</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="line_1">Address Line 1 *</Label>
+        <Input
+          id="line_1"
+          value={addressData.line_1}
+          onChange={(e) => setAddressData({...addressData, line_1: e.target.value})}
+        />
+      </div>
+      <div>
+        <Label htmlFor="line_2">Address Line 2</Label>
+        <Input
+          id="line_2"
+          value={addressData.line_2}
+          onChange={(e) => setAddressData({...addressData, line_2: e.target.value})}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="line_1">Address Line 1 *</Label>
+          <Label htmlFor="city">City *</Label>
           <Input
-            id="line_1"
-            value={addressData.line_1}
-            onChange={(e) => setAddressData({...addressData, line_1: e.target.value})}
+            id="city"
+            value={addressData.city}
+            onChange={(e) => setAddressData({...addressData, city: e.target.value})}
           />
         </div>
         <div>
-          <Label htmlFor="line_2">Address Line 2</Label>
+          <Label htmlFor="postcode">Postcode *</Label>
           <Input
-            id="line_2"
-            value={addressData.line_2}
-            onChange={(e) => setAddressData({...addressData, line_2: e.target.value})}
+            id="postcode"
+            value={addressData.postcode}
+            onChange={(e) => setAddressData({...addressData, postcode: e.target.value})}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="city">City *</Label>
-            <Input
-              id="city"
-              value={addressData.city}
-              onChange={(e) => setAddressData({...addressData, city: e.target.value})}
-            />
-          </div>
-          <div>
-            <Label htmlFor="postcode">Postcode *</Label>
-            <Input
-              id="postcode"
-              value={addressData.postcode}
-              onChange={(e) => setAddressData({...addressData, postcode: e.target.value})}
-            />
-          </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="country">Country</Label>
+          <Input
+            id="country"
+            value={addressData.country}
+            onChange={(e) => setAddressData({...addressData, country: e.target.value})}
+          />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="country">Country</Label>
-            <Input
-              id="country"
-              value={addressData.country}
-              onChange={(e) => setAddressData({...addressData, country: e.target.value})}
-            />
-          </div>
-          <div>
-            <Label htmlFor="start_date">Start Date *</Label>
-            <Input
-              id="start_date"
-              type="date"
-              value={addressData.start_date}
-              onChange={(e) => setAddressData({...addressData, start_date: e.target.value})}
-            />
-          </div>
+        <div>
+          <Label htmlFor="start_date">Start Date *</Label>
+          <Input
+            id="start_date"
+            type="date"
+            value={addressData.start_date}
+            onChange={(e) => setAddressData({...addressData, start_date: e.target.value})}
+          />
         </div>
-        <div className="flex justify-end space-x-2 pt-4">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>
-            Add Address
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+      <div className="flex justify-end space-x-2 pt-4">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave}>
+          Add Address
+        </Button>
+      </div>
+    </div>
   );
 };
 
