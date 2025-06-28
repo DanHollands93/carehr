@@ -58,69 +58,132 @@ const HoursAnalysisReport = () => {
   const { data: hoursData, isLoading } = useQuery({
     queryKey: ['hours-analysis', dateRange.from, dateRange.to],
     queryFn: async () => {
-      console.log('Fetching hours analysis data...');
+      console.log('Fetching hours analysis data for date range:', {
+        from: format(dateRange.from, 'yyyy-MM-dd'),
+        to: format(dateRange.to, 'yyyy-MM-dd')
+      });
       
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
       
-      // Get time clock records with employee and shift data
-      const { data: records, error } = await supabase
+      // First, let's get all completed time clock records in the date range
+      const { data: timeRecords, error: timeError } = await supabase
         .from('time_clock_records')
         .select(`
           id,
           employee_id,
+          shift_id,
           clock_in_time,
           clock_out_time,
-          status,
-          shift_id
+          status
         `)
+        .eq('status', 'completed')
         .not('clock_in_time', 'is', null)
         .not('clock_out_time', 'is', null)
-        .eq('status', 'completed');
+        .gte('clock_in_time', `${startDate}T00:00:00`)
+        .lte('clock_out_time', `${endDate}T23:59:59`);
         
-      if (error) throw error;
+      if (timeError) {
+        console.error('Error fetching time records:', timeError);
+        throw timeError;
+      }
       
-      if (!records?.length) return [];
+      console.log('Found time records:', timeRecords?.length || 0);
+      
+      if (!timeRecords?.length) {
+        // Let's also try to get shifts in the date range even without completed time records
+        const { data: shiftsOnly, error: shiftsError } = await supabase
+          .from('shifts')
+          .select(`
+            id,
+            employee_id,
+            date,
+            start_time,
+            end_time,
+            position
+          `)
+          .gte('date', startDate)
+          .lte('date', endDate);
+          
+        console.log('Available shifts in date range:', shiftsOnly?.length || 0, shiftsOnly);
+        return [];
+      }
+      
+      // Get unique employee IDs and shift IDs
+      const employeeIds = [...new Set(timeRecords.map(r => r.employee_id))];
+      const shiftIds = [...new Set(timeRecords.map(r => r.shift_id).filter(Boolean))];
+      
+      console.log('Employee IDs:', employeeIds.length, 'Shift IDs:', shiftIds.length);
       
       // Get employee data
-      const employeeIds = [...new Set(records.map(r => r.employee_id))];
       const { data: employees, error: empError } = await supabase
         .from('employees')
         .select('id, first_name, last_name, department')
         .in('id', employeeIds);
         
-      if (empError) throw empError;
+      if (empError) {
+        console.error('Error fetching employees:', empError);
+        throw empError;
+      }
       
       // Get shift data
-      const shiftIds = [...new Set(records.map(r => r.shift_id).filter(Boolean))];
       const { data: shifts, error: shiftError } = await supabase
         .from('shifts')
-        .select('id, date, start_time, end_time, position')
-        .in('id', shiftIds)
-        .gte('date', startDate)
-        .lte('date', endDate);
+        .select('id, date, start_time, end_time, position, employee_id')
+        .in('id', shiftIds);
         
-      if (shiftError) throw shiftError;
+      if (shiftError) {
+        console.error('Error fetching shifts:', shiftError);
+        throw shiftError;
+      }
+      
+      console.log('Found employees:', employees?.length || 0);
+      console.log('Found shifts:', shifts?.length || 0);
       
       // Create lookup maps
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
       const shiftMap = new Map(shifts?.map(shift => [shift.id, shift]) || []);
       
       // Process the data
-      const processedData: HoursRecord[] = records
+      const processedData: HoursRecord[] = timeRecords
         .map(record => {
           const employee = employeeMap.get(record.employee_id);
           const shift = shiftMap.get(record.shift_id || '');
           
-          if (!employee || !shift || !record.clock_in_time || !record.clock_out_time) {
+          if (!employee) {
+            console.log('Missing employee for record:', record.employee_id);
             return null;
           }
           
-          // Calculate hours
+          if (!shift) {
+            console.log('Missing shift for record:', record.shift_id);
+            // Try to create a basic record without shift data
+            const clockIn = parseISO(record.clock_in_time!);
+            const clockOut = parseISO(record.clock_out_time!);
+            const actualMinutes = differenceInMinutes(clockOut, clockIn);
+            const actualHours = Math.round((actualMinutes / 60) * 100) / 100;
+            
+            return {
+              employee_id: employee.id,
+              employee_name: `${employee.first_name} ${employee.last_name}`,
+              position: employee.department || 'Unknown',
+              date: format(clockIn, 'yyyy-MM-dd'),
+              shift_start: format(clockIn, 'HH:mm'),
+              shift_end: format(clockOut, 'HH:mm'),
+              clock_in: record.clock_in_time,
+              clock_out: record.clock_out_time,
+              scheduled_hours: actualHours, // Use actual as scheduled if no shift data
+              actual_hours: actualHours,
+              pay_rate: 0,
+              total_pay: 0
+            };
+          }
+          
+          // Calculate hours with shift data
           const shiftStart = parseISO(`${shift.date}T${shift.start_time}`);
           const shiftEnd = parseISO(`${shift.date}T${shift.end_time}`);
-          const clockIn = parseISO(record.clock_in_time);
-          const clockOut = parseISO(record.clock_out_time);
+          const clockIn = parseISO(record.clock_in_time!);
+          const clockOut = parseISO(record.clock_out_time!);
           
           const scheduledMinutes = differenceInMinutes(shiftEnd, shiftStart);
           const actualMinutes = differenceInMinutes(clockOut, clockIn);
@@ -139,13 +202,13 @@ const HoursAnalysisReport = () => {
             clock_out: record.clock_out_time,
             scheduled_hours: scheduledHours,
             actual_hours: actualHours,
-            pay_rate: 0, // This would come from employee pay rates if available
+            pay_rate: 0,
             total_pay: 0
           };
         })
         .filter(Boolean) as HoursRecord[];
       
-      console.log('Processed hours data:', processedData);
+      console.log('Processed hours data:', processedData.length, 'records');
       return processedData;
     }
   });
@@ -337,7 +400,10 @@ const HoursAnalysisReport = () => {
             <div className="text-center py-8">Loading hours analysis...</div>
           ) : !hoursData?.length ? (
             <div className="text-center py-8 text-gray-500">
-              No time clock data found for the selected period
+              <p>No completed time clock records found for the selected period</p>
+              <p className="text-sm mt-2">
+                Date range: {format(dateRange.from, 'dd/MM/yyyy')} - {format(dateRange.to, 'dd/MM/yyyy')}
+              </p>
             </div>
           ) : (
             <Table>
