@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +39,7 @@ const HolidayApprovalsWidget = () => {
       await approvalService.processApproval({ requestId, action: 'approve' });
       toast({
         title: "Request approved",
-        description: "Holiday request has been approved successfully.",
+        description: "Holiday request has been approved and employee has been notified.",
       });
       queryClient.invalidateQueries({ queryKey: ['holiday-approvals-widget'] });
       queryClient.invalidateQueries({ queryKey: ['today-off-count'] });

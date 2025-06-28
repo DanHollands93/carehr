@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { notificationService } from "./notificationService";
 
 export interface HolidayRequest {
   id: string;
@@ -99,11 +100,28 @@ export const approvalService = {
   },
 
   async processApproval(approval: ApprovalAction): Promise<void> {
+    // Get current user info
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Get the holiday request details first
+    const { data: holidayRequest, error: fetchError } = await supabase
+      .from('holiday_requests')
+      .select('*')
+      .eq('id', approval.requestId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching holiday request:', fetchError);
+      throw fetchError;
+    }
+
+    // Update the holiday request status
     const { error } = await supabase
       .from('holiday_requests')
       .update({
         status: approval.action === 'approve' ? 'approved' : 'rejected',
-        approved_by: (await supabase.auth.getUser()).data.user?.id,
+        approved_by: user.id,
         approval_date: new Date().toISOString(),
         comments: approval.comments
       })
@@ -112,6 +130,37 @@ export const approvalService = {
     if (error) {
       console.error('Error processing approval:', error);
       throw error;
+    }
+
+    // Get the user ID for the employee who made the request
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('employee_id', holidayRequest.employee_id)
+      .single();
+
+    if (profile) {
+      // Create notification for the employee
+      const templateData = {
+        start_date: holidayRequest.start_date,
+        end_date: holidayRequest.end_date,
+        approver_name: user.email || 'HR Team',
+        rejection_reason: approval.comments || 'No reason provided'
+      };
+
+      const triggerEvent = approval.action === 'approve' ? 'holiday_approved' : 'holiday_rejected';
+      
+      try {
+        await notificationService.createFromTemplate(
+          profile.id,
+          triggerEvent,
+          templateData
+        );
+        console.log(`Notification created for ${approval.action} holiday request`);
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+        // Don't throw here as the approval was successful
+      }
     }
   },
 
