@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -70,17 +69,28 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
     if (!userProfile) return;
     
     try {
-      // Update the profile email
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ email: employee.email })
-        .eq('id', userProfile.id);
+      console.log('Syncing email from', userProfile.email, 'to', employee.email);
+      
+      // Use the new edge function to properly sync the auth user's email
+      const { data, error } = await supabase.functions.invoke('sync-user-email', {
+        body: {
+          userId: userProfile.id,
+          newEmail: employee.email
+        }
+      });
 
-      if (profileError) {
-        console.error('Error updating profile email:', profileError);
+      if (error) {
+        console.error('Error syncing user email:', error);
         toast({
-          title: "Warning",
-          description: "Employee email updated but failed to sync with user account",
+          title: "Error",
+          description: error.message || "Failed to sync user account email",
+          variant: "destructive"
+        });
+      } else if (data?.error) {
+        console.error('Server error syncing email:', data.error);
+        toast({
+          title: "Error", 
+          description: data.error,
           variant: "destructive"
         });
       } else {
@@ -89,11 +99,16 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
         
         toast({
           title: "Email Synced",
-          description: "User account email has been updated to match employee email",
+          description: "User account email has been updated successfully",
         });
       }
     } catch (error) {
       console.error('Exception syncing email:', error);
+      toast({
+        title: "Error",
+        description: "Failed to sync user account email",
+        variant: "destructive"
+      });
     }
   };
 
