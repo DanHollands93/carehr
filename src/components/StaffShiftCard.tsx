@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,7 +73,8 @@ const StaffShiftCard = ({
   };
 
   const canClockIn = record.status === 'scheduled' && !record.clock_in_time;
-  const canClockOut = record.status === 'clocked_in' && record.clock_in_time && !record.clock_out_time;
+  // Allow clocking out if user has clocked in but not clocked out, regardless of discrepancy status
+  const canClockOut = record.clock_in_time && !record.clock_out_time;
 
   const handleClockIn = () => {
     const validation = validateClockTime(record, true, {
