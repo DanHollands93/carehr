@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -112,8 +111,11 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
     
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(userProfile.email, {
-        redirectTo: `${window.location.origin}/reset-password`
+      const { data, error } = await supabase.functions.invoke('send-password-reset', {
+        body: {
+          email: userProfile.email,
+          redirectTo: `${window.location.origin}/reset-password`
+        }
       });
 
       if (error) {
@@ -121,6 +123,13 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
         toast({
           title: "Error",
           description: "Failed to send password reset email",
+          variant: "destructive"
+        });
+      } else if (data?.error) {
+        console.error('Server error sending password reset:', data.error);
+        toast({
+          title: "Error",
+          description: data.error,
           variant: "destructive"
         });
       } else {
