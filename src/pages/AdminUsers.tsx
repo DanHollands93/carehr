@@ -11,14 +11,13 @@ const AdminUsers = () => {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-        <p className="text-gray-600 mt-2">Manage users and approve requests</p>
+        <p className="text-gray-600 mt-2">Manage employees and their user accounts</p>
       </div>
 
       <Tabs defaultValue="employees" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="employees">Employees</TabsTrigger>
+          <TabsTrigger value="employees">Employee Management</TabsTrigger>
           <TabsTrigger value="approvals">Pending Approvals</TabsTrigger>
-          <TabsTrigger value="users">User Accounts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="employees">
@@ -36,12 +35,6 @@ const AdminUsers = () => {
               onUpdate={refreshRequests}
             />
           )}
-        </TabsContent>
-
-        <TabsContent value="users">
-          <div className="p-6 bg-gray-50 rounded-lg">
-            <p className="text-muted-foreground">User account management coming soon...</p>
-          </div>
         </TabsContent>
       </Tabs>
     </div>

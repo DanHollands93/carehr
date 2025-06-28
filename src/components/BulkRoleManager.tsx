@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,7 @@ interface BulkRoleRule {
   position: string;
   permission_group_id: string;
   created_at: string;
-  permission_groups: PermissionGroup;
+  permission_groups: PermissionGroup; // Changed from array to single object
 }
 
 const BulkRoleManager = () => {
@@ -85,38 +84,38 @@ const BulkRoleManager = () => {
     }
   };
 
-  const loadBulkRules = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('bulk_position_rules')
-        .select(`
+const loadBulkRules = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('bulk_position_rules')
+      .select(`
+        id,
+        position,
+        permission_group_id,
+        created_at,
+        permission_groups!inner(
           id,
-          position,
-          permission_group_id,
-          created_at,
-          permission_groups!inner(
-            id,
-            name,
-            description
-          )
-        `)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error loading bulk rules:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load position rules",
-          variant: "destructive"
-        });
-      } else {
-        console.log('Loaded bulk rules:', data);
-        setBulkRules(data || []);
-      }
-    } catch (error) {
-      console.error('Exception loading bulk rules:', error);
+          name,
+          description
+        )
+      `)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error loading bulk rules:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load position rules",
+        variant: "destructive"
+      });
+    } else {
+      console.log('Loaded bulk rules:', data);
+      setBulkRules(data || []);
     }
-  };
+  } catch (error) {
+    console.error('Exception loading bulk rules:', error);
+  }
+};
 
   const handleCreateRule = async () => {
     if (!selectedPosition || !selectedPermissionGroupId) {

@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CareerHistoryForm from "@/components/CareerHistoryForm";
 import { usePermissions } from "@/hooks/usePermissions";
+import UserAccountManager from "./UserAccountManager";
 
 interface Employee {
   id?: string;
@@ -306,7 +307,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" size="sm" onClick={onBack}>
@@ -322,15 +323,15 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
         </div>
       </div>
 
-      <Tabs defaultValue="personal" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="personal">Personal</TabsTrigger>
-          <TabsTrigger value="address">Address & Contact</TabsTrigger>
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="career">Career History</TabsTrigger>
-          <TabsTrigger value="financial">Financial</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="user-account">User Account</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="personal" className="space-y-4">
+        <TabsContent value="overview" className="space-y-4">
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
@@ -622,60 +623,6 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
           )}
         </TabsContent>
 
-        <TabsContent value="address" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Address History</h3>
-            <Button onClick={() => setShowAddressDialog(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add New Address
-            </Button>
-          </div>
-
-          <div className="space-y-4">
-            {addressHistory.map((address, index) => (
-              <Card key={address.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">
-                        {address.is_current ? 'Current Address' : 'Previous Address'}
-                      </CardTitle>
-                      <CardDescription>
-                        {formatDate(address.start_date)} - {address.end_date ? formatDate(address.end_date) : 'Present'}
-                      </CardDescription>
-                    </div>
-                    {address.is_current && (
-                      <Badge variant="default">Current</Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {address.line_1 && <div>{address.line_1}</div>}
-                    {address.line_2 && <div>{address.line_2}</div>}
-                    <div>{address.city}, {address.postcode}</div>
-                    <div>{address.country}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            {addressHistory.length === 0 && (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No address history</h3>
-                  <p className="text-gray-600 mb-4">Add the employee's address information</p>
-                  <Button onClick={() => setShowAddressDialog(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add First Address
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
-
         <TabsContent value="career" className="space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Career History</h3>
@@ -745,55 +692,23 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
           </div>
         </TabsContent>
 
-        <TabsContent value="financial" className="space-y-4">
-          {fullEmployee?.bank_details && Object.keys(fullEmployee.bank_details).some(key => fullEmployee.bank_details[key]) ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Bank Details</CardTitle>
-                <CardDescription>Secure banking information (masked for security)</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {fullEmployee.bank_details.bank_name && (
-                  <div>
-                    <span className="text-sm text-gray-600">Bank Name:</span>
-                    <div>{fullEmployee.bank_details.bank_name}</div>
-                  </div>
-                )}
-                {fullEmployee.bank_details.account_holder_name && (
-                  <div>
-                    <span className="text-sm text-gray-600">Account Holder Name:</span>
-                    <div>{fullEmployee.bank_details.account_holder_name}</div>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                  {fullEmployee.bank_details.account_number && (
-                    <div>
-                      <span className="text-sm text-gray-600">Account Number:</span>
-                      <div>****{fullEmployee.bank_details.account_number.slice(-4)}</div>
-                    </div>
-                  )}
-                  {fullEmployee.bank_details.sort_code && (
-                    <div>
-                      <span className="text-sm text-gray-600">Sort Code:</span>
-                      <div>**-**-{fullEmployee.bank_details.sort_code.slice(-2)}</div>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center space-x-2 text-green-600">
-                  <Check className="w-4 h-4" />
-                  <span className="text-sm">Bank details completed</span>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="text-center py-8">
-                <PoundSterling className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No bank details</h3>
-                <p className="text-gray-600">Bank details have not been provided for this employee</p>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="documents">
+          <Card>
+            <CardHeader>
+              <CardTitle>Employee Documents</CardTitle>
+              <CardDescription>Manage employee documents and files</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Document management coming soon...</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="user-account">
+          <UserAccountManager 
+            employee={employee}
+            onUpdate={onUpdate}
+          />
         </TabsContent>
       </Tabs>
 
