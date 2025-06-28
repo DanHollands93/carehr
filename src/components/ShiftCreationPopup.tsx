@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
-import { format, isValid } from "date-fns";
+import { useEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
 
 interface ShiftTemplate {
   id: string;
@@ -14,7 +15,7 @@ interface ShiftTemplate {
   end_time: string;
   color: string;
   position: string;
-  pay_value: number;
+  pay_value?: number;
 }
 
 interface Shift {
@@ -36,10 +37,12 @@ interface ShiftCreationPopupProps {
     position: string;
     pay_value?: number;
     color?: string;
+    job_role_id?: string;
   }) => void;
   onDeleteShift?: () => void;
   shiftTemplates: ShiftTemplate[];
   employeeName: string;
+  employeeId?: string;
   date: string;
   existingShift?: Shift;
 }
@@ -51,202 +54,198 @@ const ShiftCreationPopup = ({
   onDeleteShift,
   shiftTemplates,
   employeeName,
+  employeeId,
   date,
   existingShift
 }: ShiftCreationPopupProps) => {
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
-  const [customShift, setCustomShift] = useState({
-    start_time: "",
-    end_time: "",
-    position: "",
-    pay_value: 0
-  });
-  const [useCustom, setUseCustom] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('17:00');
+  const [position, setPosition] = useState('');
+  const [selectedJobRole, setSelectedJobRole] = useState<string>('');
+  const [payValue, setPayValue] = useState<number>(0);
+
+  // Get employee job roles for role selection
+  const { data: employeeJobRoles } = useEmployeeJobRoles(employeeId);
 
   useEffect(() => {
     if (existingShift) {
-      // Pre-populate with existing shift data
-      setCustomShift({
-        start_time: existingShift.start_time,
-        end_time: existingShift.end_time,
-        position: existingShift.position,
-        pay_value: 0
-      });
-      setUseCustom(true);
-      setSelectedTemplate("");
+      setStartTime(existingShift.start_time);
+      setEndTime(existingShift.end_time);
+      setPosition(existingShift.position);
+      setSelectedJobRole(existingShift.job_role_id);
+      
+      // Find matching template
+      const matchingTemplate = shiftTemplates.find(t => 
+        t.start_time === existingShift.start_time &&
+        t.end_time === existingShift.end_time &&
+        t.position === existingShift.position
+      );
+      if (matchingTemplate) {
+        setSelectedTemplate(matchingTemplate.id);
+        setPayValue(matchingTemplate.pay_value || 0);
+      }
     } else {
-      // Reset for new shift
-      setCustomShift({
-        start_time: "",
-        end_time: "",
-        position: "",
-        pay_value: 0
-      });
-      setUseCustom(false);
-      setSelectedTemplate("");
+      // Reset form for new shift
+      setSelectedTemplate('');
+      setStartTime('09:00');
+      setEndTime('17:00');
+      setPosition('');
+      setSelectedJobRole('');
+      setPayValue(0);
     }
-  }, [existingShift, isOpen]);
+  }, [existingShift, shiftTemplates, isOpen]);
 
   const handleTemplateSelect = (templateId: string) => {
-    setSelectedTemplate(templateId);
     const template = shiftTemplates.find(t => t.id === templateId);
     if (template) {
-      setCustomShift({
-        start_time: template.start_time,
-        end_time: template.end_time,
-        position: template.position,
-        pay_value: template.pay_value
-      });
-    }
-    setUseCustom(false);
-  };
-
-  const handleCustomToggle = () => {
-    setUseCustom(!useCustom);
-    if (!useCustom) {
-      setSelectedTemplate("");
+      setSelectedTemplate(templateId);
+      setStartTime(template.start_time);
+      setEndTime(template.end_time);
+      setPosition(template.position);
+      setPayValue(template.pay_value || 0);
     }
   };
 
   const handleSubmit = () => {
-    const template = selectedTemplate ? shiftTemplates.find(t => t.id === selectedTemplate) : null;
-    
+    if (!startTime || !endTime || !position) return;
+
     onCreateShift({
-      start_time: customShift.start_time,
-      end_time: customShift.end_time,
-      position: customShift.position,
-      pay_value: customShift.pay_value,
-      color: template?.color
+      start_time: startTime,
+      end_time: endTime,
+      position: position,
+      pay_value: payValue,
+      color: selectedTemplate ? shiftTemplates.find(t => t.id === selectedTemplate)?.color : '#3B82F6',
+      job_role_id: selectedJobRole
     });
-    
+  };
+
+  const handleClose = () => {
+    setSelectedTemplate('');
+    setStartTime('09:00');
+    setEndTime('17:00');
+    setPosition('');
+    setSelectedJobRole('');
+    setPayValue(0);
     onClose();
   };
 
-  const handleDelete = () => {
-    if (onDeleteShift) {
-      onDeleteShift();
-    }
-  };
-
-  const isFormValid = customShift.start_time && customShift.end_time && customShift.position;
-
-  const formatDateDisplay = (dateString: string) => {
-    // Check if it's a template day format (e.g., "Day 1")
-    if (dateString.startsWith('Day ')) {
-      return dateString;
-    }
-    
-    // Try to parse as a regular date
-    const parsedDate = new Date(dateString);
-    if (isValid(parsedDate)) {
-      return format(parsedDate, 'EEEE, MMMM dd, yyyy');
-    }
-    
-    // Fallback to the original string
-    return dateString;
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {existingShift ? 'Edit Shift' : 'Create Shift'} for {employeeName}
+            {existingShift ? 'Edit Shift' : 'Create Shift'} - {employeeName}
           </DialogTitle>
-          <p className="text-sm text-gray-500">
-            {formatDateDisplay(date)}
-          </p>
         </DialogHeader>
         
         <div className="space-y-4">
-          {!existingShift && (
-            <>
-              <div className="space-y-2">
-                <Label>Select from Template</Label>
-                <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a shift template..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {shiftTemplates.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.name} ({template.start_time} - {template.end_time})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="text-sm text-gray-600">
+            Date: {date}
+          </div>
 
-              <div className="flex items-center justify-center">
-                <span className="text-sm text-gray-500">or</span>
-              </div>
+          {/* Template Selection */}
+          <div className="space-y-2">
+            <Label>Shift Template (Optional)</Label>
+            <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a template or create custom" />
+              </SelectTrigger>
+              <SelectContent>
+                {shiftTemplates.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name} ({template.start_time} - {template.end_time})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-              <Button
-                variant="outline"
-                onClick={handleCustomToggle}
-                className="w-full"
-              >
-                {useCustom ? 'Use Template Instead' : 'Create Custom Shift'}
-              </Button>
-            </>
-          )}
-
-          {(useCustom || existingShift) && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start_time">Start Time</Label>
-                  <Input
-                    id="start_time"
-                    type="time"
-                    value={customShift.start_time}
-                    onChange={(e) => setCustomShift(prev => ({ ...prev, start_time: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end_time">End Time</Label>
-                  <Input
-                    id="end_time"
-                    type="time"
-                    value={customShift.end_time}
-                    onChange={(e) => setCustomShift(prev => ({ ...prev, end_time: e.target.value }))}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="position">Position</Label>
-                <Input
-                  id="position"
-                  value={customShift.position}
-                  onChange={(e) => setCustomShift(prev => ({ ...prev, position: e.target.value }))}
-                  placeholder="Enter position name..."
-                />
-              </div>
+          {/* Job Role Selection */}
+          {employeeJobRoles && employeeJobRoles.length > 0 && (
+            <div className="space-y-2">
+              <Label>Job Role *</Label>
+              <Select value={selectedJobRole} onValueChange={setSelectedJobRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select job role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employeeJobRoles.map((ejr) => (
+                    <SelectItem key={ejr.job_role_id} value={ejr.job_role_id}>
+                      {ejr.job_roles?.title} - £{ejr.pay_rate.toFixed(2)}/hr
+                      {ejr.is_primary && ' (Primary)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
+          {/* Time Fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Start Time</Label>
+              <Input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>End Time</Label>
+              <Input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Position */}
+          <div className="space-y-2">
+            <Label>Position</Label>
+            <Input
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              placeholder="Enter position"
+            />
+          </div>
+
+          {/* Pay Value */}
+          <div className="space-y-2">
+            <Label>Pay Rate (£/hour)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={payValue}
+              onChange={(e) => setPayValue(parseFloat(e.target.value) || 0)}
+              placeholder="0.00"
+            />
+          </div>
+
+          {/* Actions */}
           <div className="flex justify-between pt-4">
-            {existingShift && onDeleteShift && (
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                size="sm"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Shift
-              </Button>
-            )}
-            
-            <div className="flex space-x-2 ml-auto">
-              <Button variant="outline" onClick={onClose}>
+            <div>
+              {existingShift && onDeleteShift && (
+                <Button
+                  variant="destructive"
+                  onClick={onDeleteShift}
+                  size="sm"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
               <Button 
                 onClick={handleSubmit}
-                disabled={!isFormValid}
+                disabled={!startTime || !endTime || !position || !selectedJobRole}
               >
-                {existingShift ? 'Update Shift' : 'Create Shift'}
+                {existingShift ? 'Update' : 'Create'} Shift
               </Button>
             </div>
           </div>
