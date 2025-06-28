@@ -45,6 +45,17 @@ serve(async (req) => {
 
     if (error) {
       console.error('Error generating reset link:', error);
+      
+      // Log failed email attempt
+      await supabaseAdmin.from('email_logs').insert({
+        recipient_email: email,
+        subject: 'Reset Your Password',
+        email_type: 'password_reset',
+        status: 'failed',
+        email_service: 'resend',
+        error_message: error.message
+      });
+
       return new Response(
         JSON.stringify({ error: error.message }),
         { 
@@ -84,6 +95,17 @@ serve(async (req) => {
 
     if (emailResponse.error) {
       console.error('Error sending email:', emailResponse.error);
+      
+      // Log failed email
+      await supabaseAdmin.from('email_logs').insert({
+        recipient_email: email,
+        subject: 'Reset Your Password',
+        email_type: 'password_reset',
+        status: 'failed',
+        email_service: 'resend',
+        error_message: emailResponse.error.message
+      });
+
       return new Response(
         JSON.stringify({ error: 'Failed to send password reset email' }),
         { 
@@ -94,6 +116,16 @@ serve(async (req) => {
     }
 
     console.log('Password reset email sent successfully:', emailResponse);
+
+    // Log successful email
+    await supabaseAdmin.from('email_logs').insert({
+      recipient_email: email,
+      subject: 'Reset Your Password',
+      email_type: 'password_reset',
+      status: 'sent',
+      email_service: 'resend',
+      external_id: emailResponse.data?.id
+    });
 
     return new Response(
       JSON.stringify({ 

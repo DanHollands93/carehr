@@ -140,6 +140,12 @@ export const unifiedMenuConfig: MenuGroup[] = [
         path: "/settings",
         icon: "Settings"
         // Remove permission requirement temporarily to see if this shows up
+      },
+      {
+        title: "Email Logs",
+        path: "/admin/email-logs",
+        icon: "Mail",
+        requiredPermission: "view_email_logs"
       }
     ]
   }

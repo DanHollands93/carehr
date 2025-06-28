@@ -204,6 +204,48 @@ export type Database = {
           },
         ]
       }
+      email_logs: {
+        Row: {
+          created_at: string | null
+          email_service: string | null
+          email_type: string
+          error_message: string | null
+          external_id: string | null
+          id: string
+          recipient_email: string
+          sender_user_id: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_service?: string | null
+          email_type: string
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          recipient_email: string
+          sender_user_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+        }
+        Update: {
+          created_at?: string | null
+          email_service?: string | null
+          email_type?: string
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          recipient_email?: string
+          sender_user_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+        }
+        Relationships: []
+      }
       employee_drafts: {
         Row: {
           career_history: Json | null

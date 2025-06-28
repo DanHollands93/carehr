@@ -27,6 +27,7 @@ import ShiftTemplates from "./pages/ShiftTemplates";
 import Roster from "./pages/Roster";
 import RosterTemplates from "./pages/RosterTemplates";
 import HolidayApprovals from "./pages/HolidayApprovals";
+import EmailLogs from "./pages/EmailLogs";
 
 const queryClient = new QueryClient();
 
@@ -99,6 +100,11 @@ const App = () => (
               <Route path="admin/users" element={
                 <ProtectedRoute requiredPermission="manage_users">
                   <AdminUsers />
+                </ProtectedRoute>
+              } />
+              <Route path="admin/email-logs" element={
+                <ProtectedRoute requiredPermission="view_email_logs">
+                  <EmailLogs />
                 </ProtectedRoute>
               } />
             </Route>
