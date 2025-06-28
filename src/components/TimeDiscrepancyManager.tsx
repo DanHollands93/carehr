@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, differenceInMinutes } from "date-fns";
-import { Clock, User, AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { Clock, User, AlertCircle, CheckCircle } from "lucide-react";
 
 interface TimeClockRecord {
   id: string;
@@ -21,33 +22,43 @@ interface TimeClockRecord {
   discrepancy_type: string | null;
   approval_status: 'pending' | 'approved' | 'rejected';
   notes: string | null;
-  shifts?: {
+  employee?: {
+    first_name: string;
+    last_name: string;
+  };
+  shift?: {
     date: string;
     start_time: string;
     end_time: string;
-    employees: {
-      first_name: string;
-      last_name: string;
-    };
   };
+}
+
+interface DiscrepancyApproval {
+  clock_in_action?: string;
+  clock_in_notes?: string;
+  clock_out_action?: string;
+  clock_out_notes?: string;
 }
 
 const TimeDiscrepancyManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedRecord, setSelectedRecord] = useState<string | null>(null);
-  const [approvalAction, setApprovalAction] = useState<string>('');
-  const [notes, setNotes] = useState('');
+  const [approvals, setApprovals] = useState<Record<string, DiscrepancyApproval>>({});
 
   const { data: discrepancyRecords, isLoading } = useQuery({
     queryKey: ['time-discrepancies'],
     queryFn: async () => {
       console.log('Fetching discrepancy records...');
       
-      // First, let's get all discrepancy records
+      // Get discrepancy records with employee and shift data
       const { data: records, error: recordsError } = await supabase
         .from('time_clock_records')
-        .select('*')
+        .select(`
+          *,
+          employees!inner(first_name, last_name),
+          shifts!inner(date, start_time, end_time)
+        `)
         .eq('status', 'discrepancy')
         .eq('approval_status', 'pending')
         .order('created_at', { ascending: false });
@@ -59,58 +70,34 @@ const TimeDiscrepancyManager = () => {
       
       console.log('Found discrepancy records:', records);
       
-      if (!records || records.length === 0) {
-        return [];
-      }
+      // Transform the data structure to match our interface
+      const transformedRecords = records?.map(record => ({
+        ...record,
+        employee: record.employees,
+        shift: record.shifts
+      })) || [];
       
-      // Now get the shift information for each record
-      const recordsWithShifts = [];
-      
-      for (const record of records) {
-        if (record.shift_id) {
-          const { data: shift, error: shiftError } = await supabase
-            .from('shifts')
-            .select(`
-              date,
-              start_time,
-              end_time,
-              employees!inner(first_name, last_name)
-            `)
-            .eq('id', record.shift_id)
-            .single();
-          
-          if (shiftError) {
-            console.error('Error fetching shift for record:', record.id, shiftError);
-            // Include record even if shift fetch fails
-            recordsWithShifts.push(record);
-          } else {
-            recordsWithShifts.push({
-              ...record,
-              shifts: shift
-            });
-          }
-        } else {
-          // Include record even without shift_id
-          recordsWithShifts.push(record);
-        }
-      }
-      
-      console.log('Final records with shifts:', recordsWithShifts);
-      return recordsWithShifts as TimeClockRecord[];
+      console.log('Transformed records:', transformedRecords);
+      return transformedRecords as TimeClockRecord[];
     }
   });
 
   const approveRecordMutation = useMutation({
-    mutationFn: async ({ recordId, action, notes }: { 
-      recordId: string; 
-      action: string; 
-      notes: string;
-    }) => {
+    mutationFn: async ({ recordId }: { recordId: string }) => {
+      const approval = approvals[recordId];
+      if (!approval) throw new Error('No approval data found');
+
+      // Combine all notes into one
+      const combinedNotes = [
+        approval.clock_in_notes && `Clock In: ${approval.clock_in_notes}`,
+        approval.clock_out_notes && `Clock Out: ${approval.clock_out_notes}`
+      ].filter(Boolean).join('; ');
+
       const { error } = await supabase
         .from('time_clock_records')
         .update({
-          approval_status: action === 'approve' ? 'approved' : 'rejected',
-          notes: notes,
+          approval_status: 'approved',
+          notes: combinedNotes,
           updated_at: new Date().toISOString()
         })
         .eq('id', recordId);
@@ -119,14 +106,17 @@ const TimeDiscrepancyManager = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['time-discrepancies'] });
-      toast({ title: "Record updated successfully" });
+      toast({ title: "Record approved successfully" });
       setSelectedRecord(null);
-      setApprovalAction('');
-      setNotes('');
+      setApprovals(prev => {
+        const updated = { ...prev };
+        if (selectedRecord) delete updated[selectedRecord];
+        return updated;
+      });
     },
     onError: (error) => {
       toast({ 
-        title: "Error updating record", 
+        title: "Error approving record", 
         description: error.message,
         variant: "destructive" 
       });
@@ -156,51 +146,52 @@ const TimeDiscrepancyManager = () => {
       .join(', ');
   };
 
-  const getDiscrepancyInfo = (record: TimeClockRecord) => {
-    if (!record.discrepancy_type) {
-      return { type: 'Unknown discrepancy', severity: 'medium' };
-    }
+  const getDiscrepancyTypes = (record: TimeClockRecord) => {
+    if (!record.discrepancy_type) return [];
+    return record.discrepancy_type.split(',').map(t => t.trim());
+  };
 
-    const types = record.discrepancy_type.split(',');
-    let maxSeverity = 'low';
+  const hasClockInDiscrepancy = (record: TimeClockRecord) => {
+    const types = getDiscrepancyTypes(record);
+    return types.some(t => t === 'early_clock_in' || t === 'late_clock_in');
+  };
 
-    types.forEach(type => {
-      switch (type.trim()) {
-        case 'early_clock_in':
-          if (record.clock_in_time && record.shifts) {
-            const clockIn = parseISO(record.clock_in_time);
-            const shiftStart = parseISO(`${record.shifts.date}T${record.shifts.start_time}`);
-            const diff = Math.abs(differenceInMinutes(clockIn, shiftStart));
-            if (diff > 30) maxSeverity = 'high';
-            else if (diff > 15) maxSeverity = 'medium';
-          }
-          break;
-        case 'late_clock_in':
-          maxSeverity = 'high';
-          break;
-        case 'early_clock_out':
-          maxSeverity = 'medium';
-          break;
-        case 'late_clock_out':
-          if (maxSeverity !== 'high') maxSeverity = 'medium';
-          break;
+  const hasClockOutDiscrepancy = (record: TimeClockRecord) => {
+    const types = getDiscrepancyTypes(record);
+    return types.some(t => t === 'early_clock_out' || t === 'late_clock_out');
+  };
+
+  const getTimeDifference = (actual: string, scheduled: string, date: string) => {
+    const actualTime = parseISO(actual);
+    const scheduledDateTime = parseISO(`${date}T${scheduled}`);
+    return differenceInMinutes(actualTime, scheduledDateTime);
+  };
+
+  const updateApproval = (recordId: string, field: keyof DiscrepancyApproval, value: string) => {
+    setApprovals(prev => ({
+      ...prev,
+      [recordId]: {
+        ...prev[recordId],
+        [field]: value
       }
-    });
+    }));
+  };
 
-    return {
-      type: formatDiscrepancyType(record.discrepancy_type),
-      severity: maxSeverity
-    };
+  const canApprove = (recordId: string) => {
+    const record = discrepancyRecords?.find(r => r.id === recordId);
+    const approval = approvals[recordId];
+    if (!record || !approval) return false;
+
+    const needsClockInApproval = hasClockInDiscrepancy(record);
+    const needsClockOutApproval = hasClockOutDiscrepancy(record);
+
+    return (!needsClockInApproval || approval.clock_in_action) &&
+           (!needsClockOutApproval || approval.clock_out_action);
   };
 
   const handleApprove = () => {
-    if (!selectedRecord || !approvalAction) return;
-    
-    approveRecordMutation.mutate({
-      recordId: selectedRecord,
-      action: approvalAction,
-      notes
-    });
+    if (!selectedRecord) return;
+    approveRecordMutation.mutate({ recordId: selectedRecord });
   };
 
   if (isLoading) {
@@ -219,104 +210,146 @@ const TimeDiscrepancyManager = () => {
       {discrepancyRecords && discrepancyRecords.length > 0 ? (
         <div className="space-y-4">
           {discrepancyRecords.map((record) => {
-            const discrepancyInfo = getDiscrepancyInfo(record);
             const isSelected = selectedRecord === record.id;
+            const approval = approvals[record.id] || {};
             
             return (
               <Card key={record.id} className={`${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg">
-                      {record.shifts?.employees?.first_name} {record.shifts?.employees?.last_name} 
-                      {!record.shifts && ' (Employee data unavailable)'}
+                      {record.employee?.first_name} {record.employee?.last_name}
                     </CardTitle>
                     <div className="flex space-x-2">
-                      <Badge 
-                        variant={discrepancyInfo.severity === 'high' ? 'destructive' : discrepancyInfo.severity === 'medium' ? 'default' : 'secondary'}
-                      >
-                        {discrepancyInfo.severity} priority
-                      </Badge>
+                      <Badge variant="destructive">Discrepancy</Badge>
                       <Badge variant="outline">
-                        {record.shifts?.date ? format(parseISO(record.shifts.date), 'MMM dd') : 'Unknown date'}
+                        {record.shift?.date ? format(parseISO(record.shift.date), 'MMM dd') : 'Unknown date'}
                       </Badge>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <Clock className="w-4 h-4" />
-                        <span>Scheduled: {record.shifts?.start_time || 'N/A'} - {record.shifts?.end_time || 'N/A'}</span>
-                      </div>
-                      {record.clock_in_time && (
-                        <div className="flex items-center space-x-2 text-green-600">
-                          <User className="w-4 h-4" />
-                          <span>Clocked in: {format(parseISO(record.clock_in_time), 'HH:mm')}</span>
-                        </div>
-                      )}
-                      {record.clock_out_time && (
-                        <div className="flex items-center space-x-2 text-blue-600">
-                          <User className="w-4 h-4" />
-                          <span>Clocked out: {format(parseISO(record.clock_out_time), 'HH:mm')}</span>
-                        </div>
-                      )}
+                  <div className="grid grid-cols-1 gap-4 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <Clock className="w-4 h-4" />
+                      <span>Scheduled: {record.shift?.start_time || 'N/A'} - {record.shift?.end_time || 'N/A'}</span>
                     </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2 text-red-600">
+                    
+                    {/* Clock In Section */}
+                    {record.clock_in_time && hasClockInDiscrepancy(record) && (
+                      <div className="border rounded-lg p-4 bg-red-50">
+                        <div className="flex items-center space-x-2 text-red-600 mb-2">
+                          <User className="w-4 h-4" />
+                          <span>
+                            Clocked in: {format(parseISO(record.clock_in_time), 'HH:mm')}
+                            {record.shift && (
+                              <span className="ml-2 text-sm">
+                                ({getTimeDifference(record.clock_in_time, record.shift.start_time, record.shift.date) > 0 ? '+' : ''}
+                                {getTimeDifference(record.clock_in_time, record.shift.start_time, record.shift.date)} min)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        {isSelected && (
+                          <div className="space-y-2">
+                            <Label>Clock In Action</Label>
+                            <Select 
+                              value={approval.clock_in_action || ''} 
+                              onValueChange={(value) => updateApproval(record.id, 'clock_in_action', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="What to do with early/late clock in..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pay_from_scheduled">Pay from scheduled time</SelectItem>
+                                <SelectItem value="pay_from_actual">Pay from actual clock in time</SelectItem>
+                                <SelectItem value="deduct_time">Deduct time for late arrival</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Textarea
+                              placeholder="Notes for clock in decision..."
+                              value={approval.clock_in_notes || ''}
+                              onChange={(e) => updateApproval(record.id, 'clock_in_notes', e.target.value)}
+                              rows={2}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Clock Out Section */}
+                    {record.clock_out_time && hasClockOutDiscrepancy(record) && (
+                      <div className="border rounded-lg p-4 bg-blue-50">
+                        <div className="flex items-center space-x-2 text-blue-600 mb-2">
+                          <User className="w-4 h-4" />
+                          <span>
+                            Clocked out: {format(parseISO(record.clock_out_time), 'HH:mm')}
+                            {record.shift && (
+                              <span className="ml-2 text-sm">
+                                ({getTimeDifference(record.clock_out_time, record.shift.end_time, record.shift.date) > 0 ? '+' : ''}
+                                {getTimeDifference(record.clock_out_time, record.shift.end_time, record.shift.date)} min)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        {isSelected && (
+                          <div className="space-y-2">
+                            <Label>Clock Out Action</Label>
+                            <Select 
+                              value={approval.clock_out_action || ''} 
+                              onValueChange={(value) => updateApproval(record.id, 'clock_out_action', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="What to do with early/late clock out..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pay_until_scheduled">Pay until scheduled time</SelectItem>
+                                <SelectItem value="pay_until_actual">Pay until actual clock out time</SelectItem>
+                                <SelectItem value="overtime_approved">Approve overtime pay</SelectItem>
+                                <SelectItem value="deduct_early_leave">Deduct time for early departure</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Textarea
+                              placeholder="Notes for clock out decision..."
+                              value={approval.clock_out_notes || ''}
+                              onChange={(e) => updateApproval(record.id, 'clock_out_notes', e.target.value)}
+                              rows={2}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!hasClockInDiscrepancy(record) && !hasClockOutDiscrepancy(record) && (
+                      <div className="flex items-center space-x-2 text-amber-600">
                         <AlertCircle className="w-4 h-4" />
-                        <span>{discrepancyInfo.type}</span>
+                        <span>General discrepancy: {formatDiscrepancyType(record.discrepancy_type || '')}</span>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {isSelected && (
-                    <div className="space-y-4 pt-4 border-t">
-                      <div className="space-y-2">
-                        <Label htmlFor="approval-action">Action</Label>
-                        <Select value={approvalAction} onValueChange={setApprovalAction}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select approval action..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="approve">Approve as worked</SelectItem>
-                            <SelectItem value="approve_overtime">Approve with overtime</SelectItem>
-                            <SelectItem value="deduct_time">Deduct time for late arrival/early leave</SelectItem>
-                            <SelectItem value="reject">Reject - no pay adjustment</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="notes">Notes</Label>
-                        <Textarea
-                          id="notes"
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          placeholder="Add notes about this approval decision..."
-                          rows={3}
-                        />
-                      </div>
-
-                      <div className="flex space-x-2">
-                        <Button
-                          onClick={handleApprove}
-                          disabled={!approvalAction || approveRecordMutation.isPending}
-                          className="flex-1"
-                        >
-                          {approveRecordMutation.isPending ? 'Processing...' : 'Apply Decision'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedRecord(null);
-                            setApprovalAction('');
-                            setNotes('');
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
+                    <div className="flex space-x-2 pt-4 border-t">
+                      <Button
+                        onClick={handleApprove}
+                        disabled={!canApprove(record.id) || approveRecordMutation.isPending}
+                        className="flex-1"
+                      >
+                        {approveRecordMutation.isPending ? 'Processing...' : 'Approve Decisions'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedRecord(null);
+                          setApprovals(prev => {
+                            const updated = { ...prev };
+                            delete updated[record.id];
+                            return updated;
+                          });
+                        }}
+                      >
+                        Cancel
+                      </Button>
                     </div>
                   )}
 
