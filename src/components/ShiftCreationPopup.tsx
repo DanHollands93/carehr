@@ -128,7 +128,7 @@ const ShiftCreationPopup = ({
     }
   };
 
-  const isValid = customShift.start_time && customShift.end_time && customShift.position;
+  const isFormValid = customShift.start_time && customShift.end_time && customShift.position;
 
   const formatDateDisplay = (dateString: string) => {
     // Check if it's a template day format (e.g., "Day 1")
@@ -244,7 +244,7 @@ const ShiftCreationPopup = ({
               </Button>
               <Button 
                 onClick={handleSubmit}
-                disabled={!isValid}
+                disabled={!isFormValid}
               >
                 {existingShift ? 'Update Shift' : 'Create Shift'}
               </Button>
