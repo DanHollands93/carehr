@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 interface ShiftTemplate {
   id: string;
@@ -131,6 +130,22 @@ const ShiftCreationPopup = ({
 
   const isValid = customShift.start_time && customShift.end_time && customShift.position;
 
+  const formatDateDisplay = (dateString: string) => {
+    // Check if it's a template day format (e.g., "Day 1")
+    if (dateString.startsWith('Day ')) {
+      return dateString;
+    }
+    
+    // Try to parse as a regular date
+    const parsedDate = new Date(dateString);
+    if (isValid(parsedDate)) {
+      return format(parsedDate, 'EEEE, MMMM dd, yyyy');
+    }
+    
+    // Fallback to the original string
+    return dateString;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
@@ -139,7 +154,7 @@ const ShiftCreationPopup = ({
             {existingShift ? 'Edit Shift' : 'Create Shift'} for {employeeName}
           </DialogTitle>
           <p className="text-sm text-gray-500">
-            {format(new Date(date), 'EEEE, MMMM dd, yyyy')}
+            {formatDateDisplay(date)}
           </p>
         </DialogHeader>
         
