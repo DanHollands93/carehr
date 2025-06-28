@@ -23,7 +23,7 @@ interface BulkRoleRule {
   position: string;
   permission_group_id: string;
   created_at: string;
-  permission_groups: PermissionGroup; // Changed from array to single object
+  permission_groups: PermissionGroup;
 }
 
 const BulkRoleManager = () => {
@@ -93,7 +93,7 @@ const BulkRoleManager = () => {
           position,
           permission_group_id,
           created_at,
-          permission_groups(
+          permission_groups!inner(
             id,
             name,
             description
