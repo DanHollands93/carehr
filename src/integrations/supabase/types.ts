@@ -1288,6 +1288,10 @@ export type Database = {
       }
     }
     Functions: {
+      assign_default_permissions_to_user: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       create_employees_table: {
         Args: Record<PropertyKey, never>
         Returns: undefined

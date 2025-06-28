@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -85,15 +84,13 @@ export const useEnhancedPermissions = () => {
   };
 
   const loadUserRoleAssignments = async () => {
-    if (!user) return;
-
+    // Load all user role assignments, not just for current user
     const { data, error } = await supabase
       .from('user_role_assignments')
       .select(`
         *,
         permission_groups!inner(*)
       `)
-      .eq('user_id', user.id)
       .eq('is_active', true);
     
     if (error) {

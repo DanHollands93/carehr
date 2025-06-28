@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEnhancedPermissions } from "@/hooks/useEnhancedPermissions";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Users, Shield, Settings, Plus, Edit, Trash2 } from "lucide-react";
+import { User, Users, Shield, Settings, Plus, Edit, Trash2, Lock } from "lucide-react";
 
 interface Permission {
   id: string;
@@ -142,7 +142,17 @@ const EnhancedPermissionsManager = () => {
     }
   };
 
-  const handleRemoveRole = async (assignmentId: string) => {
+  const handleRemoveRole = async (assignmentId: string, groupName: string) => {
+    // Prevent removal of default user group
+    if (groupName === 'Default User') {
+      toast({
+        title: "Cannot Remove",
+        description: "The Default User group cannot be removed from users",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       await removeRoleFromUser(assignmentId);
       toast({
@@ -254,9 +264,21 @@ const EnhancedPermissionsManager = () => {
                 {permissionGroups.map(group => (
                   <Card key={group.id} className="p-4">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium">{group.name}</h4>
-                        <p className="text-sm text-muted-foreground">{group.description}</p>
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium">{group.name}</h4>
+                            {group.name === 'Default User' && (
+                              <div className="flex items-center gap-1">
+                                <Lock className="w-4 h-4 text-muted-foreground" />
+                                <Badge variant="secondary" className="text-xs">
+                                  System Default
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{group.description}</p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">
@@ -333,16 +355,24 @@ const EnhancedPermissionsManager = () => {
                         .filter(assignment => assignment.user_id === selectedUserId)
                         .map(assignment => (
                           <div key={assignment.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <p className="font-medium">{assignment.permission_group.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {assignment.location || 'All locations'}
-                              </p>
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{assignment.permission_group.name}</p>
+                                  {assignment.permission_group.name === 'Default User' && (
+                                    <Lock className="w-4 h-4 text-muted-foreground" />
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {assignment.location || 'All locations'}
+                                </p>
+                              </div>
                             </div>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleRemoveRole(assignment.id)}
+                              onClick={() => handleRemoveRole(assignment.id, assignment.permission_group.name)}
+                              disabled={assignment.permission_group.name === 'Default User'}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -360,7 +390,9 @@ const EnhancedPermissionsManager = () => {
                               <SelectValue placeholder="Choose a group" />
                             </SelectTrigger>
                             <SelectContent>
-                              {permissionGroups.map(group => (
+                              {permissionGroups
+                                .filter(group => group.name !== 'Default User') // Don't allow manual assignment of default group
+                                .map(group => (
                                 <SelectItem key={group.id} value={group.id}>
                                   {group.name}
                                 </SelectItem>
