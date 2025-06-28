@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, differenceInMinutes, startOfDay, endOfDay } from "date-fns";
-import { CalendarIcon, Download, Printer, Settings, BarChart3 } from "lucide-react";
+import { CalendarIcon, Download, Printer, Settings, BarChart3, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
@@ -27,6 +28,9 @@ interface HoursRecord {
   actual_hours: number;
   pay_rate?: number;
   total_pay?: number;
+  has_issue: boolean;
+  issue_type?: string;
+  exception_status?: string;
 }
 
 interface ColumnConfig {
@@ -40,6 +44,7 @@ const defaultColumns: ColumnConfig[] = [
   { key: 'employee_name', label: 'Employee', enabled: true, width: '200px' },
   { key: 'position', label: 'Position/Role', enabled: true, width: '150px' },
   { key: 'date', label: 'Date', enabled: true, width: '120px' },
+  { key: 'clock_times', label: 'Clock In/Out', enabled: true, width: '160px' },
   { key: 'scheduled_hours', label: 'Scheduled Hours', enabled: true, width: '130px' },
   { key: 'actual_hours', label: 'Actual Hours', enabled: true, width: '120px' },
   { key: 'variance', label: 'Variance', enabled: true, width: '100px' },
@@ -66,54 +71,42 @@ const HoursAnalysisReport = () => {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
       
-      // First, let's get all completed time clock records in the date range
-      const { data: timeRecords, error: timeError } = await supabase
-        .from('time_clock_records')
+      // Get all shifts in the date range with their time clock records
+      const { data: shifts, error: shiftsError } = await supabase
+        .from('shifts')
         .select(`
           id,
           employee_id,
-          shift_id,
-          clock_in_time,
-          clock_out_time,
-          status
+          date,
+          start_time,
+          end_time,
+          position,
+          time_clock_records (
+            id,
+            clock_in_time,
+            clock_out_time,
+            status,
+            discrepancy_type,
+            approval_status
+          )
         `)
-        .eq('status', 'completed')
-        .not('clock_in_time', 'is', null)
-        .not('clock_out_time', 'is', null)
-        .gte('clock_in_time', `${startDate}T00:00:00`)
-        .lte('clock_out_time', `${endDate}T23:59:59`);
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true });
         
-      if (timeError) {
-        console.error('Error fetching time records:', timeError);
-        throw timeError;
+      if (shiftsError) {
+        console.error('Error fetching shifts:', shiftsError);
+        throw shiftsError;
       }
       
-      console.log('Found time records:', timeRecords?.length || 0);
+      console.log('Found shifts:', shifts?.length || 0);
       
-      if (!timeRecords?.length) {
-        // Let's also try to get shifts in the date range even without completed time records
-        const { data: shiftsOnly, error: shiftsError } = await supabase
-          .from('shifts')
-          .select(`
-            id,
-            employee_id,
-            date,
-            start_time,
-            end_time,
-            position
-          `)
-          .gte('date', startDate)
-          .lte('date', endDate);
-          
-        console.log('Available shifts in date range:', shiftsOnly?.length || 0, shiftsOnly);
+      if (!shifts?.length) {
         return [];
       }
       
-      // Get unique employee IDs and shift IDs
-      const employeeIds = [...new Set(timeRecords.map(r => r.employee_id))];
-      const shiftIds = [...new Set(timeRecords.map(r => r.shift_id).filter(Boolean))];
-      
-      console.log('Employee IDs:', employeeIds.length, 'Shift IDs:', shiftIds.length);
+      // Get unique employee IDs
+      const employeeIds = [...new Set(shifts.map(s => s.employee_id))];
       
       // Get employee data
       const { data: employees, error: empError } = await supabase
@@ -126,70 +119,77 @@ const HoursAnalysisReport = () => {
         throw empError;
       }
       
-      // Get shift data
-      const { data: shifts, error: shiftError } = await supabase
-        .from('shifts')
-        .select('id, date, start_time, end_time, position, employee_id')
-        .in('id', shiftIds);
-        
-      if (shiftError) {
-        console.error('Error fetching shifts:', shiftError);
-        throw shiftError;
-      }
-      
       console.log('Found employees:', employees?.length || 0);
-      console.log('Found shifts:', shifts?.length || 0);
       
-      // Create lookup maps
+      // Create lookup map
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
-      const shiftMap = new Map(shifts?.map(shift => [shift.id, shift]) || []);
       
-      // Process the data
-      const processedData: HoursRecord[] = timeRecords
-        .map(record => {
-          const employee = employeeMap.get(record.employee_id);
-          const shift = shiftMap.get(record.shift_id || '');
+      // Process the data - include ALL shifts
+      const processedData: HoursRecord[] = shifts
+        .map(shift => {
+          const employee = employeeMap.get(shift.employee_id);
           
           if (!employee) {
-            console.log('Missing employee for record:', record.employee_id);
+            console.log('Missing employee for shift:', shift.employee_id);
             return null;
           }
           
-          if (!shift) {
-            console.log('Missing shift for record:', record.shift_id);
-            // Try to create a basic record without shift data
-            const clockIn = parseISO(record.clock_in_time!);
-            const clockOut = parseISO(record.clock_out_time!);
-            const actualMinutes = differenceInMinutes(clockOut, clockIn);
-            const actualHours = Math.round((actualMinutes / 60) * 100) / 100;
-            
-            return {
-              employee_id: employee.id,
-              employee_name: `${employee.first_name} ${employee.last_name}`,
-              position: employee.department || 'Unknown',
-              date: format(clockIn, 'yyyy-MM-dd'),
-              shift_start: format(clockIn, 'HH:mm'),
-              shift_end: format(clockOut, 'HH:mm'),
-              clock_in: record.clock_in_time,
-              clock_out: record.clock_out_time,
-              scheduled_hours: actualHours, // Use actual as scheduled if no shift data
-              actual_hours: actualHours,
-              pay_rate: 0,
-              total_pay: 0
-            };
-          }
-          
-          // Calculate hours with shift data
+          // Calculate scheduled hours
           const shiftStart = parseISO(`${shift.date}T${shift.start_time}`);
           const shiftEnd = parseISO(`${shift.date}T${shift.end_time}`);
-          const clockIn = parseISO(record.clock_in_time!);
-          const clockOut = parseISO(record.clock_out_time!);
-          
           const scheduledMinutes = differenceInMinutes(shiftEnd, shiftStart);
-          const actualMinutes = differenceInMinutes(clockOut, clockIn);
-          
           const scheduledHours = Math.round((scheduledMinutes / 60) * 100) / 100;
-          const actualHours = Math.round((actualMinutes / 60) * 100) / 100;
+          
+          // Get time clock record if exists
+          const timeRecord = shift.time_clock_records?.[0];
+          
+          let actualHours = 0;
+          let hasIssue = false;
+          let issueType = '';
+          let exceptionStatus = '';
+          
+          if (timeRecord) {
+            // Check if exception has been cleared
+            exceptionStatus = timeRecord.approval_status || 'pending';
+            
+            if (timeRecord.clock_in_time && timeRecord.clock_out_time) {
+              // Both times exist - calculate actual hours
+              const clockIn = parseISO(timeRecord.clock_in_time);
+              const clockOut = parseISO(timeRecord.clock_out_time);
+              const actualMinutes = differenceInMinutes(clockOut, clockIn);
+              actualHours = Math.round((actualMinutes / 60) * 100) / 100;
+              
+              // Check for discrepancies
+              if (timeRecord.discrepancy_type && exceptionStatus !== 'approved') {
+                hasIssue = true;
+                issueType = timeRecord.discrepancy_type;
+              }
+            } else if (timeRecord.clock_in_time && !timeRecord.clock_out_time) {
+              // Clocked in but not out
+              hasIssue = true;
+              issueType = 'Missing clock out';
+            } else if (!timeRecord.clock_in_time && timeRecord.clock_out_time) {
+              // Clocked out but not in (unusual)
+              hasIssue = true;
+              issueType = 'Missing clock in';
+            } else {
+              // No clock times at all
+              hasIssue = true;
+              issueType = 'No clock data';
+            }
+          } else {
+            // No time record at all - check if shift time has passed
+            const now = new Date();
+            const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
+            
+            if (now > shiftEndTime) {
+              hasIssue = true;
+              issueType = 'Did not clock in';
+            } else {
+              // Shift hasn't started/ended yet
+              issueType = 'Scheduled';
+            }
+          }
           
           return {
             employee_id: employee.id,
@@ -198,12 +198,15 @@ const HoursAnalysisReport = () => {
             date: shift.date,
             shift_start: shift.start_time,
             shift_end: shift.end_time,
-            clock_in: record.clock_in_time,
-            clock_out: record.clock_out_time,
+            clock_in: timeRecord?.clock_in_time || null,
+            clock_out: timeRecord?.clock_out_time || null,
             scheduled_hours: scheduledHours,
             actual_hours: actualHours,
             pay_rate: 0,
-            total_pay: 0
+            total_pay: 0,
+            has_issue: hasIssue,
+            issue_type: issueType,
+            exception_status: exceptionStatus
           };
         })
         .filter(Boolean) as HoursRecord[];
@@ -252,6 +255,9 @@ const HoursAnalysisReport = () => {
           case 'date':
             row[col.label] = format(parseISO(record.date), 'dd/MM/yyyy');
             break;
+          case 'clock_times':
+            row[col.label] = `${record.clock_in ? format(parseISO(record.clock_in), 'HH:mm') : 'N/A'} - ${record.clock_out ? format(parseISO(record.clock_out), 'HH:mm') : 'N/A'}`;
+            break;
           case 'scheduled_hours':
             row[col.label] = record.scheduled_hours;
             break;
@@ -284,10 +290,41 @@ const HoursAnalysisReport = () => {
     window.print();
   };
 
+  const getRowClassName = (record: HoursRecord) => {
+    if (record.has_issue && record.exception_status !== 'approved') {
+      return 'bg-red-50 border-l-4 border-l-red-500';
+    }
+    if (record.exception_status === 'approved') {
+      return 'bg-green-50 border-l-4 border-l-green-500';
+    }
+    return '';
+  };
+
+  const getIssueDisplay = (record: HoursRecord) => {
+    if (!record.has_issue) return null;
+    
+    if (record.exception_status === 'approved') {
+      return (
+        <Badge variant="default" className="bg-green-100 text-green-800">
+          <AlertTriangle className="w-3 h-3 mr-1" />
+          Resolved
+        </Badge>
+      );
+    }
+    
+    return (
+      <Badge variant="destructive">
+        <AlertTriangle className="w-3 h-3 mr-1" />
+        {record.issue_type}
+      </Badge>
+    );
+  };
+
   const enabledColumns = columns.filter(col => col.enabled);
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -400,7 +437,7 @@ const HoursAnalysisReport = () => {
             <div className="text-center py-8">Loading hours analysis...</div>
           ) : !hoursData?.length ? (
             <div className="text-center py-8 text-gray-500">
-              <p>No completed time clock records found for the selected period</p>
+              <p>No shifts found for the selected period</p>
               <p className="text-sm mt-2">
                 Date range: {format(dateRange.from, 'dd/MM/yyyy')} - {format(dateRange.to, 'dd/MM/yyyy')}
               </p>
@@ -414,6 +451,7 @@ const HoursAnalysisReport = () => {
                       {column.label}
                     </TableHead>
                   ))}
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -425,12 +463,18 @@ const HoursAnalysisReport = () => {
                   return (
                     <React.Fragment key={employeeId}>
                       {records.map((record, index) => (
-                        <TableRow key={`${employeeId}-${index}`}>
+                        <TableRow key={`${employeeId}-${index}`} className={getRowClassName(record)}>
                           {enabledColumns.map((column) => (
                             <TableCell key={column.key}>
                               {column.key === 'employee_name' && record.employee_name}
                               {column.key === 'position' && record.position}
                               {column.key === 'date' && format(parseISO(record.date), 'dd/MM/yyyy')}
+                              {column.key === 'clock_times' && (
+                                <div className="text-sm">
+                                  <div>In: {record.clock_in ? format(parseISO(record.clock_in), 'HH:mm') : 'N/A'}</div>
+                                  <div>Out: {record.clock_out ? format(parseISO(record.clock_out), 'HH:mm') : 'N/A'}</div>
+                                </div>
+                              )}
                               {column.key === 'scheduled_hours' && record.scheduled_hours.toFixed(2)}
                               {column.key === 'actual_hours' && record.actual_hours.toFixed(2)}
                               {column.key === 'variance' && (
@@ -442,6 +486,9 @@ const HoursAnalysisReport = () => {
                               {column.key === 'total_pay' && `£${record.total_pay?.toFixed(2) || '0.00'}`}
                             </TableCell>
                           ))}
+                          <TableCell>
+                            {getIssueDisplay(record)}
+                          </TableCell>
                         </TableRow>
                       ))}
                       {/* Employee Total Row */}
@@ -451,6 +498,7 @@ const HoursAnalysisReport = () => {
                             {column.key === 'employee_name' && `${records[0].employee_name} - Total`}
                             {column.key === 'position' && 'All Roles'}
                             {column.key === 'date' && ''}
+                            {column.key === 'clock_times' && ''}
                             {column.key === 'scheduled_hours' && `${totalScheduled.toFixed(2)}h`}
                             {column.key === 'actual_hours' && `${totalActual.toFixed(2)}h`}
                             {column.key === 'variance' && (
@@ -462,6 +510,7 @@ const HoursAnalysisReport = () => {
                             {column.key === 'total_pay' && `£${records.reduce((sum, r) => sum + (r.total_pay || 0), 0).toFixed(2)}`}
                           </TableCell>
                         ))}
+                        <TableCell></TableCell>
                       </TableRow>
                     </React.Fragment>
                   );
