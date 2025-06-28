@@ -188,9 +188,24 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
     console.log('Personal form data:', personalFormData);
 
     try {
+      // Clean the form data to handle empty date fields
+      const cleanedFormData = {
+        ...personalFormData,
+        // Convert empty strings to null for date fields
+        date_of_birth: personalFormData.date_of_birth || null,
+        visa_expiry: personalFormData.visa_expiry || null,
+        // Keep other fields as they are, but convert empty strings to null for optional fields
+        phone_number: personalFormData.phone_number || null,
+        national_insurance_number: personalFormData.national_insurance_number || null,
+        tax_code: personalFormData.tax_code || null,
+        passport_number: personalFormData.passport_number || null,
+      };
+
+      console.log('Cleaned form data:', cleanedFormData);
+
       const { data, error } = await supabase
         .from('employees')
-        .update(personalFormData)
+        .update(cleanedFormData)
         .eq('id', employeeId)
         .select();
 
