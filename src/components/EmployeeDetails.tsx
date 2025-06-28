@@ -712,8 +712,11 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
 
         <TabsContent value="user-account">
           <UserAccountManager 
-            employee={employee}
-            onUpdate={onUpdate}
+            employee={displayEmployee}
+            onUpdate={() => {
+              refetchEmployee();
+              onUpdate();
+            }}
           />
         </TabsContent>
       </Tabs>
