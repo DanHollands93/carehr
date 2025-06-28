@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -57,6 +56,19 @@ interface AddressHistoryEntry {
   is_current: boolean;
 }
 
+interface PersonalFormData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone_number: string;
+  date_of_birth: string;
+  national_insurance_number: string;
+  tax_code: string;
+  passport_number: string;
+  visa_expiry: string;
+  right_to_work_status: string;
+}
+
 interface EmployeeDetailsProps {
   employee: Employee;
   onUpdate: () => void;
@@ -67,7 +79,18 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
   const [showCareerForm, setShowCareerForm] = useState(false);
   const [editingPersonal, setEditingPersonal] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
-  const [personalFormData, setPersonalFormData] = useState({});
+  const [personalFormData, setPersonalFormData] = useState<PersonalFormData>({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone_number: '',
+    date_of_birth: '',
+    national_insurance_number: '',
+    tax_code: '',
+    passport_number: '',
+    visa_expiry: '',
+    right_to_work_status: 'verified'
+  });
 
   const { data: fullEmployee, refetch: refetchEmployee } = useQuery({
     queryKey: ['employee', employee.id],
@@ -209,9 +232,9 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                     <Button variant="outline" size="sm" onClick={() => {
                       setEditingPersonal(true);
                       setPersonalFormData({
-                        first_name: fullEmployee.first_name,
-                        last_name: fullEmployee.last_name,
-                        email: fullEmployee.email,
+                        first_name: fullEmployee.first_name || '',
+                        last_name: fullEmployee.last_name || '',
+                        email: fullEmployee.email || '',
                         phone_number: fullEmployee.phone_number || '',
                         date_of_birth: fullEmployee.date_of_birth || '',
                         national_insurance_number: fullEmployee.national_insurance_number || '',
@@ -235,7 +258,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                         <Label htmlFor="first_name">First Name</Label>
                         <Input
                           id="first_name"
-                          value={personalFormData.first_name || ''}
+                          value={personalFormData.first_name}
                           onChange={(e) => setPersonalFormData({...personalFormData, first_name: e.target.value})}
                         />
                       </div>
@@ -243,7 +266,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                         <Label htmlFor="last_name">Last Name</Label>
                         <Input
                           id="last_name"
-                          value={personalFormData.last_name || ''}
+                          value={personalFormData.last_name}
                           onChange={(e) => setPersonalFormData({...personalFormData, last_name: e.target.value})}
                         />
                       </div>
@@ -254,7 +277,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                       <Input
                         id="email"
                         type="email"
-                        value={personalFormData.email || ''}
+                        value={personalFormData.email}
                         onChange={(e) => setPersonalFormData({...personalFormData, email: e.target.value})}
                       />
                     </div>
@@ -264,7 +287,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                         <Label htmlFor="phone_number">Phone Number</Label>
                         <Input
                           id="phone_number"
-                          value={personalFormData.phone_number || ''}
+                          value={personalFormData.phone_number}
                           onChange={(e) => setPersonalFormData({...personalFormData, phone_number: e.target.value})}
                         />
                       </div>
@@ -273,7 +296,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                         <Input
                           id="date_of_birth"
                           type="date"
-                          value={personalFormData.date_of_birth || ''}
+                          value={personalFormData.date_of_birth}
                           onChange={(e) => setPersonalFormData({...personalFormData, date_of_birth: e.target.value})}
                         />
                       </div>
@@ -284,7 +307,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                         <Label htmlFor="national_insurance_number">National Insurance Number</Label>
                         <Input
                           id="national_insurance_number"
-                          value={personalFormData.national_insurance_number || ''}
+                          value={personalFormData.national_insurance_number}
                           onChange={(e) => setPersonalFormData({...personalFormData, national_insurance_number: e.target.value})}
                         />
                       </div>
@@ -292,7 +315,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                         <Label htmlFor="tax_code">Tax Code</Label>
                         <Input
                           id="tax_code"
-                          value={personalFormData.tax_code || ''}
+                          value={personalFormData.tax_code}
                           onChange={(e) => setPersonalFormData({...personalFormData, tax_code: e.target.value})}
                         />
                       </div>
@@ -303,7 +326,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                         <Label htmlFor="passport_number">Passport Number</Label>
                         <Input
                           id="passport_number"
-                          value={personalFormData.passport_number || ''}
+                          value={personalFormData.passport_number}
                           onChange={(e) => setPersonalFormData({...personalFormData, passport_number: e.target.value})}
                         />
                       </div>
@@ -312,14 +335,14 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                         <Input
                           id="visa_expiry"
                           type="date"
-                          value={personalFormData.visa_expiry || ''}
+                          value={personalFormData.visa_expiry}
                           onChange={(e) => setPersonalFormData({...personalFormData, visa_expiry: e.target.value})}
                         />
                       </div>
                       <div>
                         <Label htmlFor="right_to_work_status">Right to Work Status</Label>
                         <Select
-                          value={personalFormData.right_to_work_status || 'verified'}
+                          value={personalFormData.right_to_work_status}
                           onValueChange={(value) => setPersonalFormData({...personalFormData, right_to_work_status: value})}
                         >
                           <SelectTrigger>
