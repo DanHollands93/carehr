@@ -25,6 +25,38 @@ interface NotificationTemplate {
   updated_at: string;
 }
 
+// Available trigger events with descriptions
+const TRIGGER_EVENTS = [
+  { value: 'holiday_approved', label: 'Holiday Approved', description: 'When a holiday request is approved by a manager' },
+  { value: 'holiday_rejected', label: 'Holiday Rejected', description: 'When a holiday request is rejected by a manager' },
+  { value: 'holiday_submitted', label: 'Holiday Submitted', description: 'When an employee submits a new holiday request' },
+  { value: 'profile_updated', label: 'Profile Updated', description: 'When an employee updates their profile information' },
+  { value: 'shift_assigned', label: 'Shift Assigned', description: 'When a new shift is assigned to an employee' },
+  { value: 'policy_updated', label: 'Policy Updated', description: 'When company policies are updated' },
+  { value: 'training_assigned', label: 'Training Assigned', description: 'When training is assigned to an employee' },
+  { value: 'document_uploaded', label: 'Document Uploaded', description: 'When a new document is uploaded to the system' },
+  { value: 'system_maintenance', label: 'System Maintenance', description: 'System maintenance notifications' }
+];
+
+// Available dynamic content variables with descriptions
+const DYNAMIC_VARIABLES = [
+  { value: 'employee_name', label: 'Employee Name', description: 'Full name of the employee' },
+  { value: 'first_name', label: 'First Name', description: 'Employee\'s first name' },
+  { value: 'last_name', label: 'Last Name', description: 'Employee\'s last name' },
+  { value: 'approver_name', label: 'Approver Name', description: 'Name of the person who approved/rejected' },
+  { value: 'start_date', label: 'Start Date', description: 'Start date for holidays or events' },
+  { value: 'end_date', label: 'End Date', description: 'End date for holidays or events' },
+  { value: 'rejection_reason', label: 'Rejection Reason', description: 'Reason for rejection' },
+  { value: 'department', label: 'Department', description: 'Employee\'s department' },
+  { value: 'job_title', label: 'Job Title', description: 'Employee\'s job title' },
+  { value: 'manager_name', label: 'Manager Name', description: 'Name of the employee\'s manager' },
+  { value: 'shift_date', label: 'Shift Date', description: 'Date of the assigned shift' },
+  { value: 'shift_time', label: 'Shift Time', description: 'Time of the assigned shift' },
+  { value: 'document_name', label: 'Document Name', description: 'Name of the uploaded document' },
+  { value: 'policy_name', label: 'Policy Name', description: 'Name of the updated policy' },
+  { value: 'training_name', label: 'Training Name', description: 'Name of the assigned training' }
+];
+
 const NotificationTemplateManager = () => {
   const { hasPermission } = usePermissions();
   const { toast } = useToast();
@@ -219,7 +251,9 @@ const NotificationTemplateManager = () => {
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Trigger Event:</Label>
-                  <p className="text-sm text-gray-600">{template.trigger_event}</p>
+                  <p className="text-sm text-gray-600">
+                    {TRIGGER_EVENTS.find(e => e.value === template.trigger_event)?.label || template.trigger_event}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -248,6 +282,21 @@ const TemplateForm = ({ template, onSave, onCancel }: {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
+  };
+
+  const addDynamicContent = (variable: string, field: 'title' | 'message') => {
+    const placeholder = `{{${variable}}}`;
+    if (field === 'title') {
+      setFormData(prev => ({
+        ...prev,
+        title_template: prev.title_template + placeholder
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        message_template: prev.message_template + placeholder
+      }));
+    }
   };
 
   return (
@@ -294,17 +343,43 @@ const TemplateForm = ({ template, onSave, onCancel }: {
             </div>
             <div>
               <Label htmlFor="trigger_event">Trigger Event</Label>
-              <Input
-                id="trigger_event"
-                value={formData.trigger_event}
-                onChange={(e) => setFormData(prev => ({ ...prev, trigger_event: e.target.value }))}
-                required
-              />
+              <Select value={formData.trigger_event} onValueChange={(value) => setFormData(prev => ({ ...prev, trigger_event: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select trigger event" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRIGGER_EVENTS.map((event) => (
+                    <SelectItem key={event.value} value={event.value}>
+                      <div>
+                        <div className="font-medium">{event.label}</div>
+                        <div className="text-xs text-gray-500">{event.description}</div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           <div>
-            <Label htmlFor="title_template">Title Template</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor="title_template">Title Template</Label>
+              <Select onValueChange={(value) => addDynamicContent(value, 'title')}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Add dynamic content" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DYNAMIC_VARIABLES.map((variable) => (
+                    <SelectItem key={variable.value} value={variable.value}>
+                      <div>
+                        <div className="font-medium">{variable.label}</div>
+                        <div className="text-xs text-gray-500">{variable.description}</div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Input
               id="title_template"
               value={formData.title_template}
@@ -314,7 +389,24 @@ const TemplateForm = ({ template, onSave, onCancel }: {
           </div>
 
           <div>
-            <Label htmlFor="message_template">Message Template</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor="message_template">Message Template</Label>
+              <Select onValueChange={(value) => addDynamicContent(value, 'message')}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Add dynamic content" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DYNAMIC_VARIABLES.map((variable) => (
+                    <SelectItem key={variable.value} value={variable.value}>
+                      <div>
+                        <div className="font-medium">{variable.label}</div>
+                        <div className="text-xs text-gray-500">{variable.description}</div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Textarea
               id="message_template"
               value={formData.message_template}
@@ -323,7 +415,7 @@ const TemplateForm = ({ template, onSave, onCancel }: {
               rows={3}
             />
             <p className="text-sm text-gray-500 mt-1">
-              Use double curly braces for dynamic content (e.g., start_date, approver_name)
+              Use the dropdown above to add dynamic content or manually type variables with double curly braces (e.g., {{employee_name}})
             </p>
           </div>
 
