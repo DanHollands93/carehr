@@ -33,18 +33,12 @@ interface EmployeeFormData {
   postcode: string;
   country: string;
   
-  // Bank Details
-  bank_name: string;
-  account_holder_name: string;
-  account_number: string;
-  sort_code: string;
-  
   // Emergency Contact
   emergency_name: string;
   emergency_phone: string;
   emergency_relationship: string;
   
-  // Employment Details
+  // Employment Details (including pay)
   job_title: string;
   department: string;
   location: string;
@@ -56,6 +50,12 @@ interface EmployeeFormData {
   start_date: string;
   probation_end_date: string;
   notice_period_weeks: number;
+  
+  // Bank Details
+  bank_name: string;
+  account_holder_name: string;
+  account_number: string;
+  sort_code: string;
 }
 
 interface EmployeeFormProps {
@@ -493,9 +493,7 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="financial" className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Pay Information</CardTitle>
@@ -539,7 +537,9 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
 
+            <TabsContent value="financial" className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Bank Details</CardTitle>

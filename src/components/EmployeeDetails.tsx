@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -115,77 +116,172 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
         </Button>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+      <Tabs defaultValue="personal" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="personal">Personal</TabsTrigger>
+          <TabsTrigger value="address">Address & Contact</TabsTrigger>
           <TabsTrigger value="career">Career History</TabsTrigger>
-          <TabsTrigger value="personal">Personal Details</TabsTrigger>
+          <TabsTrigger value="financial">Financial</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <TabsContent value="personal" className="space-y-4">
+          {fullEmployee && (
             <Card>
               <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
+                <CardTitle>Personal Information</CardTitle>
+                <CardDescription>Basic personal details and identification</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <Mail className="w-4 h-4 text-gray-500" />
-                  <span>{employee.email}</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-sm text-gray-600">First Name:</span>
+                    <div>{fullEmployee.first_name}</div>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">Last Name:</span>
+                    <div>{fullEmployee.last_name}</div>
+                  </div>
                 </div>
-                {employee.phone_number && (
-                  <div className="flex items-center space-x-3">
-                    <Phone className="w-4 h-4 text-gray-500" />
-                    <span>{employee.phone_number}</span>
-                  </div>
-                )}
-                {employee.location && (
-                  <div className="flex items-center space-x-3">
-                    <MapPin className="w-4 h-4 text-gray-500" />
-                    <span>{employee.location}</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Employment Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Department</span>
-                  {employee.department && (
-                    <Badge variant="secondary">{employee.department}</Badge>
+                <div>
+                  <span className="text-sm text-gray-600">Email Address:</span>
+                  <div className="flex items-center space-x-3">
+                    <Mail className="w-4 h-4 text-gray-500" />
+                    <span>{fullEmployee.email}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {fullEmployee.phone_number && (
+                    <div>
+                      <span className="text-sm text-gray-600">Phone Number:</span>
+                      <div className="flex items-center space-x-3">
+                        <Phone className="w-4 h-4 text-gray-500" />
+                        <span>{fullEmployee.phone_number}</span>
+                      </div>
+                    </div>
+                  )}
+                  {fullEmployee.date_of_birth && (
+                    <div>
+                      <span className="text-sm text-gray-600">Date of Birth:</span>
+                      <div>{formatDate(fullEmployee.date_of_birth)}</div>
+                    </div>
                   )}
                 </div>
-                {employee.employment_type && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Employment Type</span>
-                    <Badge variant="outline">{employee.employment_type}</Badge>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {fullEmployee.national_insurance_number && (
+                    <div>
+                      <span className="text-sm text-gray-600">National Insurance Number:</span>
+                      <div>{fullEmployee.national_insurance_number}</div>
+                    </div>
+                  )}
+                  {fullEmployee.tax_code && (
+                    <div>
+                      <span className="text-sm text-gray-600">Tax Code:</span>
+                      <div>{fullEmployee.tax_code}</div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  {fullEmployee.passport_number && (
+                    <div>
+                      <span className="text-sm text-gray-600">Passport Number:</span>
+                      <div>{fullEmployee.passport_number}</div>
+                    </div>
+                  )}
+                  {fullEmployee.visa_expiry && (
+                    <div>
+                      <span className="text-sm text-gray-600">Visa Expiry:</span>
+                      <div>{formatDate(fullEmployee.visa_expiry)}</div>
+                    </div>
+                  )}
+                  {fullEmployee.right_to_work_status && (
+                    <div>
+                      <span className="text-sm text-gray-600">Right to Work Status:</span>
+                      <Badge variant="outline" className="mt-1">
+                        {fullEmployee.right_to_work_status}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="address" className="space-y-4">
+          {fullEmployee?.address && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Address Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {fullEmployee.address.line_1 && (
+                  <div>
+                    <span className="text-sm text-gray-600">Address Line 1:</span>
+                    <div>{fullEmployee.address.line_1}</div>
                   </div>
                 )}
-                {employee.hire_date && (
-                  <div className="flex items-center space-x-3">
-                    <Calendar className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm">Joined {formatDate(employee.hire_date)}</span>
+                {fullEmployee.address.line_2 && (
+                  <div>
+                    <span className="text-sm text-gray-600">Address Line 2:</span>
+                    <div>{fullEmployee.address.line_2}</div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  {fullEmployee.address.city && (
+                    <div>
+                      <span className="text-sm text-gray-600">City:</span>
+                      <div>{fullEmployee.address.city}</div>
+                    </div>
+                  )}
+                  {fullEmployee.address.postcode && (
+                    <div>
+                      <span className="text-sm text-gray-600">Postcode:</span>
+                      <div>{fullEmployee.address.postcode}</div>
+                    </div>
+                  )}
+                </div>
+                {fullEmployee.address.country && (
+                  <div>
+                    <span className="text-sm text-gray-600">Country:</span>
+                    <div>{fullEmployee.address.country}</div>
                   </div>
                 )}
               </CardContent>
             </Card>
-          </div>
+          )}
 
-          {employee.pay_rate && (
+          {fullEmployee?.emergency_contact && (
             <Card>
               <CardHeader>
-                <CardTitle>Current Compensation</CardTitle>
+                <CardTitle>Emergency Contact</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <PoundSterling className="w-4 h-4 text-gray-500" />
-                  <span className="text-lg font-semibold">
-                    {formatCurrency(employee.pay_rate, employee.pay_type || 'salary')}
-                  </span>
+                {fullEmployee.emergency_contact.name && (
+                  <div>
+                    <span className="text-sm text-gray-600">Contact Name:</span>
+                    <div>{fullEmployee.emergency_contact.name}</div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  {fullEmployee.emergency_contact.phone && (
+                    <div>
+                      <span className="text-sm text-gray-600">Contact Phone:</span>
+                      <div className="flex items-center space-x-3">
+                        <Phone className="w-4 h-4 text-gray-500" />
+                        <span>{fullEmployee.emergency_contact.phone}</span>
+                      </div>
+                    </div>
+                  )}
+                  {fullEmployee.emergency_contact.relationship && (
+                    <div>
+                      <span className="text-sm text-gray-600">Relationship:</span>
+                      <div>{fullEmployee.emergency_contact.relationship}</div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -261,60 +357,41 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
           </div>
         </TabsContent>
 
-        <TabsContent value="personal" className="space-y-6">
-          {fullEmployee && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Government Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {fullEmployee.national_insurance_number && (
+        <TabsContent value="financial" className="space-y-4">
+          {fullEmployee?.bank_details && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Bank Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {fullEmployee.bank_details.bank_name && (
+                  <div>
+                    <span className="text-sm text-gray-600">Bank Name:</span>
+                    <div>{fullEmployee.bank_details.bank_name}</div>
+                  </div>
+                )}
+                {fullEmployee.bank_details.account_holder_name && (
+                  <div>
+                    <span className="text-sm text-gray-600">Account Holder Name:</span>
+                    <div>{fullEmployee.bank_details.account_holder_name}</div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  {fullEmployee.bank_details.account_number && (
                     <div>
-                      <span className="text-sm text-gray-600">National Insurance:</span>
-                      <div>{fullEmployee.national_insurance_number}</div>
+                      <span className="text-sm text-gray-600">Account Number:</span>
+                      <div>{fullEmployee.bank_details.account_number}</div>
                     </div>
                   )}
-                  {fullEmployee.tax_code && (
+                  {fullEmployee.bank_details.sort_code && (
                     <div>
-                      <span className="text-sm text-gray-600">Tax Code:</span>
-                      <div>{fullEmployee.tax_code}</div>
+                      <span className="text-sm text-gray-600">Sort Code:</span>
+                      <div>{fullEmployee.bank_details.sort_code}</div>
                     </div>
                   )}
-                  {fullEmployee.passport_number && (
-                    <div>
-                      <span className="text-sm text-gray-600">Passport:</span>
-                      <div>{fullEmployee.passport_number}</div>
-                    </div>
-                  )}
-                  {fullEmployee.right_to_work_status && (
-                    <div>
-                      <span className="text-sm text-gray-600">Right to Work:</span>
-                      <Badge variant="outline" className="ml-2">
-                        {fullEmployee.right_to_work_status}
-                      </Badge>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {fullEmployee.address && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Address</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-1">
-                      {fullEmployee.address.line_1 && <div>{fullEmployee.address.line_1}</div>}
-                      {fullEmployee.address.line_2 && <div>{fullEmployee.address.line_2}</div>}
-                      {fullEmployee.address.city && <div>{fullEmployee.address.city}</div>}
-                      {fullEmployee.address.postcode && <div>{fullEmployee.address.postcode}</div>}
-                      {fullEmployee.address.country && <div>{fullEmployee.address.country}</div>}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>
