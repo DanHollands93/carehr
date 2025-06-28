@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, differenceInMinutes } from "date-fns";
+import { format, parseISO, differenceInMinutes, addDays, startOfDay, endOfDay } from "date-fns";
 
 interface TimeClockRecord {
   id: string;
@@ -20,6 +20,16 @@ interface TimeClockRecord {
   approved_by: string | null;
   approval_status: 'pending' | 'approved' | 'rejected';
   notes: string | null;
+}
+
+interface ShiftWithRecord {
+  id: string;
+  employee_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  position: string;
+  time_record: TimeClockRecord | null;
 }
 
 export const useTimeClockRecords = () => {
@@ -102,6 +112,41 @@ export const useTimeClockRecords = () => {
     enabled: !!employeeProfile?.employee_id
   });
 
+  // New query for upcoming shifts (next 6 weeks)
+  const { data: upcomingShifts } = useQuery({
+    queryKey: ['upcoming-shifts', employeeProfile?.employee_id],
+    queryFn: async () => {
+      if (!employeeProfile?.employee_id) return [];
+      
+      const today = new Date();
+      const sixWeeksFromNow = addDays(today, 42); // 6 weeks = 42 days
+      
+      const { data: shifts, error } = await supabase
+        .from('shifts')
+        .select(`
+          *,
+          time_clock_records!left(
+            id,
+            status,
+            clock_in_time,
+            clock_out_time
+          )
+        `)
+        .eq('employee_id', employeeProfile.employee_id)
+        .gte('date', format(today, 'yyyy-MM-dd'))
+        .lte('date', format(sixWeeksFromNow, 'yyyy-MM-dd'))
+        .order('date', { ascending: true });
+      
+      if (error) throw error;
+      
+      return (shifts || []).map(shift => ({
+        ...shift,
+        time_record: shift.time_clock_records?.[0] || null
+      })) as ShiftWithRecord[];
+    },
+    enabled: !!employeeProfile?.employee_id
+  });
+
   const clockInMutation = useMutation({
     mutationFn: async (recordId: string) => {
       const { error } = await supabase
@@ -117,6 +162,7 @@ export const useTimeClockRecords = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['time-clock-records'] });
+      queryClient.invalidateQueries({ queryKey: ['upcoming-shifts'] });
       toast({ title: "Successfully clocked in!" });
     },
     onError: (error) => {
@@ -143,6 +189,7 @@ export const useTimeClockRecords = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['time-clock-records'] });
+      queryClient.invalidateQueries({ queryKey: ['upcoming-shifts'] });
       toast({ title: "Successfully clocked out!" });
     },
     onError: (error) => {
@@ -183,6 +230,7 @@ export const useTimeClockRecords = () => {
 
   return {
     todayRecords,
+    upcomingShifts,
     isLoading,
     clockIn: clockInMutation.mutate,
     clockOut: clockOutMutation.mutate,

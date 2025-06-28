@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { useTimeClockRecords } from "@/hooks/useTimeClockRecords";
 import { useTimeClockSettings } from "@/hooks/useTimeClockSettings";
 import StaffShiftCard from "@/components/StaffShiftCard";
+import UpcomingShiftsCalendar from "@/components/UpcomingShiftsCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 
@@ -13,6 +14,7 @@ const StaffShifts = () => {
   const { user } = useAuth();
   const { 
     todayRecords, 
+    upcomingShifts,
     isLoading, 
     clockIn, 
     clockOut, 
@@ -36,7 +38,7 @@ const StaffShifts = () => {
   }
 
   return (
-    <div className="space-y-6 p-4 max-w-2xl mx-auto">
+    <div className="space-y-6 p-4 max-w-6xl mx-auto">
       {/* Header */}
       <div className="text-center space-y-2">
         <h1 className="text-2xl font-bold text-gray-900">My Shifts</h1>
@@ -102,6 +104,28 @@ const StaffShifts = () => {
         )}
       </div>
 
+      <Separator />
+
+      {/* Upcoming Shifts Calendar */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Next 6 Weeks</h2>
+        {upcomingShifts && upcomingShifts.length > 0 ? (
+          <UpcomingShiftsCalendar shifts={upcomingShifts} />
+        ) : (
+          <Card>
+            <CardContent className="text-center py-8">
+              <div className="space-y-2">
+                <Calendar className="w-12 h-12 mx-auto text-gray-400" />
+                <h3 className="text-lg font-medium text-gray-900">No upcoming shifts</h3>
+                <p className="text-gray-500">
+                  You don't have any shifts scheduled for the next 6 weeks.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
       {/* Instructions */}
       <Card className="bg-blue-50 border-blue-200">
         <CardContent className="pt-6">
@@ -111,6 +135,7 @@ const StaffShifts = () => {
               <li>• Clock in at the start of your shift</li>
               <li>• Clock out when your shift ends</li>
               <li>• You'll get warnings if clocking in/out outside the allowed time window</li>
+              <li>• Use the calendar above to see your upcoming shifts</li>
               <li>• Contact your manager if you have any issues</li>
             </ul>
           </div>
