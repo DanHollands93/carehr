@@ -191,6 +191,22 @@ const Roster = () => {
   const canViewRoster = hasPermission('view_roster') || hasPermission('edit_roster');
   const canEditRoster = hasPermission('edit_roster');
 
+  // Helper function to check for time overlaps
+  const hasTimeOverlap = (newStart: string, newEnd: string, existingShifts: Shift[], excludeShiftId?: string) => {
+    const newStartTime = parseInt(newStart.replace(':', ''));
+    const newEndTime = parseInt(newEnd.replace(':', ''));
+    
+    return existingShifts.some(shift => {
+      if (excludeShiftId && shift.id === excludeShiftId) return false;
+      
+      const existingStartTime = parseInt(shift.start_time.replace(':', ''));
+      const existingEndTime = parseInt(shift.end_time.replace(':', ''));
+      
+      // Check if times overlap
+      return (newStartTime < existingEndTime && newEndTime > existingStartTime);
+    });
+  };
+
   const createShiftMutation = useMutation({
     mutationFn: async ({ employeeId, date, shiftData }: {
       employeeId: string;
@@ -203,6 +219,12 @@ const Roster = () => {
         color?: string;
       };
     }) => {
+      // Check for overlapping shifts
+      const existingShifts = getShiftsForEmployeeAndDate(employeeId, date);
+      if (hasTimeOverlap(shiftData.start_time, shiftData.end_time, existingShifts)) {
+        throw new Error('This shift overlaps with an existing shift. Please choose different times.');
+      }
+
       const { error } = await supabase
         .from('shifts')
         .insert([{
@@ -391,6 +413,15 @@ const Roster = () => {
     setShowDeleteBin(false);
   };
 
+  // Updated function to get ALL shifts for an employee on a specific date
+  const getShiftsForEmployeeAndDate = (employeeId: string, date: string) => {
+    return shifts?.filter(shift => 
+      shift.employee_id === employeeId && 
+      shift.date === format(new Date(date), 'yyyy-MM-dd')
+    ) || [];
+  };
+
+  // Keep the old function for backward compatibility but mark it as deprecated
   const getShiftForEmployeeAndDate = (employeeId: string, date: string) => {
     return shifts?.find(shift => 
       shift.employee_id === employeeId && 
@@ -455,6 +486,17 @@ const Roster = () => {
     color?: string;
   }) => {
     if (!canEditRoster || !shiftPopup.existingShift) return;
+    
+    // Check for overlapping shifts (excluding the current shift being updated)
+    const existingShifts = getShiftsForEmployeeAndDate(shiftPopup.employeeId, shiftPopup.date);
+    if (hasTimeOverlap(shiftData.start_time, shiftData.end_time, existingShifts, shiftPopup.existingShift.id)) {
+      toast({
+        title: "Time Overlap Error",
+        description: "This shift overlaps with another existing shift. Please choose different times.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Delete the old shift and create a new one with updated data
     deleteShiftMutation.mutate(shiftPopup.existingShift.id);
@@ -575,8 +617,8 @@ const Roster = () => {
         <p className="text-gray-600">
           {canEditRoster 
             ? (isMobile 
-                ? "Tap on shifts to edit or remove them, or tap empty cells to add shifts"
-                : "Drag and drop shifts to assign staff or move shifts between staff and days, or click on empty cells to add shifts"
+                ? "Tap on shifts to edit or remove them, or tap empty cells to add shifts. Multiple shifts per day are allowed but cannot overlap."
+                : "Drag and drop shifts to assign staff or move shifts between staff and days, or click on empty cells to add shifts. Multiple shifts per day are allowed but cannot overlap."
               )
             : "View-only access - shifts cannot be modified"
           }
@@ -746,14 +788,7 @@ const Roster = () => {
                               <div className="text-sm text-gray-500">{employee.department}</div>
                             </td>
                             {weekDays.map((day) => {
-                              const shift = getShiftForEmployeeAndDate(employee.id, day.toISOString()) as ShiftWithTimeRecord;
-                              const template = shiftTemplates?.find(t => 
-                                shift && t.position === shift.position && 
-                                t.start_time === shift.start_time && 
-                                t.end_time === shift.end_time
-                              );
-                              const statusColor = shift ? getShiftStatusColor(shift) : null;
-                              const statusText = shift ? getShiftStatusText(shift) : '';
+                              const employeeShifts = getShiftsForEmployeeAndDate(employee.id, day.toISOString()) as ShiftWithTimeRecord[];
                               
                               return (
                                 <td
@@ -770,7 +805,7 @@ const Roster = () => {
                                   <div 
                                     className={cn(
                                       "min-h-16 border-2 border-dashed border-gray-200 rounded p-2 transition-colors relative group",
-                                      canEditRoster && !shift && "cursor-pointer hover:border-gray-300",
+                                      canEditRoster && "cursor-pointer hover:border-gray-300",
                                       !canEditRoster && "cursor-default"
                                     )}
                                     style={{
@@ -779,38 +814,63 @@ const Roster = () => {
                                     onClick={canEditRoster ? () => handleCellClick(
                                       employee.id, 
                                       `${employee.first_name} ${employee.last_name}`, 
-                                      day.toISOString(),
-                                      shift
+                                      day.toISOString()
                                     ) : undefined}
                                   >
-                                    {shift ? (
-                                      <div 
-                                        draggable={canEditRoster && !isMobile}
-                                        onDragStart={canEditRoster && !isMobile ? () => handleShiftDragStart(shift) : undefined}
-                                        onDragEnd={canEditRoster && !isMobile ? handleDragEnd : undefined}
-                                        className={cn(
-                                          "p-2 rounded text-xs transition-shadow relative",
-                                          canEditRoster ? "cursor-pointer hover:shadow-md" : "cursor-default",
-                                          !isMobile && canEditRoster && "hover:cursor-move"
-                                        )}
-                                        style={{ 
-                                          backgroundColor: template?.color + '20' || '#3B82F6' + '20',
-                                          borderColor: template?.color || '#3B82F6',
-                                          borderLeft: statusColor ? `4px solid ${statusColor}` : undefined
-                                        }}
-                                        onDoubleClick={canEditRoster && !isMobile ? () => deleteShiftMutation.mutate(shift.id) : undefined}
-                                        title={canEditRoster ? (isMobile ? "Tap to edit or remove" : "Drag to move, click to edit, or double-click to delete") : "View only"}
-                                      >
-                                        <div className="font-medium">{shift.position}</div>
-                                        <div>{shift.start_time} - {shift.end_time}</div>
-                                        {statusText && (
-                                          <div className="text-xs mt-1 font-medium" style={{ color: statusColor }}>
-                                            {statusText}
-                                          </div>
-                                        )}
-                                        {shift.time_record?.status === 'discrepancy' && (
-                                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                                        )}
+                                    {employeeShifts.length > 0 ? (
+                                      <div className="space-y-1">
+                                        {employeeShifts.map((shift, index) => {
+                                          const template = shiftTemplates?.find(t => 
+                                            t.position === shift.position && 
+                                            t.start_time === shift.start_time && 
+                                            t.end_time === shift.end_time
+                                          );
+                                          const statusColor = getShiftStatusColor(shift);
+                                          const statusText = getShiftStatusText(shift);
+                                          
+                                          return (
+                                            <div
+                                              key={shift.id}
+                                              draggable={canEditRoster && !isMobile}
+                                              onDragStart={canEditRoster && !isMobile ? () => handleShiftDragStart(shift) : undefined}
+                                              onDragEnd={canEditRoster && !isMobile ? handleDragEnd : undefined}
+                                              className={cn(
+                                                "p-1 rounded text-xs transition-shadow relative",
+                                                canEditRoster ? "cursor-pointer hover:shadow-md" : "cursor-default",
+                                                !isMobile && canEditRoster && "hover:cursor-move"
+                                              )}
+                                              style={{ 
+                                                backgroundColor: template?.color + '20' || '#3B82F6' + '20',
+                                                borderColor: template?.color || '#3B82F6',
+                                                borderLeft: statusColor ? `4px solid ${statusColor}` : undefined
+                                              }}
+                                              onDoubleClick={canEditRoster && !isMobile ? () => deleteShiftMutation.mutate(shift.id) : undefined}
+                                              onClick={(e) => {
+                                                if (canEditRoster) {
+                                                  e.stopPropagation();
+                                                  handleCellClick(
+                                                    employee.id, 
+                                                    `${employee.first_name} ${employee.last_name}`, 
+                                                    day.toISOString(),
+                                                    shift
+                                                  );
+                                                }
+                                              }}
+                                              title={canEditRoster ? (isMobile ? "Tap to edit or remove" : "Click to edit, drag to move, or double-click to delete") : "View only"}
+                                            >
+                                              <div className="font-medium text-xs">{shift.position}</div>
+                                              <div className="text-xs">{shift.start_time} - {shift.end_time}</div>
+                                              {statusText && (
+                                                <div className="text-xs mt-1 font-medium" style={{ color: statusColor }}>
+                                                  {statusText}
+                                                </div>
+                                              )}
+                                              {shift.time_record?.status === 'discrepancy' && (
+                                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                              )}
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     ) : (
                                       canEditRoster && (
