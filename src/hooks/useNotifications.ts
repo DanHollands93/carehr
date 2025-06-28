@@ -77,11 +77,18 @@ export const useNotifications = () => {
   const markAllAsSeen = async () => {
     if (!user) return;
 
+    // Get notifications that need to be marked as seen
+    const unseenNotifications = notifications.filter(n => !n.seen_at);
+    
+    if (unseenNotifications.length === 0) return;
+
+    const now = new Date().toISOString();
+
     const { error } = await supabase
       .from('notifications')
       .update({ 
-        seen_at: new Date().toISOString(),
-        updated_at: new Date().toISOString() 
+        seen_at: now,
+        updated_at: now
       })
       .eq('user_id', user.id)
       .is('seen_at', null);
@@ -89,9 +96,10 @@ export const useNotifications = () => {
     if (error) {
       console.error('Error marking notifications as seen:', error);
     } else {
+      // Update local state immediately
       setNotifications(prev => 
         prev.map(n => 
-          n.seen_at === null ? { ...n, seen_at: new Date().toISOString() } : n
+          n.seen_at === null ? { ...n, seen_at: now } : n
         )
       );
     }
@@ -100,12 +108,14 @@ export const useNotifications = () => {
   const markAsRead = async (notificationId: string) => {
     if (!user) return;
 
+    const now = new Date().toISOString();
+
     const { error } = await supabase
       .from('notifications')
       .update({ 
         read: true, 
-        marked_read_at: new Date().toISOString(),
-        updated_at: new Date().toISOString() 
+        marked_read_at: now,
+        updated_at: now
       })
       .eq('id', notificationId)
       .eq('user_id', user.id);
@@ -118,7 +128,7 @@ export const useNotifications = () => {
           n.id === notificationId ? { 
             ...n, 
             read: true, 
-            marked_read_at: new Date().toISOString() 
+            marked_read_at: now
           } : n
         )
       );
@@ -128,12 +138,14 @@ export const useNotifications = () => {
   const markAllAsRead = async () => {
     if (!user) return;
 
+    const now = new Date().toISOString();
+
     const { error } = await supabase
       .from('notifications')
       .update({ 
         read: true, 
-        marked_read_at: new Date().toISOString(),
-        updated_at: new Date().toISOString() 
+        marked_read_at: now,
+        updated_at: now
       })
       .eq('user_id', user.id)
       .eq('read', false);
@@ -145,7 +157,7 @@ export const useNotifications = () => {
         prev.map(n => ({ 
           ...n, 
           read: true, 
-          marked_read_at: new Date().toISOString() 
+          marked_read_at: now
         }))
       );
     }
@@ -169,8 +181,8 @@ export const useNotifications = () => {
     }
   };
 
-  // Count unseen notifications (not read and not seen)
-  const unseenCount = notifications.filter(n => !n.read && !n.seen_at).length;
+  // Count unseen notifications (not seen at all)
+  const unseenCount = notifications.filter(n => !n.seen_at).length;
 
   return {
     notifications,
