@@ -26,8 +26,8 @@ interface BulkRoleRule {
   job_role_id: string;
   permission_group_id: string;
   created_at: string;
-  job_role: JobRole;
-  permission_group: PermissionGroup;
+  job_roles: JobRole;
+  permission_groups: PermissionGroup;
 }
 
 const BulkRoleManager = () => {
@@ -46,51 +46,64 @@ const BulkRoleManager = () => {
   }, []);
 
   const loadJobRoles = async () => {
-    const { data, error } = await supabase
-      .from('job_roles')
-      .select('id, title, department, location')
-      .order('title');
-    
-    if (error) {
-      console.error('Error loading job roles:', error);
-    } else {
-      setJobRoles(data || []);
+    try {
+      const { data, error } = await supabase
+        .from('job_roles')
+        .select('id, title, department, location')
+        .order('title');
+      
+      if (error) {
+        console.error('Error loading job roles:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load job roles",
+          variant: "destructive"
+        });
+      } else {
+        console.log('Loaded job roles:', data);
+        setJobRoles(data || []);
+      }
+    } catch (error) {
+      console.error('Exception loading job roles:', error);
     }
   };
 
   const loadPermissionGroups = async () => {
-    const { data, error } = await supabase
-      .from('permission_groups')
-      .select('id, name, description')
-      .eq('is_active', true)
-      .order('name');
-    
-    if (error) {
-      console.error('Error loading permission groups:', error);
-    } else {
-      setPermissionGroups(data || []);
+    try {
+      const { data, error } = await supabase
+        .from('permission_groups')
+        .select('id, name, description')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) {
+        console.error('Error loading permission groups:', error);
+      } else {
+        setPermissionGroups(data || []);
+      }
+    } catch (error) {
+      console.error('Exception loading permission groups:', error);
     }
   };
 
   const loadBulkRules = async () => {
-    const { data, error } = await supabase
-      .from('bulk_role_rules')
-      .select(`
-        *,
-        job_roles!inner(id, title, department, location),
-        permission_groups!inner(id, name, description)
-      `)
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Error loading bulk rules:', error);
-    } else {
-      const transformedData = data?.map(item => ({
-        ...item,
-        job_role: Array.isArray(item.job_roles) ? item.job_roles[0] : item.job_roles,
-        permission_group: Array.isArray(item.permission_groups) ? item.permission_groups[0] : item.permission_groups
-      })) || [];
-      setBulkRules(transformedData);
+    try {
+      const { data, error } = await supabase
+        .from('bulk_role_rules')
+        .select(`
+          *,
+          job_roles!inner(id, title, department, location),
+          permission_groups!inner(id, name, description)
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error loading bulk rules:', error);
+      } else {
+        setBulkRules(data || []);
+      }
+    } catch (error) {
+      console.error('Exception loading bulk rules:', error);
     }
   };
 
@@ -156,37 +169,45 @@ const BulkRoleManager = () => {
   };
 
   const applyRuleToExistingUsers = async (jobRoleId: string, permissionGroupId: string) => {
-    // Get all employees with this job role
-    const { data: employees, error: employeesError } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('job_role_id', jobRoleId);
+    try {
+      // Get all employees with this job role
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('job_role_id', jobRoleId);
 
-    if (employeesError) {
-      console.error('Error getting employees:', employeesError);
-      return;
-    }
+      if (employeesError) {
+        console.error('Error getting employees:', employeesError);
+        return;
+      }
 
-    // Get user IDs for these employees
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id')
-      .in('employee_id', employees?.map(e => e.id) || []);
+      if (!employees || employees.length === 0) {
+        return;
+      }
 
-    if (profilesError) {
-      console.error('Error getting profiles:', profilesError);
-      return;
-    }
+      // Get user IDs for these employees
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id')
+        .in('employee_id', employees.map(e => e.id));
 
-    // Assign the permission group to these users
-    const assignments = profiles?.map(profile => ({
-      user_id: profile.id,
-      permission_group_id: permissionGroupId,
-      assigned_by: null, // System assignment
-      location: null // Apply to all locations for bulk rules
-    })) || [];
+      if (profilesError) {
+        console.error('Error getting profiles:', profilesError);
+        return;
+      }
 
-    if (assignments.length > 0) {
+      if (!profiles || profiles.length === 0) {
+        return;
+      }
+
+      // Assign the permission group to these users
+      const assignments = profiles.map(profile => ({
+        user_id: profile.id,
+        permission_group_id: permissionGroupId,
+        assigned_by: null, // System assignment
+        location: null // Apply to all locations for bulk rules
+      }));
+
       const { error: assignmentError } = await supabase
         .from('user_role_assignments')
         .upsert(assignments, { 
@@ -197,6 +218,8 @@ const BulkRoleManager = () => {
       if (assignmentError) {
         console.error('Error assigning roles:', assignmentError);
       }
+    } catch (error) {
+      console.error('Exception applying rule to existing users:', error);
     }
   };
 
@@ -234,30 +257,38 @@ const BulkRoleManager = () => {
   };
 
   const removeRuleFromExistingUsers = async (jobRoleId: string, permissionGroupId: string) => {
-    // Get all employees with this job role
-    const { data: employees, error: employeesError } = await supabase
-      .from('employees')
-      .select('id')
-      .eq('job_role_id', jobRoleId);
+    try {
+      // Get all employees with this job role
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('job_role_id', jobRoleId);
 
-    if (employeesError) {
-      console.error('Error getting employees:', employeesError);
-      return;
-    }
+      if (employeesError) {
+        console.error('Error getting employees:', employeesError);
+        return;
+      }
 
-    // Get user IDs for these employees
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id')
-      .in('employee_id', employees?.map(e => e.id) || []);
+      if (!employees || employees.length === 0) {
+        return;
+      }
 
-    if (profilesError) {
-      console.error('Error getting profiles:', profilesError);
-      return;
-    }
+      // Get user IDs for these employees
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id')
+        .in('employee_id', employees.map(e => e.id));
 
-    // Remove the permission group assignments (only system-assigned ones)
-    if (profiles?.length > 0) {
+      if (profilesError) {
+        console.error('Error getting profiles:', profilesError);
+        return;
+      }
+
+      if (!profiles || profiles.length === 0) {
+        return;
+      }
+
+      // Remove the permission group assignments (only system-assigned ones)
       const { error: removeError } = await supabase
         .from('user_role_assignments')
         .delete()
@@ -268,6 +299,8 @@ const BulkRoleManager = () => {
       if (removeError) {
         console.error('Error removing role assignments:', removeError);
       }
+    } catch (error) {
+      console.error('Exception removing rule from existing users:', error);
     }
   };
 
@@ -280,7 +313,8 @@ const BulkRoleManager = () => {
             Create Bulk Role Rule
           </CardTitle>
           <CardDescription>
-            Automatically assign permission groups to users based on their job role
+            Automatically assign permission groups to users based on their job role. 
+            Found {jobRoles.length} job roles and {permissionGroups.length} permission groups.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -289,7 +323,7 @@ const BulkRoleManager = () => {
               <label className="text-sm font-medium mb-2 block">Job Role</label>
               <Select value={selectedJobRoleId} onValueChange={setSelectedJobRoleId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a job role" />
+                  <SelectValue placeholder={`Select from ${jobRoles.length} job roles`} />
                 </SelectTrigger>
                 <SelectContent>
                   {jobRoles.map(jobRole => (
@@ -311,7 +345,7 @@ const BulkRoleManager = () => {
               <label className="text-sm font-medium mb-2 block">Permission Group</label>
               <Select value={selectedPermissionGroupId} onValueChange={setSelectedPermissionGroupId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a permission group" />
+                  <SelectValue placeholder={`Select from ${permissionGroups.length} groups`} />
                 </SelectTrigger>
                 <SelectContent>
                   {permissionGroups.map(group => (
@@ -355,14 +389,14 @@ const BulkRoleManager = () => {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <Briefcase className="w-4 h-4" />
-                        <span className="font-medium">{rule.job_role.title}</span>
+                        <span className="font-medium">{rule.job_roles.title}</span>
                         <span className="text-muted-foreground text-sm">
-                          ({rule.job_role.department}, {rule.job_role.location})
+                          ({rule.job_roles.department}, {rule.job_roles.location})
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">gets assigned</span>
-                        <Badge variant="secondary">{rule.permission_group.name}</Badge>
+                        <Badge variant="secondary">{rule.permission_groups.name}</Badge>
                       </div>
                     </div>
                   </div>
