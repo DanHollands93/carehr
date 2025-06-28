@@ -1,3 +1,4 @@
+
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,16 @@ const UnifiedSidebar = ({
   };
 
   const isMenuItemVisible = (item: any) => {
+    // Debug logging for Email Logs specifically
+    if (item.title === 'Email Logs') {
+      console.log('Checking Email Logs visibility:', {
+        title: item.title,
+        requiredPermission: item.requiredPermission,
+        hasPermission: hasPermission(item.requiredPermission, item.location),
+        location: item.location
+      });
+    }
+
     // If no permission required, show to everyone
     if (!item.requiredPermission) {
       return true;
@@ -62,10 +73,16 @@ const UnifiedSidebar = ({
   };
 
   const getVisibleGroups = () => {
-    return unifiedMenuConfig.map(group => ({
+    const visibleGroups = unifiedMenuConfig.map(group => ({
       ...group,
       items: group.items.filter(isMenuItemVisible)
     })).filter(group => group.items.length > 0);
+
+    // Debug logging for Administration group
+    const adminGroup = visibleGroups.find(group => group.label === 'Administration');
+    console.log('Administration group:', adminGroup);
+    
+    return visibleGroups;
   };
 
   const visibleGroups = getVisibleGroups();
