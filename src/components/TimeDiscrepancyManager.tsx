@@ -165,6 +165,52 @@ const TimeDiscrepancyManager = () => {
     }
   });
 
+  const getClockInOptions = (record: TimeClockRecord) => {
+    if (!record.shift || !record.clock_in_time) return [];
+    
+    const today = record.shift.date;
+    const shiftStartDateTime = parseISO(`${today}T${record.shift.start_time}`);
+    const clockInTime = parseISO(record.clock_in_time);
+    const minutesDiff = differenceInMinutes(clockInTime, shiftStartDateTime);
+    
+    if (minutesDiff < 0) {
+      // Early clock in
+      return [
+        { value: 'pay_from_scheduled', label: 'Pay from scheduled time (ignore early arrival)' },
+        { value: 'pay_from_actual', label: 'Pay from actual clock in time (pay for early arrival)' }
+      ];
+    } else {
+      // Late clock in
+      return [
+        { value: 'pay_from_scheduled', label: 'Pay from scheduled time (excuse lateness)' },
+        { value: 'pay_from_actual', label: 'Pay from actual clock in time (deduct late arrival)' }
+      ];
+    }
+  };
+
+  const getClockOutOptions = (record: TimeClockRecord) => {
+    if (!record.shift || !record.clock_out_time) return [];
+    
+    const today = record.shift.date;
+    const shiftEndDateTime = parseISO(`${today}T${record.shift.end_time}`);
+    const clockOutTime = parseISO(record.clock_out_time);
+    const minutesDiff = differenceInMinutes(clockOutTime, shiftEndDateTime);
+    
+    if (minutesDiff < 0) {
+      // Early clock out
+      return [
+        { value: 'pay_until_scheduled', label: 'Pay until scheduled time (ignore early departure)' },
+        { value: 'pay_until_actual', label: 'Pay until actual clock out time (deduct early departure)' }
+      ];
+    } else {
+      // Late clock out
+      return [
+        { value: 'pay_until_scheduled', label: 'Pay until scheduled time (no overtime)' },
+        { value: 'pay_until_actual', label: 'Pay until actual clock out time (approve overtime)' }
+      ];
+    }
+  };
+
   const formatDiscrepancyType = (type: string) => {
     if (!type) return 'Unknown discrepancy';
     
@@ -305,12 +351,14 @@ const TimeDiscrepancyManager = () => {
                               onValueChange={(value) => updateApproval(record.id, 'clock_in_action', value)}
                             >
                               <SelectTrigger>
-                                <SelectValue placeholder="What to do with early/late clock in..." />
+                                <SelectValue placeholder="What to do with this clock in time..." />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="pay_from_scheduled">Pay from scheduled time</SelectItem>
-                                <SelectItem value="pay_from_actual">Pay from actual clock in time</SelectItem>
-                                <SelectItem value="deduct_time">Deduct time for late arrival</SelectItem>
+                                {getClockInOptions(record).map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <Textarea
@@ -347,13 +395,14 @@ const TimeDiscrepancyManager = () => {
                               onValueChange={(value) => updateApproval(record.id, 'clock_out_action', value)}
                             >
                               <SelectTrigger>
-                                <SelectValue placeholder="What to do with early/late clock out..." />
+                                <SelectValue placeholder="What to do with this clock out time..." />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="pay_until_scheduled">Pay until scheduled time</SelectItem>
-                                <SelectItem value="pay_until_actual">Pay until actual clock out time</SelectItem>
-                                <SelectItem value="overtime_approved">Approve overtime pay</SelectItem>
-                                <SelectItem value="deduct_early_leave">Deduct time for early departure</SelectItem>
+                                {getClockOutOptions(record).map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <Textarea
