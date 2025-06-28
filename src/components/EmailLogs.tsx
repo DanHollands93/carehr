@@ -41,25 +41,11 @@ const EmailLogs = () => {
 
     setLoading(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('email_logs')
         .select('*')
         .order('sent_at', { ascending: false })
         .limit(100);
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-
-      if (typeFilter !== 'all') {
-        query = query.eq('email_type', typeFilter);
-      }
-
-      if (searchTerm) {
-        query = query.or(`recipient_email.ilike.%${searchTerm}%,subject.ilike.%${searchTerm}%`);
-      }
-
-      const { data, error } = await query;
 
       if (error) {
         console.error('Error loading email logs:', error);
@@ -81,7 +67,7 @@ const EmailLogs = () => {
     } finally {
       setLoading(false);
     }
-  }, [hasPermission, permissionsLoading, statusFilter, typeFilter, searchTerm, toast]);
+  }, [hasPermission, permissionsLoading, toast]);
 
   // Load email logs when permissions are ready and user has access
   useEffect(() => {
