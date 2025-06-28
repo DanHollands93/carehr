@@ -68,7 +68,8 @@ export const useAllEmployeeJobRoles = () => {
           )
         `)
         .is('end_date', null) // Only active roles
-        .order('employee_id, is_primary', { ascending: [true, false] });
+        .order('employee_id')
+        .order('is_primary', { ascending: false });
       
       if (error) throw error;
       return data as EmployeeJobRole[];
