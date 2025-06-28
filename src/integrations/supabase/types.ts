@@ -1133,6 +1133,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      current_user_employee_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_employee_career_history: {
         Args: { p_employee_id: string }
         Returns: {
@@ -1163,6 +1167,38 @@ export type Database = {
           _user_id: string
           _role: Database["public"]["Enums"]["user_role"]
         }
+        Returns: boolean
+      }
+      user_can_create_employees: {
+        Args: { _location?: string }
+        Returns: boolean
+      }
+      user_can_delete_employees: {
+        Args: { _location?: string }
+        Returns: boolean
+      }
+      user_can_edit_employees: {
+        Args: { _location?: string }
+        Returns: boolean
+      }
+      user_can_edit_roster: {
+        Args: { _location?: string }
+        Returns: boolean
+      }
+      user_can_manage_settings: {
+        Args: { _location?: string }
+        Returns: boolean
+      }
+      user_can_view_employees: {
+        Args: { _location?: string }
+        Returns: boolean
+      }
+      user_can_view_reports: {
+        Args: { _location?: string }
+        Returns: boolean
+      }
+      user_can_view_roster: {
+        Args: { _location?: string }
         Returns: boolean
       }
       user_has_location_access: {

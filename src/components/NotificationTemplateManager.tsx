@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -414,7 +415,7 @@ const TemplateForm = ({ template, onSave, onCancel }: {
               rows={3}
             />
             <p className="text-sm text-gray-500 mt-1">
-              Use the dropdown above to add dynamic content or manually type variables with double curly braces (e.g., {{employee_name}})
+              Use the dropdown above to add dynamic content or manually type variables with double curly braces (e.g., {`{{employee_name}}`})
             </p>
           </div>
 
