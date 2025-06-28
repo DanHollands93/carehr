@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,30 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<EmployeeFormData>();
 
   const payType = watch('pay_type');
+
+  // Fetch lookup lists from settings
+  const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
+    queryKey: ['lookup-lists-all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lookup_lists')
+        .select('*')
+        .eq('is_active', true)
+        .order('category, value');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Group lookup lists by category
+  const lookupsByCategory = lookupLists.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = [];
+    }
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<string, typeof lookupLists>);
 
   const onSubmit = async (data: EmployeeFormData) => {
     setIsSubmitting(true);
@@ -141,6 +166,18 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoadingLookups) {
+    return (
+      <Dialog open={true} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-center p-8">
+            <div>Loading form data...</div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -312,23 +349,53 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="job_title">Job Title *</Label>
-                      <Input
-                        id="job_title"
-                        {...register("job_title", { required: "Job title is required" })}
-                      />
+                      <Select onValueChange={(value) => setValue('job_title', value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select job title" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {lookupsByCategory.positions?.map((position) => (
+                            <SelectItem key={position.id} value={position.value}>
+                              {position.value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       {errors.job_title && (
                         <p className="text-sm text-red-600 mt-1">{errors.job_title.message}</p>
                       )}
                     </div>
                     <div>
                       <Label htmlFor="department">Department</Label>
-                      <Input id="department" {...register("department")} />
+                      <Select onValueChange={(value) => setValue('department', value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {lookupsByCategory.departments?.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.value}>
+                              {dept.value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
                   <div>
                     <Label htmlFor="location">Work Location</Label>
-                    <Input id="location" {...register("location")} />
+                    <Select onValueChange={(value) => setValue('location', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select work location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {lookupsByCategory.locations?.map((location) => (
+                          <SelectItem key={location.id} value={location.value}>
+                            {location.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4">
@@ -339,10 +406,11 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="permanent">Permanent</SelectItem>
-                          <SelectItem value="temporary">Temporary</SelectItem>
-                          <SelectItem value="contract">Contract</SelectItem>
-                          <SelectItem value="internship">Internship</SelectItem>
+                          {lookupsByCategory.employment_types?.map((type) => (
+                            <SelectItem key={type.id} value={type.value}>
+                              {type.value}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -353,9 +421,11 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="full_time">Full Time</SelectItem>
-                          <SelectItem value="part_time">Part Time</SelectItem>
-                          <SelectItem value="zero_hours">Zero Hours</SelectItem>
+                          {lookupsByCategory.contract_types?.map((type) => (
+                            <SelectItem key={type.id} value={type.value}>
+                              {type.value}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -413,8 +483,11 @@ const EmployeeForm = ({ onClose, onSuccess }: EmployeeFormProps) => {
                           <SelectValue placeholder="Select pay type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="salary">Salary (Annual)</SelectItem>
-                          <SelectItem value="hourly">Hourly Rate</SelectItem>
+                          {lookupsByCategory.pay_types?.map((type) => (
+                            <SelectItem key={type.id} value={type.value.toLowerCase()}>
+                              {type.value}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
