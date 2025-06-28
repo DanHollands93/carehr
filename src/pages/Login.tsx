@@ -42,21 +42,18 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login form submitted with email:', email);
     setLoading(true);
 
     try {
       const { error } = await signIn(email, password);
       
       if (error) {
-        console.error('Login failed:', error);
         toast({
           title: "Login Failed",
           description: error.message,
           variant: "destructive",
         });
       } else {
-        console.log('Login successful');
         toast({
           title: "Login Successful",
           description: "Welcome back!",
@@ -126,11 +123,6 @@ const Login = () => {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm text-gray-600">
-            <p>Demo credentials:</p>
-            <p>Admin: admin@demo.com / admin</p>
-            <p>HR User: hr@demo.com / hr</p>
-          </div>
         </CardContent>
       </Card>
     </div>

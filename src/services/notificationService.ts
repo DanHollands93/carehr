@@ -1,4 +1,8 @@
 
+// DEPRECATED: This service is deprecated for security reasons.
+// Use secureNotificationService.ts instead for all new implementations.
+// This file is kept temporarily for backward compatibility and will be removed.
+
 import { supabase } from '@/integrations/supabase/client';
 
 interface NotificationData {
@@ -20,9 +24,15 @@ interface NotificationTemplate {
   is_active: boolean;
 }
 
+/**
+ * @deprecated Use secureNotificationService instead
+ * This service lacks proper security validation and XSS protection
+ */
 export const notificationService = {
   // Create a notification directly
   createNotification: async (notification: NotificationData) => {
+    console.warn('SECURITY WARNING: Using deprecated notificationService. Switch to secureNotificationService.');
+    
     const { error } = await supabase
       .from('notifications')
       .insert({
@@ -42,6 +52,8 @@ export const notificationService = {
     userId: string,
     variables: Record<string, string>
   ) => {
+    console.warn('SECURITY WARNING: Using deprecated notificationService. Switch to secureNotificationService.');
+    
     // Get the template
     const { data: template, error: templateError } = await supabase
       .from('notification_templates')
@@ -55,7 +67,7 @@ export const notificationService = {
       throw new Error('Template not found or inactive');
     }
 
-    // Replace variables in template
+    // Replace variables in template (INSECURE - no validation)
     let title = template.title_template;
     let message = template.message_template;
 
