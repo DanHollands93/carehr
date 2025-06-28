@@ -134,7 +134,7 @@ const HoursAnalysisReport = () => {
       // Process the data - include ALL shifts
       const processedData: HoursRecord[] = shifts
         .map(shift => {
-          const employee = shift.employees;
+          const employee = Array.isArray(shift.employees) ? shift.employees[0] : shift.employees;
           
           if (!employee) {
             console.log('Missing employee for shift:', shift.employee_id);
@@ -148,7 +148,7 @@ const HoursAnalysisReport = () => {
           const scheduledHours = Math.round((scheduledMinutes / 60) * 100) / 100;
           
           // Get time clock record if exists
-          const timeRecord = shift.time_clock_records?.[0];
+          const timeRecord = Array.isArray(shift.time_clock_records) ? shift.time_clock_records[0] : shift.time_clock_records;
           
           let actualHours = 0;
           let hasIssue = false;
@@ -208,11 +208,13 @@ const HoursAnalysisReport = () => {
           const payRate = shift.pay_rate || 0;
           const totalPay = actualHours * payRate;
           
+          const jobRole = Array.isArray(shift.job_roles) ? shift.job_roles[0] : shift.job_roles;
+          
           return {
             employee_id: employee.id,
             employee_name: `${employee.first_name} ${employee.last_name}`,
             position: shift.position || employee.department || 'Unknown',
-            job_title: shift.job_roles?.title || 'Unknown',
+            job_title: jobRole?.title || 'Unknown',
             date: shift.date,
             shift_start: shift.start_time,
             shift_end: shift.end_time,
@@ -267,18 +269,21 @@ const HoursAnalysisReport = () => {
       
       if (error) throw error;
       
-      return data.map(record => ({
-        id: record.id,
-        employee_name: `${record.employees?.first_name} ${record.employees?.last_name}`,
-        shift_date: record.shift_date,
-        expected_start: record.expected_start_time,
-        expected_end: record.expected_end_time,
-        actual_clock_in: record.clock_in_time,
-        actual_clock_out: record.clock_out_time,
-        discrepancy_type: record.discrepancy_type || '',
-        status: record.status,
-        approval_status: record.approval_status || 'pending'
-      })) as TimeDiscrepancy[];
+      return data.map(record => {
+        const employee = Array.isArray(record.employees) ? record.employees[0] : record.employees;
+        return {
+          id: record.id,
+          employee_name: employee ? `${employee.first_name} ${employee.last_name}` : 'Unknown',
+          shift_date: record.shift_date,
+          expected_start: record.expected_start_time,
+          expected_end: record.expected_end_time,
+          actual_clock_in: record.clock_in_time,
+          actual_clock_out: record.clock_out_time,
+          discrepancy_type: record.discrepancy_type || '',
+          status: record.status,
+          approval_status: record.approval_status || 'pending'
+        };
+      }) as TimeDiscrepancy[];
     }
   });
 

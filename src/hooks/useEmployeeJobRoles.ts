@@ -42,7 +42,10 @@ export const useEmployeeJobRoles = (employeeId?: string) => {
         .order('is_primary', { ascending: false });
       
       if (error) throw error;
-      return data as EmployeeJobRole[];
+      return (data || []).map(item => ({
+        ...item,
+        job_roles: Array.isArray(item.job_roles) ? item.job_roles[0] : item.job_roles
+      })) as EmployeeJobRole[];
     },
     enabled: !!employeeId
   });
@@ -72,7 +75,10 @@ export const useAllEmployeeJobRoles = () => {
         .order('is_primary', { ascending: false });
       
       if (error) throw error;
-      return data as EmployeeJobRole[];
+      return (data || []).map(item => ({
+        ...item,
+        job_roles: Array.isArray(item.job_roles) ? item.job_roles[0] : item.job_roles
+      })) as EmployeeJobRole[];
     }
   });
 };
