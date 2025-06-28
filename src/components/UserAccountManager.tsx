@@ -35,17 +35,14 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     loadUserProfile();
   }, [employee.id]);
 
-  // Sync email when employee email changes
-  useEffect(() => {
-    if (userProfile && userProfile.email !== employee.email) {
-      syncEmailAddress();
-    }
-  }, [employee.email, userProfile]);
+  // Check for email mismatch and show sync button
+  const hasEmailMismatch = userProfile && userProfile.email !== employee.email;
 
   const loadUserProfile = async () => {
     try {
@@ -68,6 +65,7 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
   const syncEmailAddress = async () => {
     if (!userProfile) return;
     
+    setIsSyncing(true);
     try {
       console.log('Syncing email from', userProfile.email, 'to', employee.email);
       
@@ -109,6 +107,8 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
         description: "Failed to sync user account email",
         variant: "destructive"
       });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -335,17 +335,39 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
                   Created {new Date(userProfile.created_at).toLocaleDateString()}
                 </span>
               </div>
-              {userProfile.email !== employee.email && (
+              {hasEmailMismatch && (
                 <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm">
                   <div className="flex items-center gap-1">
                     <AlertCircle className="w-3 h-3 text-amber-600" />
-                    <span className="text-amber-800">Email will be synced automatically</span>
+                    <span className="text-amber-800">Email mismatch detected - sync required</span>
                   </div>
                 </div>
               )}
             </div>
           </div>
         </div>
+
+        {hasEmailMismatch && (
+          <div className="p-4 border border-orange-200 bg-orange-50 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-800">Email Sync Required</p>
+                <p className="text-xs text-orange-600">
+                  Employee email: {employee.email}<br/>
+                  User account email: {userProfile.email}
+                </p>
+              </div>
+              <Button 
+                onClick={syncEmailAddress} 
+                disabled={isSyncing}
+                size="sm"
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                {isSyncing ? "Syncing..." : "Sync Email"}
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           <Button
