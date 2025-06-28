@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import LookupListsManager from "@/components/LookupListsManager";
-import PermissionsManager from "@/components/PermissionsManager";
+import EnhancedPermissionsManager from "@/components/EnhancedPermissionsManager";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -142,7 +143,7 @@ const Settings = () => {
         </TabsContent>
 
         <TabsContent value="permissions">
-          <PermissionsManager />
+          <EnhancedPermissionsManager />
         </TabsContent>
 
         <TabsContent value="integration">

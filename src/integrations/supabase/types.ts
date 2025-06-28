@@ -605,6 +605,72 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_group_permissions: {
+        Row: {
+          created_at: string | null
+          id: string
+          location: string | null
+          permission_group_id: string
+          permission_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          permission_group_id: string
+          permission_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          permission_group_id?: string
+          permission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_group_permissions_permission_group_id_fkey"
+            columns: ["permission_group_id"]
+            isOneToOne: false
+            referencedRelation: "permission_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_group_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      permission_groups: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       permissions: {
         Row: {
           category: string
@@ -1032,11 +1098,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_menu_overrides: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_visible: boolean
+          location: string | null
+          menu_item: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_visible: boolean
+          location?: string | null
+          menu_item: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_visible?: boolean
+          location?: string | null
+          menu_item?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           created_at: string
           id: string
           location: string | null
+          override_type: string | null
           permission_id: string
           user_id: string
         }
@@ -1044,6 +1138,7 @@ export type Database = {
           created_at?: string
           id?: string
           location?: string | null
+          override_type?: string | null
           permission_id: string
           user_id: string
         }
@@ -1051,6 +1146,7 @@ export type Database = {
           created_at?: string
           id?: string
           location?: string | null
+          override_type?: string | null
           permission_id?: string
           user_id?: string
         }
@@ -1060,6 +1156,44 @@ export type Database = {
             columns: ["permission_id"]
             isOneToOne: false
             referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_role_assignments: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          id: string
+          is_active: boolean | null
+          location: string | null
+          permission_group_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          location?: string | null
+          permission_group_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          location?: string | null
+          permission_group_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_role_assignments_permission_group_id_fkey"
+            columns: ["permission_group_id"]
+            isOneToOne: false
+            referencedRelation: "permission_groups"
             referencedColumns: ["id"]
           },
         ]
@@ -1182,6 +1316,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_effective_user_permissions: {
+        Args: { p_user_id: string; p_location?: string }
+        Returns: {
+          permission_name: string
+          permission_category: string
+          location: string
+          source: string
+        }[]
+      }
       get_employee_career_history: {
         Args: { p_employee_id: string }
         Returns: {
@@ -1244,6 +1387,14 @@ export type Database = {
       }
       user_can_view_roster: {
         Args: { _location?: string }
+        Returns: boolean
+      }
+      user_has_effective_permission: {
+        Args: {
+          p_user_id: string
+          p_permission_name: string
+          p_location?: string
+        }
         Returns: boolean
       }
       user_has_location_access: {

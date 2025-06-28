@@ -41,6 +41,12 @@ interface EmployeePosition {
   employment_type?: string;
 }
 
+interface LocationData {
+  location: string;
+  job_titles: string[];
+  employment_type?: string;
+}
+
 const Employees = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -73,7 +79,7 @@ const Employees = () => {
         department: position.department,
         phone_number: position.phone_number,
         hire_date: position.hire_date,
-        locations: {}
+        locations: {} as Record<string, LocationData>
       };
     }
     
