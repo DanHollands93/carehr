@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,13 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
     loadUserProfile();
   }, [employee.id]);
 
+  // Sync email when employee email changes
+  useEffect(() => {
+    if (userProfile && userProfile.email !== employee.email) {
+      syncEmailAddress();
+    }
+  }, [employee.email, userProfile]);
+
   const loadUserProfile = async () => {
     try {
       const { data, error } = await supabase
@@ -55,6 +63,37 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
       }
     } catch (error) {
       console.error('Exception loading user profile:', error);
+    }
+  };
+
+  const syncEmailAddress = async () => {
+    if (!userProfile) return;
+    
+    try {
+      // Update the profile email
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ email: employee.email })
+        .eq('id', userProfile.id);
+
+      if (profileError) {
+        console.error('Error updating profile email:', profileError);
+        toast({
+          title: "Warning",
+          description: "Employee email updated but failed to sync with user account",
+          variant: "destructive"
+        });
+      } else {
+        // Update local state
+        setUserProfile(prev => prev ? { ...prev, email: employee.email } : null);
+        
+        toast({
+          title: "Email Synced",
+          description: "User account email has been updated to match employee email",
+        });
+      }
+    } catch (error) {
+      console.error('Exception syncing email:', error);
     }
   };
 
@@ -120,18 +159,42 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
 
       if (error) {
         console.error('Error sending password reset:', error);
-        toast({
-          title: "Error",
-          description: "Failed to send password reset email",
-          variant: "destructive"
-        });
+        
+        // Check if it's a domain validation error from Resend
+        if (error.message?.includes('validation_error') || 
+            error.message?.includes('domain') ||
+            error.message?.includes('verify')) {
+          toast({
+            title: "Email Configuration Required",
+            description: "To send password reset emails, you need to verify your domain in Resend. Currently only emails to your verified domain can be sent.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to send password reset email",
+            variant: "destructive"
+          });
+        }
       } else if (data?.error) {
         console.error('Server error sending password reset:', data.error);
-        toast({
-          title: "Error",
-          description: data.error,
-          variant: "destructive"
-        });
+        
+        // Parse the server error for better user feedback
+        if (data.error.includes('validation_error') || 
+            data.error.includes('domain') ||
+            data.error.includes('verify')) {
+          toast({
+            title: "Domain Verification Required",
+            description: "Please verify your sending domain in Resend to send emails to this address.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: data.error,
+            variant: "destructive"
+          });
+        }
       } else {
         toast({
           title: "Success",
@@ -257,6 +320,14 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
                   Created {new Date(userProfile.created_at).toLocaleDateString()}
                 </span>
               </div>
+              {userProfile.email !== employee.email && (
+                <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm">
+                  <div className="flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 text-amber-600" />
+                    <span className="text-amber-800">Email will be synced automatically</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -302,12 +373,13 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
           </Button>
         </div>
 
-        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-600" />
-            <span className="text-sm text-amber-800">
-              Account unlocking for failed login attempts will be implemented in a future update.
-            </span>
+            <AlertCircle className="w-4 h-4 text-blue-600" />
+            <div className="text-sm text-blue-800">
+              <p className="font-medium">Password Reset Email Setup:</p>
+              <p>To send password reset emails, verify your domain at <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="underline">resend.com/domains</a></p>
+            </div>
           </div>
         </div>
       </CardContent>
