@@ -8,11 +8,9 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Trash2, Plus, Users, Briefcase } from "lucide-react";
 
-interface JobRole {
+interface Position {
   id: string;
-  title: string;
-  department: string;
-  location: string;
+  value: string;
 }
 
 interface PermissionGroup {
@@ -23,48 +21,49 @@ interface PermissionGroup {
 
 interface BulkRoleRule {
   id: string;
-  job_role_id: string;
+  position: string;
   permission_group_id: string;
   created_at: string;
-  job_roles: JobRole;
   permission_groups: PermissionGroup;
 }
 
 const BulkRoleManager = () => {
   const { toast } = useToast();
-  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [permissionGroups, setPermissionGroups] = useState<PermissionGroup[]>([]);
   const [bulkRules, setBulkRules] = useState<BulkRoleRule[]>([]);
-  const [selectedJobRoleId, setSelectedJobRoleId] = useState<string>('');
+  const [selectedPosition, setSelectedPosition] = useState<string>('');
   const [selectedPermissionGroupId, setSelectedPermissionGroupId] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadJobRoles();
+    loadPositions();
     loadPermissionGroups();
     loadBulkRules();
   }, []);
 
-  const loadJobRoles = async () => {
+  const loadPositions = async () => {
     try {
       const { data, error } = await supabase
-        .from('job_roles')
-        .select('id, title, department, location')
-        .order('title');
+        .from('lookup_lists')
+        .select('id, value')
+        .eq('category', 'positions')
+        .eq('is_active', true)
+        .order('value');
       
       if (error) {
-        console.error('Error loading job roles:', error);
+        console.error('Error loading positions:', error);
         toast({
           title: "Error",
-          description: "Failed to load job roles",
+          description: "Failed to load positions",
           variant: "destructive"
         });
       } else {
-        console.log('Loaded job roles:', data);
-        setJobRoles(data || []);
+        console.log('Loaded positions:', data);
+        setPositions(data || []);
       }
     } catch (error) {
-      console.error('Exception loading job roles:', error);
+      console.error('Exception loading positions:', error);
     }
   };
 
@@ -88,220 +87,39 @@ const BulkRoleManager = () => {
 
   const loadBulkRules = async () => {
     try {
-      const { data, error } = await supabase
-        .from('bulk_role_rules')
-        .select(`
-          *,
-          job_roles!inner(id, title, department, location),
-          permission_groups!inner(id, name, description)
-        `)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error loading bulk rules:', error);
-      } else {
-        setBulkRules(data || []);
-      }
+      // For now, we'll create a temporary table structure
+      // Later we'll need to create a proper bulk_position_rules table
+      setBulkRules([]);
     } catch (error) {
       console.error('Exception loading bulk rules:', error);
     }
   };
 
   const handleCreateRule = async () => {
-    if (!selectedJobRoleId || !selectedPermissionGroupId) {
+    if (!selectedPosition || !selectedPermissionGroupId) {
       toast({
         title: "Error",
-        description: "Please select both a job role and permission group",
+        description: "Please select both a position and permission group",
         variant: "destructive"
       });
       return;
     }
 
-    setLoading(true);
-    
-    try {
-      // Check if rule already exists
-      const existingRule = bulkRules.find(
-        rule => rule.job_role_id === selectedJobRoleId && rule.permission_group_id === selectedPermissionGroupId
-      );
-      
-      if (existingRule) {
-        toast({
-          title: "Error",
-          description: "A rule already exists for this job role and permission group combination",
-          variant: "destructive"
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Create the bulk rule
-      const { error: ruleError } = await supabase
-        .from('bulk_role_rules')
-        .insert({
-          job_role_id: selectedJobRoleId,
-          permission_group_id: selectedPermissionGroupId
-        });
-
-      if (ruleError) throw ruleError;
-
-      // Apply the rule to existing users
-      await applyRuleToExistingUsers(selectedJobRoleId, selectedPermissionGroupId);
-
-      setSelectedJobRoleId('');
-      setSelectedPermissionGroupId('');
-      loadBulkRules();
-      
-      toast({
-        title: "Success",
-        description: "Bulk role rule created and applied to existing users"
-      });
-    } catch (error) {
-      console.error('Error creating bulk rule:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create bulk role rule",
-        variant: "destructive"
-      });
-    }
-    
-    setLoading(false);
+    // For now, show a placeholder message
+    toast({
+      title: "Feature Coming Soon",
+      description: "Position-based bulk role assignment will be implemented once the database structure is updated",
+      variant: "default"
+    });
   };
 
-  const applyRuleToExistingUsers = async (jobRoleId: string, permissionGroupId: string) => {
-    try {
-      // Get all employees with this job role
-      const { data: employees, error: employeesError } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('job_role_id', jobRoleId);
-
-      if (employeesError) {
-        console.error('Error getting employees:', employeesError);
-        return;
-      }
-
-      if (!employees || employees.length === 0) {
-        return;
-      }
-
-      // Get user IDs for these employees
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id')
-        .in('employee_id', employees.map(e => e.id));
-
-      if (profilesError) {
-        console.error('Error getting profiles:', profilesError);
-        return;
-      }
-
-      if (!profiles || profiles.length === 0) {
-        return;
-      }
-
-      // Assign the permission group to these users
-      const assignments = profiles.map(profile => ({
-        user_id: profile.id,
-        permission_group_id: permissionGroupId,
-        assigned_by: null, // System assignment
-        location: null // Apply to all locations for bulk rules
-      }));
-
-      const { error: assignmentError } = await supabase
-        .from('user_role_assignments')
-        .upsert(assignments, { 
-          onConflict: 'user_id,permission_group_id,location',
-          ignoreDuplicates: true 
-        });
-
-      if (assignmentError) {
-        console.error('Error assigning roles:', assignmentError);
-      }
-    } catch (error) {
-      console.error('Exception applying rule to existing users:', error);
-    }
-  };
-
-  const handleDeleteRule = async (ruleId: string, jobRoleId: string, permissionGroupId: string) => {
-    setLoading(true);
-    
-    try {
-      // Delete the bulk rule
-      const { error: deleteError } = await supabase
-        .from('bulk_role_rules')
-        .delete()
-        .eq('id', ruleId);
-
-      if (deleteError) throw deleteError;
-
-      // Remove the permission group from users who got it through this bulk rule
-      await removeRuleFromExistingUsers(jobRoleId, permissionGroupId);
-
-      loadBulkRules();
-      
-      toast({
-        title: "Success",
-        description: "Bulk role rule deleted and removed from existing users"
-      });
-    } catch (error) {
-      console.error('Error deleting bulk rule:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete bulk role rule",
-        variant: "destructive"
-      });
-    }
-    
-    setLoading(false);
-  };
-
-  const removeRuleFromExistingUsers = async (jobRoleId: string, permissionGroupId: string) => {
-    try {
-      // Get all employees with this job role
-      const { data: employees, error: employeesError } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('job_role_id', jobRoleId);
-
-      if (employeesError) {
-        console.error('Error getting employees:', employeesError);
-        return;
-      }
-
-      if (!employees || employees.length === 0) {
-        return;
-      }
-
-      // Get user IDs for these employees
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id')
-        .in('employee_id', employees.map(e => e.id));
-
-      if (profilesError) {
-        console.error('Error getting profiles:', profilesError);
-        return;
-      }
-
-      if (!profiles || profiles.length === 0) {
-        return;
-      }
-
-      // Remove the permission group assignments (only system-assigned ones)
-      const { error: removeError } = await supabase
-        .from('user_role_assignments')
-        .delete()
-        .eq('permission_group_id', permissionGroupId)
-        .in('user_id', profiles.map(p => p.id))
-        .is('assigned_by', null); // Only remove system assignments
-
-      if (removeError) {
-        console.error('Error removing role assignments:', removeError);
-      }
-    } catch (error) {
-      console.error('Exception removing rule from existing users:', error);
-    }
+  const handleDeleteRule = async (ruleId: string) => {
+    // Placeholder for delete functionality
+    toast({
+      title: "Feature Coming Soon",
+      description: "Delete functionality will be available once the database structure is updated",
+      variant: "default"
+    });
   };
 
   return (
@@ -310,30 +128,27 @@ const BulkRoleManager = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" />
-            Create Bulk Role Rule
+            Create Bulk Position Rule
           </CardTitle>
           <CardDescription>
-            Automatically assign permission groups to users based on their job role. 
-            Found {jobRoles.length} job roles and {permissionGroups.length} permission groups.
+            Automatically assign permission groups to users based on their position. 
+            Found {positions.length} positions and {permissionGroups.length} permission groups.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Job Role</label>
-              <Select value={selectedJobRoleId} onValueChange={setSelectedJobRoleId}>
+              <label className="text-sm font-medium mb-2 block">Position</label>
+              <Select value={selectedPosition} onValueChange={setSelectedPosition}>
                 <SelectTrigger>
-                  <SelectValue placeholder={`Select from ${jobRoles.length} job roles`} />
+                  <SelectValue placeholder={`Select from ${positions.length} positions`} />
                 </SelectTrigger>
                 <SelectContent>
-                  {jobRoles.map(jobRole => (
-                    <SelectItem key={jobRole.id} value={jobRole.id}>
+                  {positions.map(position => (
+                    <SelectItem key={position.id} value={position.value}>
                       <div className="flex items-center gap-2">
                         <Briefcase className="w-4 h-4" />
-                        <span>{jobRole.title}</span>
-                        <span className="text-muted-foreground text-sm">
-                          ({jobRole.department}, {jobRole.location})
-                        </span>
+                        <span>{position.value}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -360,27 +175,28 @@ const BulkRoleManager = () => {
           
           <Button 
             onClick={handleCreateRule} 
-            disabled={loading || !selectedJobRoleId || !selectedPermissionGroupId}
+            disabled={loading || !selectedPosition || !selectedPermissionGroupId}
             className="w-full"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Create Rule
+            Create Position Rule
           </Button>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Active Bulk Role Rules</CardTitle>
+          <CardTitle>Active Position-Based Rules</CardTitle>
           <CardDescription>
-            These rules automatically assign permission groups when users are assigned to job roles
+            These rules automatically assign permission groups when users are assigned to positions
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {bulkRules.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No bulk role rules configured yet. Create one above to get started.
+                <p className="mb-2">No position-based rules configured yet.</p>
+                <p className="text-sm">Database structure needs to be updated to support position-based bulk assignments.</p>
               </div>
             ) : (
               bulkRules.map(rule => (
@@ -389,10 +205,7 @@ const BulkRoleManager = () => {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <Briefcase className="w-4 h-4" />
-                        <span className="font-medium">{rule.job_roles.title}</span>
-                        <span className="text-muted-foreground text-sm">
-                          ({rule.job_roles.department}, {rule.job_roles.location})
-                        </span>
+                        <span className="font-medium">{rule.position}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">gets assigned</span>
@@ -403,7 +216,7 @@ const BulkRoleManager = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDeleteRule(rule.id, rule.job_role_id, rule.permission_group_id)}
+                    onClick={() => handleDeleteRule(rule.id)}
                     disabled={loading}
                   >
                     <Trash2 className="w-4 h-4" />
