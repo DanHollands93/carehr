@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEnhancedPermissions } from "@/hooks/useEnhancedPermissions";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Users, Shield, Settings, Plus, Edit, Trash2, Lock } from "lucide-react";
+import { User, Users, Shield, Settings, Plus, Edit, Trash2, Lock, ArrowLeft } from "lucide-react";
+import PermissionGroupManager from "./PermissionGroupManager";
 
 interface Permission {
   id: string;
@@ -53,8 +53,9 @@ const EnhancedPermissionsManager = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   
-  // Dialog states
+  // Dialog and view states
   const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
+  const [selectedGroupForConfig, setSelectedGroupForConfig] = useState<any>(null);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDescription, setNewGroupDescription] = useState('');
 
@@ -109,13 +110,17 @@ const EnhancedPermissionsManager = () => {
     if (!newGroupName.trim()) return;
     
     try {
-      await createPermissionGroup(newGroupName.trim(), newGroupDescription.trim());
+      const newGroup = await createPermissionGroup(newGroupName.trim(), newGroupDescription.trim());
       setNewGroupName('');
       setNewGroupDescription('');
       setShowCreateGroupDialog(false);
+      
+      // Automatically open the permission configuration for the new group
+      setSelectedGroupForConfig(newGroup);
+      
       toast({
         title: "Success",
-        description: "Permission group created successfully"
+        description: "Permission group created successfully. Now configure its permissions."
       });
     } catch (error) {
       toast({
@@ -167,6 +172,45 @@ const EnhancedPermissionsManager = () => {
       });
     }
   };
+
+  // If we're configuring a specific group, show the configuration view
+  if (selectedGroupForConfig) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setSelectedGroupForConfig(null)}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Groups
+              </Button>
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  Configure {selectedGroupForConfig.name}
+                </CardTitle>
+                <CardDescription>
+                  Assign permissions to this group
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        <PermissionGroupManager 
+          permissionGroup={selectedGroupForConfig}
+          onUpdate={() => {
+            refetch();
+            // Keep the group selected to continue configuration
+          }}
+        />
+      </div>
+    );
+  }
 
   const selectedProfile = profiles.find(p => p.id === selectedUserId);
   const selectedGroup = permissionGroups.find(g => g.id === selectedGroupId);
@@ -251,7 +295,7 @@ const EnhancedPermissionsManager = () => {
                           Cancel
                         </Button>
                         <Button onClick={handleCreateGroup}>
-                          Create Group
+                          Create & Configure
                         </Button>
                       </div>
                     </div>
@@ -284,8 +328,13 @@ const EnhancedPermissionsManager = () => {
                         <Badge variant="outline">
                           {userRoleAssignments.filter(r => r.permission_group_id === group.id).length} users
                         </Badge>
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-4 h-4" />
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedGroupForConfig(group)}
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Configure
                         </Button>
                       </div>
                     </div>
