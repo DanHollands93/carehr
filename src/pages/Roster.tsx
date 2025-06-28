@@ -218,11 +218,11 @@ const Roster = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      // Invalidate and refetch the shifts query to update the UI
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast({ title: "Shift added successfully" });
     },
     onError: (error) => {
+      console.error('Create shift error:', error);
       toast({ 
         title: "Error adding shift", 
         description: error.message,
@@ -248,7 +248,6 @@ const Roster = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      // Invalidate and refetch the shifts query to update the UI
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast({ title: "Shift moved successfully" });
     },
@@ -271,7 +270,6 @@ const Roster = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      // Invalidate and refetch the shifts query to update the UI
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast({ title: "Shift removed successfully" });
     },
@@ -336,10 +334,14 @@ const Roster = () => {
     if (!canEditRoster || isMobile) return;
     
     try {
+      // Format the date properly - date is coming from day.toISOString()
+      const formattedDate = format(new Date(date), 'yyyy-MM-dd');
+      console.log('Dropping shift:', { employeeId, originalDate: date, formattedDate });
+      
       if (draggedTemplate) {
         await createShiftMutation.mutateAsync({
           employeeId,
-          date: format(new Date(date), 'yyyy-MM-dd'),
+          date: formattedDate,
           shiftData: {
             start_time: draggedTemplate.start_time,
             end_time: draggedTemplate.end_time,
@@ -353,7 +355,7 @@ const Roster = () => {
         await updateShiftMutation.mutateAsync({
           shiftId: draggedShift.id,
           employeeId,
-          date
+          date: formattedDate
         });
         setDraggedShift(null);
       }
@@ -437,9 +439,10 @@ const Roster = () => {
     color?: string;
   }) => {
     if (!canEditRoster) return;
+    const formattedDate = format(new Date(shiftPopup.date), 'yyyy-MM-dd');
     createShiftMutation.mutate({
       employeeId: shiftPopup.employeeId,
-      date: format(new Date(shiftPopup.date), 'yyyy-MM-dd'),
+      date: formattedDate,
       shiftData
     });
   };

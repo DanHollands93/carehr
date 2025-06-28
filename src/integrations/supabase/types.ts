@@ -1148,6 +1148,47 @@ export type Database = {
         }
         Relationships: []
       }
+      time_clock_records: {
+        Row: {
+          clock_in_time: string | null
+          clock_out_time: string | null
+          created_at: string | null
+          employee_id: string
+          id: string
+          shift_id: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          clock_in_time?: string | null
+          clock_out_time?: string | null
+          created_at?: string | null
+          employee_id: string
+          id?: string
+          shift_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          clock_in_time?: string | null
+          clock_out_time?: string | null
+          created_at?: string | null
+          employee_id?: string
+          id?: string
+          shift_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_records_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_location_permissions: {
         Row: {
           created_at: string
