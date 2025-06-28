@@ -34,12 +34,16 @@ serve(async (req) => {
 
     const { email, redirectTo }: PasswordResetRequest = await req.json();
 
+    // Get the origin from the request headers to build the correct redirect URL
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/') || 'http://localhost:3000';
+    const resetUrl = redirectTo || `${origin}/reset-password`;
+
     // Generate a password reset token
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email,
       options: {
-        redirectTo: redirectTo || `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify`
+        redirectTo: resetUrl
       }
     });
 

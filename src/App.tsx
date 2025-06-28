@@ -14,6 +14,7 @@ import Processes from "./pages/Processes";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 import AdminUsers from "./pages/AdminUsers";
 import NotFound from "./pages/NotFound";
 import Employees from "./pages/Employees";
@@ -40,6 +41,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             
             {/* Unified Routes - All authenticated users use the same layout */}
             <Route path="/" element={
