@@ -52,14 +52,19 @@ const UnifiedSidebar = ({
   };
 
   const isMenuItemVisible = (item: any) => {
-    // Debug logging for ALL items to see what's happening
-    console.log('Checking visibility for:', {
-      title: item.title,
-      requiredPermission: item.requiredPermission,
-      location: item.location,
-      hasPermissionResult: hasPermission(item.requiredPermission, item.location),
-      allUserPermissions: permissions.map(p => p.permission.name)
-    });
+    // Special debugging for My Shifts
+    if (item.title === 'My Shifts') {
+      console.log('=== MY SHIFTS DEBUG ===');
+      console.log('Item:', item);
+      console.log('Required permission:', item.requiredPermission);
+      console.log('Location:', item.location);
+      console.log('Has view_staff_shifts permission?', hasPermission('view_staff_shifts'));
+      console.log('Has permission with location?', hasPermission(item.requiredPermission, item.location));
+      console.log('All permissions that match view_staff_shifts:', 
+        permissions.filter(p => p.permission.name === 'view_staff_shifts')
+      );
+      console.log('========================');
+    }
 
     // If no permission required, show to everyone
     if (!item.requiredPermission) {
@@ -67,19 +72,27 @@ const UnifiedSidebar = ({
     }
     
     // Check if user has the required permission
-    return hasPermission(item.requiredPermission, item.location);
+    const hasRequiredPermission = hasPermission(item.requiredPermission, item.location);
+    
+    if (item.title === 'My Shifts') {
+      console.log('My Shifts final result:', hasRequiredPermission);
+    }
+    
+    return hasRequiredPermission;
   };
 
-  const getVisibleGroups = () => {
-    console.log('Getting visible groups. All permissions:', permissions);
-    console.log('Permission names:', permissions.map(p => p.permission.name));
-    
+  const getVisibleGroups = () => {    
     const visibleGroups = unifiedMenuConfig.map(group => ({
       ...group,
       items: group.items.filter(isMenuItemVisible)
     })).filter(group => group.items.length > 0);
 
-    console.log('Visible groups:', visibleGroups);
+    // Special debug for Roster & Time group
+    const rosterGroup = unifiedMenuConfig.find(g => g.label === 'Roster & Time');
+    const visibleRosterGroup = visibleGroups.find(g => g.label === 'Roster & Time');
+    
+    console.log('Original Roster & Time items:', rosterGroup?.items);
+    console.log('Visible Roster & Time items:', visibleRosterGroup?.items);
     
     return visibleGroups;
   };
