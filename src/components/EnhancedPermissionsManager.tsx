@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { User, Users, Shield, Settings, Plus, Edit, Trash2, Lock, ArrowLeft } from "lucide-react";
 import PermissionGroupManager from "./PermissionGroupManager";
+import BulkRoleManager from "./BulkRoleManager";
 
 interface Permission {
   id: string;
@@ -499,23 +500,7 @@ const EnhancedPermissionsManager = () => {
         </TabsContent>
 
         <TabsContent value="bulk">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Bulk Management
-              </CardTitle>
-              <CardDescription>
-                Apply roles to multiple users at once
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                Bulk management tools will be implemented here.
-                This allows assigning roles to multiple users simultaneously.
-              </div>
-            </CardContent>
-          </Card>
+          <BulkRoleManager />
         </TabsContent>
       </Tabs>
     </div>
