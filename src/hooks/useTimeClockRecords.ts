@@ -60,6 +60,8 @@ export const useTimeClockRecords = () => {
       if (!employeeProfile?.employee_id) return [];
       
       const today = format(new Date(), 'yyyy-MM-dd');
+      console.log('Looking for shifts on date:', today);
+      console.log('Employee ID:', employeeProfile.employee_id);
       
       // First get today's shifts
       const { data: shifts, error: shiftsError } = await supabase
@@ -68,45 +70,64 @@ export const useTimeClockRecords = () => {
         .eq('employee_id', employeeProfile.employee_id)
         .eq('date', today);
       
-      if (shiftsError) throw shiftsError;
+      if (shiftsError) {
+        console.error('Error fetching shifts:', shiftsError);
+        throw shiftsError;
+      }
+      
+      console.log('Found shifts for today:', shifts);
       
       // Then get or create time clock records for these shifts
       const records: TimeClockRecord[] = [];
       
       for (const shift of shifts || []) {
+        console.log('Processing shift:', shift);
+        
         let { data: existingRecord, error: recordError } = await supabase
           .from('time_clock_records')
           .select('*')
           .eq('employee_id', employeeProfile.employee_id)
-          .eq('shift_date', today)
-          .eq('shift_start_time', shift.start_time)
-          .eq('shift_end_time', shift.end_time)
+          .eq('shift_id', shift.id)
           .maybeSingle();
         
-        if (recordError && recordError.code !== 'PGRST116') throw recordError;
+        if (recordError && recordError.code !== 'PGRST116') {
+          console.error('Error fetching time clock record:', recordError);
+          throw recordError;
+        }
         
         if (!existingRecord) {
+          console.log('Creating new time clock record for shift:', shift.id);
           // Create a new record for this shift
           const { data: newRecord, error: createError } = await supabase
             .from('time_clock_records')
             .insert({
               employee_id: employeeProfile.employee_id,
               shift_id: shift.id,
-              shift_date: today,
-              shift_start_time: shift.start_time,
-              shift_end_time: shift.end_time,
               status: 'scheduled'
             })
             .select()
             .single();
           
-          if (createError) throw createError;
+          if (createError) {
+            console.error('Error creating time clock record:', createError);
+            throw createError;
+          }
           existingRecord = newRecord;
+          console.log('Created new time clock record:', existingRecord);
         }
         
-        records.push(existingRecord as TimeClockRecord);
+        // Add the shift information to the record for display purposes
+        const recordWithShiftInfo = {
+          ...existingRecord,
+          shift_date: shift.date,
+          shift_start_time: shift.start_time,
+          shift_end_time: shift.end_time
+        } as TimeClockRecord;
+        
+        records.push(recordWithShiftInfo);
       }
       
+      console.log('Final records for today:', records);
       return records;
     },
     enabled: !!employeeProfile?.employee_id
