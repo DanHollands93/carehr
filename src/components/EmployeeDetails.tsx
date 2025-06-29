@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ArrowLeft, Edit, Plus, MapPin, Phone, Mail, Calendar, Briefcase, PoundSterling, Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import CareerHistoryForm from "@/components/CareerHistoryForm";
+import CareerHistoryForm, { CareerHistoryEditForm } from "@/components/CareerHistoryForm";
 import { usePermissions } from "@/hooks/usePermissions";
 import UserAccountManager from "./UserAccountManager";
 
