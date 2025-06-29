@@ -1,3 +1,4 @@
+
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -149,7 +150,7 @@ const UnifiedSidebar = ({
                                 "flex items-center gap-3 w-full transition-colors",
                                 isActive 
                                   ? "bg-muted text-foreground font-semibold" 
-                                  : "hover:bg-secondary/20"
+                                  : "hover:bg-secondary hover:bg-opacity-20"
                               )
                             }
                           >
