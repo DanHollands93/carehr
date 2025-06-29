@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,11 +53,13 @@ const TimeDiscrepancyManager = () => {
     queryFn: async () => {
       console.log('Fetching discrepancy records...');
       
-      // Get discrepancy records that need approval - only for shifts that have ended
+      const now = new Date();
+      
+      // Get all time clock records that need review
       const { data: records, error: recordsError } = await supabase
         .from('time_clock_records')
         .select('*')
-        .eq('status', 'discrepancy')
+        .in('status', ['discrepancy', 'scheduled']) // Include both discrepancy and scheduled records
         .eq('approval_status', 'pending')
         .order('created_at', { ascending: false });
       
@@ -67,32 +68,59 @@ const TimeDiscrepancyManager = () => {
         throw recordsError;
       }
       
-      console.log('Found discrepancy records:', records);
+      console.log('Found time clock records:', records);
       
       if (!records || records.length === 0) {
         return [];
       }
       
-      // Filter records to only include those where the shift has ended
-      const now = new Date();
+      // Get shift details for all records
+      const shiftIds = records.map(r => r.shift_id).filter(Boolean);
+      const { data: shifts } = await supabase
+        .from('shifts')
+        .select('*')
+        .in('id', shiftIds);
+      
+      const shiftsMap = new Map(shifts?.map(s => [s.id, s]) || []);
+      
+      // Filter records to only include those that need review
       const validRecords = [];
       
       for (const record of records) {
-        // Get shift details to check if it has ended
-        const { data: shift } = await supabase
-          .from('shifts')
-          .select('date, start_time, end_time')
-          .eq('id', record.shift_id)
-          .single();
+        const shift = shiftsMap.get(record.shift_id);
+        if (!shift) continue;
         
-        if (shift) {
-          const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
-          if (now > shiftEndTime) {
-            validRecords.push({
-              ...record,
-              shift
-            });
+        const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
+        const hasShiftEnded = now > shiftEndTime;
+        
+        // Include record if:
+        // 1. It's already marked as discrepancy, OR
+        // 2. It's scheduled but shift has ended and no clock in/out recorded
+        const shouldInclude = record.status === 'discrepancy' || 
+          (record.status === 'scheduled' && hasShiftEnded && !record.clock_in_time && !record.clock_out_time);
+        
+        if (shouldInclude) {
+          // If it's a scheduled record that should be a discrepancy, mark it as such
+          if (record.status === 'scheduled' && hasShiftEnded && !record.clock_in_time) {
+            console.log('Marking record as discrepancy:', record.id);
+            await supabase
+              .from('time_clock_records')
+              .update({
+                status: 'discrepancy',
+                discrepancy_type: 'did_not_clock_in',
+                updated_at: now.toISOString()
+              })
+              .eq('id', record.id);
+            
+            // Update the record object for display
+            record.status = 'discrepancy';
+            record.discrepancy_type = 'did_not_clock_in';
           }
+          
+          validRecords.push({
+            ...record,
+            shift
+          });
         }
       }
       
@@ -119,7 +147,7 @@ const TimeDiscrepancyManager = () => {
         employee: employeeMap.get(record.employee_id)
       })) as TimeClockRecord[];
       
-      console.log('Transformed records with employee data:', transformedRecords);
+      console.log('Final transformed records:', transformedRecords);
       return transformedRecords;
     }
   });
@@ -131,7 +159,23 @@ const TimeDiscrepancyManager = () => {
       
       if (!approval || !record) throw new Error('No approval data or record found');
 
-      // Calculate time segments and paid minutes
+      // Handle case where employee didn't clock in at all
+      if (record.discrepancy_type === 'did_not_clock_in') {
+        const { error: updateError } = await supabase
+          .from('time_clock_records')
+          .update({
+            approval_status: 'approved',
+            notes: approval.general_notes || 'Employee did not clock in for scheduled shift',
+            processed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', recordId);
+        
+        if (updateError) throw updateError;
+        return;
+      }
+
+      // Calculate time segments and paid minutes for normal discrepancies
       const clockInTime = record.clock_in_time ? parseISO(record.clock_in_time) : null;
       const clockOutTime = record.clock_out_time ? parseISO(record.clock_out_time) : null;
       const shift = record.shift;
@@ -198,54 +242,56 @@ const TimeDiscrepancyManager = () => {
       
       if (updateError) throw updateError;
       
-      // Create time segments for detailed reporting
-      const segments = [];
-      
-      if (earlyMinutes > 0) {
-        segments.push({
-          time_clock_record_id: recordId,
-          segment_type: 'early_overtime',
-          start_time: clockInTime.toISOString(),
-          end_time: shiftStartTime.toISOString(),
-          minutes_worked: earlyMinutes,
-          minutes_paid: earlyPaidMinutes,
-          pay_status: approval.early_overtime_decision || 'pending'
-        });
-      }
-      
-      if (scheduledMinutes > 0) {
-        segments.push({
-          time_clock_record_id: recordId,
-          segment_type: 'scheduled',
-          start_time: actualStartTime.toISOString(),
-          end_time: actualEndTime.toISOString(),
-          minutes_worked: scheduledMinutes,
-          minutes_paid: scheduledPaidMinutes,
-          pay_status: 'paid'
-        });
-      }
-      
-      if (lateMinutes > 0) {
-        segments.push({
-          time_clock_record_id: recordId,
-          segment_type: 'late_overtime',
-          start_time: shiftEndTime.toISOString(),
-          end_time: clockOutTime.toISOString(),
-          minutes_worked: lateMinutes,
-          minutes_paid: latePaidMinutes,
-          pay_status: approval.late_overtime_decision || 'pending'
-        });
-      }
-      
-      // Insert time segments
-      if (segments.length > 0) {
-        const { error: segmentsError } = await supabase
-          .from('time_segments')
-          .insert(segments);
-          
-        if (segmentsError) {
-          console.error('Error creating time segments:', segmentsError);
-          // Don't throw here as the main approval was successful
+      // Create time segments for detailed reporting (only if employee actually worked)
+      if (clockInTime && clockOutTime) {
+        const segments = [];
+        
+        if (earlyMinutes > 0) {
+          segments.push({
+            time_clock_record_id: recordId,
+            segment_type: 'early_overtime',
+            start_time: clockInTime.toISOString(),
+            end_time: shiftStartTime.toISOString(),
+            minutes_worked: earlyMinutes,
+            minutes_paid: earlyPaidMinutes,
+            pay_status: approval.early_overtime_decision || 'pending'
+          });
+        }
+        
+        if (scheduledMinutes > 0) {
+          segments.push({
+            time_clock_record_id: recordId,
+            segment_type: 'scheduled',
+            start_time: actualStartTime.toISOString(),
+            end_time: actualEndTime.toISOString(),
+            minutes_worked: scheduledMinutes,
+            minutes_paid: scheduledPaidMinutes,
+            pay_status: 'paid'
+          });
+        }
+        
+        if (lateMinutes > 0) {
+          segments.push({
+            time_clock_record_id: recordId,
+            segment_type: 'late_overtime',
+            start_time: shiftEndTime.toISOString(),
+            end_time: clockOutTime.toISOString(),
+            minutes_worked: lateMinutes,
+            minutes_paid: latePaidMinutes,
+            pay_status: approval.late_overtime_decision || 'pending'
+          });
+        }
+        
+        // Insert time segments
+        if (segments.length > 0) {
+          const { error: segmentsError } = await supabase
+            .from('time_segments')
+            .insert(segments);
+            
+          if (segmentsError) {
+            console.error('Error creating time segments:', segmentsError);
+            // Don't throw here as the main approval was successful
+          }
         }
       }
     },
@@ -290,6 +336,8 @@ const TimeDiscrepancyManager = () => {
             return 'Early clock out';
           case 'late_clock_out':
             return 'Late clock out';
+          case 'did_not_clock_in':
+            return 'Did not clock in';
           default:
             return t.replace(/_/g, ' ');
         }
@@ -317,6 +365,11 @@ const TimeDiscrepancyManager = () => {
     const record = discrepancyRecords?.find(r => r.id === recordId);
     const approval = approvals[recordId];
     if (!record || !approval) return false;
+
+    // If employee didn't clock in at all, just need general notes
+    if (record.discrepancy_type === 'did_not_clock_in') {
+      return true; // Can always approve no-show cases
+    }
 
     // Check if we have decisions for all required overtime periods
     const hasEarlyOvertime = record.clock_in_time && record.shift && 
@@ -352,10 +405,13 @@ const TimeDiscrepancyManager = () => {
             const isSelected = selectedRecord === record.id;
             const approval = approvals[record.id] || {};
             
-            // Calculate overtime periods
-            const hasEarlyOvertime = record.clock_in_time && record.shift && 
+            // Check if this is a no-show case
+            const isNoShow = record.discrepancy_type === 'did_not_clock_in';
+            
+            // Calculate overtime periods for non-no-show cases
+            const hasEarlyOvertime = !isNoShow && record.clock_in_time && record.shift && 
               parseISO(record.clock_in_time) < parseISO(`${record.shift.date}T${record.shift.start_time}`);
-            const hasLateOvertime = record.clock_out_time && record.shift && 
+            const hasLateOvertime = !isNoShow && record.clock_out_time && record.shift && 
               parseISO(record.clock_out_time) > parseISO(`${record.shift.date}T${record.shift.end_time}`);
             
             return (
@@ -369,7 +425,9 @@ const TimeDiscrepancyManager = () => {
                       }
                     </CardTitle>
                     <div className="flex space-x-2">
-                      <Badge variant="destructive">Discrepancy</Badge>
+                      <Badge variant="destructive">
+                        {formatDiscrepancyType(record.discrepancy_type || '')}
+                      </Badge>
                       <Badge variant="outline">
                         {record.shift?.date ? format(parseISO(record.shift.date), 'MMM dd') : 'Unknown date'}
                       </Badge>
@@ -385,12 +443,23 @@ const TimeDiscrepancyManager = () => {
                       </span>
                     </div>
                     
-                    <div className="flex items-center space-x-2">
-                      <User className="w-4 h-4" />
-                      <span>
-                        Actual: {record.clock_in_time ? format(parseISO(record.clock_in_time), 'HH:mm') : 'N/A'} - {record.clock_out_time ? format(parseISO(record.clock_out_time), 'HH:mm') : 'N/A'}
-                      </span>
-                    </div>
+                    {!isNoShow && (
+                      <div className="flex items-center space-x-2">
+                        <User className="w-4 h-4" />
+                        <span>
+                          Actual: {record.clock_in_time ? format(parseISO(record.clock_in_time), 'HH:mm') : 'N/A'} - {record.clock_out_time ? format(parseISO(record.clock_out_time), 'HH:mm') : 'N/A'}
+                        </span>
+                      </div>
+                    )}
+
+                    {isNoShow && (
+                      <div className="border rounded-lg p-4 bg-red-50">
+                        <div className="flex items-center space-x-2 text-red-600 mb-2">
+                          <AlertCircle className="w-4 h-4" />
+                          <span>Employee did not clock in for scheduled shift</span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Early Overtime Section */}
                     {hasEarlyOvertime && (
