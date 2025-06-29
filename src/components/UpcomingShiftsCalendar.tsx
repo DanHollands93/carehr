@@ -57,26 +57,92 @@ const UpcomingShiftsCalendar = ({ shifts }: UpcomingShiftsCalendarProps) => {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center space-x-2">
-            <Calendar className="w-5 h-5" />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <CardTitle className="flex items-center space-x-2 text-sm md:text-base">
+            <Calendar className="w-4 h-4 md:w-5 md:h-5" />
             <span>Upcoming Shifts</span>
           </CardTitle>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={prevWeek}>
-              Previous
-            </Button>
-            <span className="text-sm font-medium">
+          <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2">
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm" onClick={prevWeek} className="text-xs md:text-sm">
+                Previous
+              </Button>
+              <Button variant="outline" size="sm" onClick={nextWeek} className="text-xs md:text-sm">
+                Next
+              </Button>
+            </div>
+            <span className="text-xs md:text-sm font-medium text-center">
               Week of {format(weekStart, 'MMM dd, yyyy')}
             </span>
-            <Button variant="outline" size="sm" onClick={nextWeek}>
-              Next
-            </Button>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-7 gap-2">
+        {/* Mobile: Vertical Stack */}
+        <div className="block md:hidden space-y-3">
+          {weekDays.map((day) => {
+            const dayShifts = getShiftsForDate(day);
+            const isToday = isSameDay(day, new Date());
+            
+            return (
+              <div
+                key={day.toISOString()}
+                className={`p-3 border rounded-lg ${
+                  isToday ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="text-sm font-medium text-gray-600">
+                      {format(day, 'EEEE')}
+                    </div>
+                    <div className={`text-lg font-semibold ${
+                      isToday ? 'text-blue-600' : 'text-gray-900'
+                    }`}>
+                      {format(day, 'dd')}
+                    </div>
+                  </div>
+                  {dayShifts.length > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      {dayShifts.length} shift{dayShifts.length > 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  {dayShifts.map((shift) => (
+                    <div
+                      key={shift.id}
+                      className="p-2 bg-white rounded border"
+                    >
+                      <div className="font-medium text-sm mb-1">{shift.position}</div>
+                      <div className="flex items-center space-x-1 text-gray-600 text-xs mb-1">
+                        <Clock className="w-3 h-3" />
+                        <span>
+                          {shift.start_time} - {shift.end_time}
+                        </span>
+                      </div>
+                      {shift.time_record && (
+                        <div>
+                          {getStatusBadge(shift.time_record.status)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {dayShifts.length === 0 && (
+                    <div className="text-xs text-gray-400 text-center py-2">
+                      No shifts
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop: Grid Layout */}
+        <div className="hidden md:grid grid-cols-7 gap-2">
           {weekDays.map((day) => {
             const dayShifts = getShiftsForDate(day);
             const isToday = isSameDay(day, new Date());

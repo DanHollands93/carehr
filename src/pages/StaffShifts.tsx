@@ -39,26 +39,26 @@ const StaffShifts = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
+      <div className="max-w-4xl mx-auto p-3 md:p-4 space-y-4 md:space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">My Shifts</h1>
-          <div className="flex items-center justify-center space-x-2 text-sm md:text-base text-gray-600">
-            <Calendar className="w-4 h-4" />
-            <span className="truncate">{formattedDate}</span>
+          <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900">My Shifts</h1>
+          <div className="flex items-center justify-center space-x-2 text-xs md:text-sm lg:text-base text-gray-600">
+            <Calendar className="w-3 h-3 md:w-4 md:h-4" />
+            <span className="truncate text-center">{formattedDate}</span>
           </div>
         </div>
 
         {/* Current Time Display */}
         <Card className="shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-center space-x-2 text-base md:text-lg">
-              <Clock className="w-4 h-4 md:w-5 md:h-5" />
+          <CardHeader className="pb-2 md:pb-3">
+            <CardTitle className="flex items-center justify-center space-x-2 text-sm md:text-base lg:text-lg">
+              <Clock className="w-3 h-3 md:w-4 md:h-4 lg:w-5 lg:h-5" />
               <span>Current Time</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-mono font-bold text-center text-blue-600">
+          <CardContent className="pt-0">
+            <div className="text-lg md:text-xl lg:text-2xl font-mono font-bold text-center text-blue-600">
               {format(today, 'HH:mm:ss')}
             </div>
           </CardContent>
@@ -67,19 +67,19 @@ const StaffShifts = () => {
         <Separator />
 
         {/* Today's Shifts */}
-        <div className="space-y-4">
+        <div className="space-y-3 md:space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <h2 className="text-lg md:text-xl font-semibold flex items-center space-x-2">
-              <User className="w-4 h-4 md:w-5 md:h-5" />
+            <h2 className="text-base md:text-lg lg:text-xl font-semibold flex items-center space-x-2">
+              <User className="w-3 h-3 md:w-4 md:h-4 lg:w-5 lg:h-5" />
               <span>Today's Shifts</span>
             </h2>
-            <Badge variant="outline" className="self-start sm:self-center">
+            <Badge variant="outline" className="self-start sm:self-center text-xs">
               {todayRecords?.length || 0} shifts
             </Badge>
           </div>
 
           {todayRecords && todayRecords.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2 md:space-y-3">
               {todayRecords.map((record) => (
                 <StaffShiftCard
                   key={record.id}
@@ -94,11 +94,11 @@ const StaffShifts = () => {
             </div>
           ) : (
             <Card className="shadow-sm">
-              <CardContent className="text-center py-8">
-                <div className="space-y-3">
-                  <Clock className="w-10 h-10 md:w-12 md:h-12 mx-auto text-gray-400" />
-                  <h3 className="text-base md:text-lg font-medium text-gray-900">No shifts today</h3>
-                  <p className="text-sm md:text-base text-gray-500 px-4">
+              <CardContent className="text-center py-6 md:py-8">
+                <div className="space-y-2 md:space-y-3">
+                  <Clock className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 mx-auto text-gray-400" />
+                  <h3 className="text-sm md:text-base lg:text-lg font-medium text-gray-900">No shifts today</h3>
+                  <p className="text-xs md:text-sm lg:text-base text-gray-500 px-2 md:px-4">
                     You don't have any shifts scheduled for today. Enjoy your day off!
                   </p>
                 </div>
@@ -110,19 +110,19 @@ const StaffShifts = () => {
         <Separator />
 
         {/* Upcoming Shifts Calendar */}
-        <div className="space-y-4">
-          <h2 className="text-lg md:text-xl font-semibold">Next 6 Weeks</h2>
+        <div className="space-y-3 md:space-y-4">
+          <h2 className="text-base md:text-lg lg:text-xl font-semibold">Next 6 Weeks</h2>
           {upcomingShifts && upcomingShifts.length > 0 ? (
-            <div className="overflow-hidden">
+            <div className="w-full">
               <UpcomingShiftsCalendar shifts={upcomingShifts} />
             </div>
           ) : (
             <Card className="shadow-sm">
-              <CardContent className="text-center py-8">
-                <div className="space-y-3">
-                  <Calendar className="w-10 h-10 md:w-12 md:h-12 mx-auto text-gray-400" />
-                  <h3 className="text-base md:text-lg font-medium text-gray-900">No upcoming shifts</h3>
-                  <p className="text-sm md:text-base text-gray-500 px-4">
+              <CardContent className="text-center py-6 md:py-8">
+                <div className="space-y-2 md:space-y-3">
+                  <Calendar className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 mx-auto text-gray-400" />
+                  <h3 className="text-sm md:text-base lg:text-lg font-medium text-gray-900">No upcoming shifts</h3>
+                  <p className="text-xs md:text-sm lg:text-base text-gray-500 px-2 md:px-4">
                     You don't have any shifts scheduled for the next 6 weeks.
                   </p>
                 </div>
@@ -133,9 +133,9 @@ const StaffShifts = () => {
 
         {/* Instructions */}
         <Card className="bg-blue-50 border-blue-200 shadow-sm">
-          <CardContent className="pt-6">
-            <div className="space-y-3">
-              <h3 className="font-medium text-blue-900 text-sm md:text-base">How to use:</h3>
+          <CardContent className="pt-4 md:pt-6">
+            <div className="space-y-2 md:space-y-3">
+              <h3 className="font-medium text-blue-900 text-xs md:text-sm lg:text-base">How to use:</h3>
               <ul className="text-xs md:text-sm text-blue-800 space-y-1 pl-2">
                 <li>• Clock in at the start of your shift</li>
                 <li>• Clock out when your shift ends</li>
