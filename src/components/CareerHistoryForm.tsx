@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -369,11 +370,11 @@ const CareerHistoryEditForm = ({
   onClose, 
   onSuccess 
 }: { 
-  entry: CareerHistoryEntry; 
+  entry: CareerHistoryRecord; 
   onClose: () => void; 
-  onSuccess: (entry: CareerHistoryEntry) => void;
+  onSuccess: (entry: CareerHistoryRecord) => void;
 }) => {
-  const [formData, setFormData] = useState<CareerHistoryEntry>(entry);
+  const [formData, setFormData] = useState<CareerHistoryRecord>(entry);
 
   // Fetch lookup lists from settings
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
@@ -429,10 +430,10 @@ const CareerHistoryEditForm = ({
               value={formData.job_title} 
               onValueChange={(value) => setFormData({ ...formData, job_title: value })}
             >
-              <SelectTrigger className="bg-white">
+              <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
                 <SelectValue placeholder="Select job title" />
               </SelectTrigger>
-              <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+              <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
                 {lookupsByCategory.positions?.map((position) => (
                   <SelectItem key={position.id} value={position.value}>
                     {position.value}
@@ -448,10 +449,10 @@ const CareerHistoryEditForm = ({
               value={formData.location} 
               onValueChange={(value) => setFormData({ ...formData, location: value })}
             >
-              <SelectTrigger className="bg-white">
+              <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
                 <SelectValue placeholder="Select work location" />
               </SelectTrigger>
-              <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+              <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
                 {lookupsByCategory.locations?.map((location) => (
                   <SelectItem key={location.id} value={location.value}>
                     {location.value}
@@ -468,10 +469,10 @@ const CareerHistoryEditForm = ({
                 value={formData.pay_type} 
                 onValueChange={(value) => setFormData({ ...formData, pay_type: value })}
               >
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
                   <SelectValue placeholder="Select pay type" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
                   {lookupsByCategory.pay_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase()}>
                       {type.value}
@@ -499,10 +500,10 @@ const CareerHistoryEditForm = ({
                 value={formData.employment_type} 
                 onValueChange={(value) => setFormData({ ...formData, employment_type: value })}
               >
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
                   <SelectValue placeholder="Select employment type" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
                   {lookupsByCategory.employment_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase()}>
                       {type.value}
@@ -517,10 +518,10 @@ const CareerHistoryEditForm = ({
                 value={formData.contract_type} 
                 onValueChange={(value) => setFormData({ ...formData, contract_type: value })}
               >
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
                   <SelectValue placeholder="Select contract type" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
                   {lookupsByCategory.contract_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase().replace(' ', '_')}>
                       {type.value}
@@ -558,7 +559,7 @@ const CareerHistoryEditForm = ({
                 id="end_date"
                 type="date"
                 value={formData.end_date ? formData.end_date.split('T')[0] : ''}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value || undefined })}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value || null })}
               />
             </div>
           </div>
@@ -570,7 +571,7 @@ const CareerHistoryEditForm = ({
                 id="probation_end_date"
                 type="date"
                 value={formData.probation_end_date || ''}
-                onChange={(e) => setFormData({ ...formData, probation_end_date: e.target.value || undefined })}
+                onChange={(e) => setFormData({ ...formData, probation_end_date: e.target.value || null })}
               />
             </div>
             <div>
@@ -579,7 +580,7 @@ const CareerHistoryEditForm = ({
                 id="notice_period_weeks"
                 type="number"
                 value={formData.notice_period_weeks || ''}
-                onChange={(e) => setFormData({ ...formData, notice_period_weeks: parseInt(e.target.value) || undefined })}
+                onChange={(e) => setFormData({ ...formData, notice_period_weeks: parseInt(e.target.value) || 0 })}
               />
             </div>
           </div>
