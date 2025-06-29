@@ -1,3 +1,4 @@
+
 import { LucideIcon } from "lucide-react";
 import {
   BarChart3,
@@ -121,19 +122,19 @@ export const menuConfig: MenuConfig = {
     label: "Processes",
     icon: Workflow,
     href: "/processes", 
-    permissions: []
+    permissions: ["view_settings"]
   },
   menu_sets: {
     label: "Menu Sets",
     icon: Menu,
     href: "/menu-sets",
-    permissions: []
+    permissions: ["view_settings"]
   },
   settings: {
     label: "Settings", 
     icon: Settings,
     href: "/settings",
-    permissions: []
+    permissions: ["view_settings"]
   },
   reports: {
     label: "Reports",
@@ -271,17 +272,20 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
       {
         title: "Processes",
         path: "/processes",
-        icon: "Settings"
+        icon: "Settings",
+        requiredPermission: "view_settings"
       },
       {
         title: "Menu Sets",
         path: "/menu-sets",
-        icon: "Menu"
+        icon: "Menu",
+        requiredPermission: "view_settings"
       },
       {
         title: "Settings",
         path: "/settings",
-        icon: "Settings"
+        icon: "Settings",
+        requiredPermission: "view_settings"
       },
       {
         title: "Reports",
