@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { Lock, User } from 'lucide-react';
+import { Lock, User, Users } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -90,11 +91,13 @@ const Login = () => {
       <div className="w-full max-w-md">
         {/* Logo Section */}
         <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-lg mb-4">
+            <Users className="w-8 h-8 text-teal-600" />
+          </div>
           <h1 className="text-3xl font-bold mb-4">
             <span className="text-slate-800">Care</span>
             <span className="text-teal-600">HR</span>
           </h1>
-          <p className="text-gray-600 mt-2">Human Resources Management System</p>
         </div>
 
         {/* Login Card */}
