@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ShiftTemplate {
   id: string;
@@ -26,6 +27,13 @@ interface Shift {
   end_time: string;
   position: string;
   job_role_id: string;
+}
+
+interface JobRole {
+  id: string;
+  title: string;
+  department: string;
+  location: string;
 }
 
 interface ShiftCreationPopupProps {
@@ -63,12 +71,27 @@ const ShiftCreationPopup = ({
   const [selectedCareerHistoryId, setSelectedCareerHistoryId] = useState<string>('');
 
   // Use career history hook
-  const { data: careerHistory, isLoading, error } = useCareerHistory(employeeId);
+  const { data: careerHistory, isLoading: careerLoading, error: careerError } = useCareerHistory(employeeId);
+
+  // Fetch all job roles to match against career history
+  const { data: jobRoles, isLoading: jobRolesLoading } = useQuery({
+    queryKey: ['job-roles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_roles')
+        .select('*')
+        .order('title');
+      
+      if (error) throw error;
+      return data as JobRole[];
+    }
+  });
 
   console.log('ShiftCreationPopup - Employee ID:', employeeId);
   console.log('ShiftCreationPopup - Career History:', careerHistory);
-  console.log('ShiftCreationPopup - Loading:', isLoading);
-  console.log('ShiftCreationPopup - Error:', error);
+  console.log('ShiftCreationPopup - Job Roles:', jobRoles);
+  console.log('ShiftCreationPopup - Loading:', careerLoading);
+  console.log('ShiftCreationPopup - Error:', careerError);
 
   useEffect(() => {
     if (existingShift) {
@@ -112,6 +135,7 @@ const ShiftCreationPopup = ({
     console.log('Submit clicked');
     console.log('Selected career history ID:', selectedCareerHistoryId);
     console.log('Career history:', careerHistory);
+    console.log('Job roles:', jobRoles);
     
     if (!startTime || !endTime || !selectedCareerHistoryId) {
       console.log('Missing required fields:', { startTime, endTime, selectedCareerHistoryId });
@@ -127,8 +151,27 @@ const ShiftCreationPopup = ({
       return;
     }
 
-    // Use job_role_id from career history if available, otherwise use the career history ID
-    const jobRoleId = selectedCareerEntry.job_role_id || selectedCareerHistoryId;
+    // Try to find a matching job role based on title and location
+    let jobRoleId: string;
+    
+    if (selectedCareerEntry.job_role_id) {
+      // If career history has a job_role_id, use it
+      jobRoleId = selectedCareerEntry.job_role_id;
+    } else {
+      // Otherwise, try to find a matching job role by title and location
+      const matchingJobRole = jobRoles?.find(role => 
+        role.title === selectedCareerEntry.job_title && 
+        role.location === selectedCareerEntry.location
+      );
+      
+      if (matchingJobRole) {
+        jobRoleId = matchingJobRole.id;
+      } else {
+        console.log('No matching job role found for:', selectedCareerEntry.job_title, selectedCareerEntry.location);
+        console.log('Available job roles:', jobRoles);
+        return;
+      }
+    }
 
     const shiftData = {
       start_time: startTime,
@@ -151,6 +194,7 @@ const ShiftCreationPopup = ({
   };
 
   const selectedCareerEntry = careerHistory?.find(entry => entry.id === selectedCareerHistoryId);
+  const isLoading = careerLoading || jobRolesLoading;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -186,14 +230,14 @@ const ShiftCreationPopup = ({
           {/* Loading State */}
           {isLoading && (
             <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
-              Loading employee career history...
+              Loading employee career history and job roles...
             </div>
           )}
 
           {/* Error State */}
-          {error && (
+          {careerError && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-              Error loading career history: {error.message}
+              Error loading career history: {careerError.message}
             </div>
           )}
 
@@ -224,6 +268,11 @@ const ShiftCreationPopup = ({
                   <strong>Employment Type:</strong> {selectedCareerEntry.employment_type}
                   <br />
                   <strong>Contract Type:</strong> {selectedCareerEntry.contract_type}
+                  {selectedCareerEntry.job_role_id ? (
+                    <><br /><strong>Status:</strong> <span className="text-green-600">Linked to job role</span></>
+                  ) : (
+                    <><br /><strong>Status:</strong> <span className="text-orange-600">Will auto-link to matching job role</span></>
+                  )}
                 </div>
               )}
             </div>
