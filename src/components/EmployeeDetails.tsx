@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,7 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
   const [showCareerForm, setShowCareerForm] = useState(false);
   const [editingPersonal, setEditingPersonal] = useState(false);
   const [showAddressDialog, setShowAddressDialog] = useState(false);
+  const [editingCareerEntry, setEditingCareerEntry] = useState<CareerHistoryEntry | null>(null);
   const [personalFormData, setPersonalFormData] = useState<PersonalFormData>({
     first_name: '',
     last_name: '',
@@ -289,6 +291,73 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
     } catch (error) {
       console.error('Error adding address:', error);
       toast.error("Failed to add address");
+    }
+  };
+
+  const handleEditCareerEntry = async (updatedEntry: CareerHistoryEntry) => {
+    if (!employeeId) {
+      toast.error("Employee ID not found");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('career_history')
+        .update({
+          job_title: updatedEntry.job_title,
+          location: updatedEntry.location,
+          pay_rate: updatedEntry.pay_rate,
+          pay_type: updatedEntry.pay_type,
+          hours_per_week: updatedEntry.hours_per_week,
+          employment_type: updatedEntry.employment_type,
+          contract_type: updatedEntry.contract_type,
+          start_date: updatedEntry.start_date,
+          end_date: updatedEntry.end_date,
+          probation_end_date: updatedEntry.probation_end_date,
+          notice_period_weeks: updatedEntry.notice_period_weeks
+        })
+        .eq('id', updatedEntry.id);
+
+      if (error) {
+        console.error('Error updating career entry:', error);
+        throw error;
+      }
+
+      toast.success("Career history updated successfully!");
+      setEditingCareerEntry(null);
+      refetchCareer();
+      onUpdate();
+    } catch (error) {
+      console.error('Error updating career entry:', error);
+      toast.error("Failed to update career history");
+    }
+  };
+
+  const handleMakeRoleInactive = async (entryId: string) => {
+    if (!employeeId) {
+      toast.error("Employee ID not found");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('career_history')
+        .update({
+          end_date: new Date().toISOString()
+        })
+        .eq('id', entryId);
+
+      if (error) {
+        console.error('Error making role inactive:', error);
+        throw error;
+      }
+
+      toast.success("Role marked as inactive successfully!");
+      refetchCareer();
+      onUpdate();
+    } catch (error) {
+      console.error('Error making role inactive:', error);
+      toast.error("Failed to make role inactive");
     }
   };
 
@@ -647,13 +716,36 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
                       <CardTitle className="text-lg">{entry.job_title}</CardTitle>
                       <CardDescription>{entry.location}</CardDescription>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold">
-                        {formatCurrency(entry.pay_rate, entry.pay_type)}
+                    <div className="flex items-center space-x-2">
+                      <div className="text-right">
+                        <div className="font-semibold">
+                          {formatCurrency(entry.pay_rate, entry.pay_type)}
+                        </div>
+                        {!entry.end_date && (
+                          <Badge variant="default" className="mt-1">Current</Badge>
+                        )}
+                        {entry.end_date && (
+                          <Badge variant="secondary" className="mt-1">Inactive</Badge>
+                        )}
                       </div>
-                      {!entry.end_date && (
-                        <Badge variant="default" className="mt-1">Current</Badge>
-                      )}
+                      <div className="flex flex-col space-y-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingCareerEntry(entry)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        {!entry.end_date && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleMakeRoleInactive(entry.id)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -733,6 +825,14 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
         />
       )}
 
+      {editingCareerEntry && (
+        <CareerHistoryEditForm
+          entry={editingCareerEntry}
+          onClose={() => setEditingCareerEntry(null)}
+          onSuccess={handleEditCareerEntry}
+        />
+      )}
+
       <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -745,6 +845,180 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
         </DialogContent>
       </Dialog>
     </div>
+  );
+};
+
+// Career History Edit Form Component
+const CareerHistoryEditForm = ({ 
+  entry, 
+  onClose, 
+  onSuccess 
+}: { 
+  entry: CareerHistoryEntry; 
+  onClose: () => void; 
+  onSuccess: (entry: CareerHistoryEntry) => void;
+}) => {
+  const [formData, setFormData] = useState<CareerHistoryEntry>(entry);
+
+  const handleSave = () => {
+    onSuccess(formData);
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Career History Entry</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="job_title">Job Title</Label>
+            <Input
+              id="job_title"
+              value={formData.job_title}
+              onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="location">Location</Label>
+            <Input
+              id="location"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="pay_type">Pay Type</Label>
+              <Select 
+                value={formData.pay_type} 
+                onValueChange={(value) => setFormData({ ...formData, pay_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="salary">Salary</SelectItem>
+                  <SelectItem value="hourly">Hourly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="pay_rate">Pay Rate</Label>
+              <Input
+                id="pay_rate"
+                type="number"
+                step="0.01"
+                value={formData.pay_rate}
+                onChange={(e) => setFormData({ ...formData, pay_rate: parseFloat(e.target.value) })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="employment_type">Employment Type</Label>
+              <Select 
+                value={formData.employment_type} 
+                onValueChange={(value) => setFormData({ ...formData, employment_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="permanent">Permanent</SelectItem>
+                  <SelectItem value="temporary">Temporary</SelectItem>
+                  <SelectItem value="contract">Contract</SelectItem>
+                  <SelectItem value="internship">Internship</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="contract_type">Contract Type</Label>
+              <Select 
+                value={formData.contract_type} 
+                onValueChange={(value) => setFormData({ ...formData, contract_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="full_time">Full Time</SelectItem>
+                  <SelectItem value="part_time">Part Time</SelectItem>
+                  <SelectItem value="zero_hours">Zero Hours</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="hours_per_week">Hours per Week</Label>
+            <Input
+              id="hours_per_week"
+              type="number"
+              step="0.5"
+              value={formData.hours_per_week}
+              onChange={(e) => setFormData({ ...formData, hours_per_week: parseFloat(e.target.value) })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="start_date">Start Date</Label>
+              <Input
+                id="start_date"
+                type="date"
+                value={formData.start_date.split('T')[0]}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="end_date">End Date</Label>
+              <Input
+                id="end_date"
+                type="date"
+                value={formData.end_date ? formData.end_date.split('T')[0] : ''}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value || undefined })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="probation_end_date">Probation End Date</Label>
+              <Input
+                id="probation_end_date"
+                type="date"
+                value={formData.probation_end_date || ''}
+                onChange={(e) => setFormData({ ...formData, probation_end_date: e.target.value || undefined })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="notice_period_weeks">Notice Period (weeks)</Label>
+              <Input
+                id="notice_period_weeks"
+                type="number"
+                value={formData.notice_period_weeks || ''}
+                onChange={(e) => setFormData({ ...formData, notice_period_weeks: parseInt(e.target.value) || undefined })}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-4 pt-4">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>
+              <Check className="w-4 h-4 mr-2" />
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
