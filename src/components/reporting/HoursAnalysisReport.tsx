@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,7 +84,7 @@ const HoursAnalysisReport = () => {
           position,
           pay_rate,
           actual_job_role_id,
-          employees!inner (
+          employees (
             id,
             first_name,
             last_name,
@@ -132,7 +131,7 @@ const HoursAnalysisReport = () => {
       // Process the data - include ALL shifts
       const processedData: HoursRecord[] = shifts
         .map(shift => {
-          const employee = shift.employees;
+          const employee = Array.isArray(shift.employees) ? shift.employees[0] : shift.employees;
           
           if (!employee) {
             console.log('Missing employee for shift:', shift.employee_id);
