@@ -73,7 +73,7 @@ const HoursAnalysisReport = () => {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
       
-      // Get all shifts in the date range with their time clock records, job role info, and employee career history
+      // First, get all shifts in the date range
       const { data: shifts, error: shiftsError } = await supabase
         .from('shifts')
         .select(`
@@ -85,22 +85,11 @@ const HoursAnalysisReport = () => {
           position,
           pay_rate,
           actual_job_role_id,
-          time_clock_records (
-            id,
-            clock_in_time,
-            clock_out_time,
-            status,
-            discrepancy_type,
-            approval_status
-          ),
-          employees (
+          employees!inner (
             id,
             first_name,
             last_name,
             department
-          ),
-          job_roles!shifts_actual_job_role_id_fkey (
-            title
           )
         `)
         .gte('date', startDate)
@@ -117,8 +106,22 @@ const HoursAnalysisReport = () => {
       if (!shifts?.length) {
         return [];
       }
+
+      // Get shift IDs for time clock records lookup
+      const shiftIds = shifts.map(s => s.id);
       
-      // Get career history for pay rates (this will override shift pay_rate if available)
+      // Get time clock records for these shifts
+      const { data: timeRecords, error: timeError } = await supabase
+        .from('time_clock_records')
+        .select('*')
+        .in('shift_id', shiftIds);
+        
+      if (timeError) {
+        console.error('Error fetching time records:', timeError);
+        // Don't throw here, just log - we can still show shifts without time records
+      }
+      
+      // Get employee career history for pay rates
       const employeeIds = [...new Set(shifts.map(s => s.employee_id))];
       const { data: careerHistory } = await supabase
         .from('career_history')
@@ -129,7 +132,7 @@ const HoursAnalysisReport = () => {
       // Process the data - include ALL shifts
       const processedData: HoursRecord[] = shifts
         .map(shift => {
-          const employee = Array.isArray(shift.employees) ? shift.employees[0] : shift.employees;
+          const employee = shift.employees;
           
           if (!employee) {
             console.log('Missing employee for shift:', shift.employee_id);
@@ -143,7 +146,7 @@ const HoursAnalysisReport = () => {
           const scheduledHours = Math.round((scheduledMinutes / 60) * 100) / 100;
           
           // Get time clock record if exists
-          const timeRecord = Array.isArray(shift.time_clock_records) ? shift.time_clock_records[0] : shift.time_clock_records;
+          const timeRecord = timeRecords?.find(tr => tr.shift_id === shift.id);
           
           let actualHours = 0;
           let hasIssue = false;
@@ -204,8 +207,7 @@ const HoursAnalysisReport = () => {
           const payRate = employeeCareer?.pay_rate || shift.pay_rate || 0;
           const totalPay = actualHours * payRate;
           
-          const jobRole = Array.isArray(shift.job_roles) ? shift.job_roles[0] : shift.job_roles;
-          const jobTitle = employeeCareer?.job_title || jobRole?.title || 'Unknown';
+          const jobTitle = employeeCareer?.job_title || 'Unknown';
           
           return {
             employee_id: employee.id,
@@ -232,22 +234,6 @@ const HoursAnalysisReport = () => {
       return processedData;
     }
   });
-
-  // Group data by employee for summary rows
-  const groupedData = useMemo(() => {
-    if (!hoursData) return {};
-    
-    const groups: Record<string, HoursRecord[]> = {};
-    hoursData.forEach(record => {
-      const key = record.employee_id;
-      if (!groups[key]) {
-        groups[key] = [];
-      }
-      groups[key].push(record);
-    });
-    
-    return groups;
-  }, [hoursData]);
 
   const toggleColumn = (columnKey: string) => {
     setColumns(prev => prev.map(col => 
@@ -476,67 +462,35 @@ const HoursAnalysisReport = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Object.entries(groupedData).map(([employeeId, records]) => {
-                  const totalScheduled = records.reduce((sum, r) => sum + r.scheduled_hours, 0);
-                  const totalActual = records.reduce((sum, r) => sum + r.actual_hours, 0);
-                  const totalVariance = totalActual - totalScheduled;
-                  const totalPay = records.reduce((sum, r) => sum + r.total_pay, 0);
-                  
-                  return (
-                    <React.Fragment key={employeeId}>
-                      {records.map((record, index) => (
-                        <TableRow key={`${employeeId}-${index}`} className={getRowClassName(record)}>
-                          {enabledColumns.map((column) => (
-                            <TableCell key={column.key}>
-                              {column.key === 'employee_name' && record.employee_name}
-                              {column.key === 'position' && (record.job_title || record.position)}
-                              {column.key === 'date' && format(parseISO(record.date), 'dd/MM/yyyy')}
-                              {column.key === 'clock_times' && (
-                                <div className="text-sm">
-                                  <div>In: {record.clock_in ? format(parseISO(record.clock_in), 'HH:mm') : 'N/A'}</div>
-                                  <div>Out: {record.clock_out ? format(parseISO(record.clock_out), 'HH:mm') : 'N/A'}</div>
-                                </div>
-                              )}
-                              {column.key === 'scheduled_hours' && record.scheduled_hours.toFixed(2)}
-                              {column.key === 'actual_hours' && record.actual_hours.toFixed(2)}
-                              {column.key === 'variance' && (
-                                <Badge variant={record.actual_hours - record.scheduled_hours >= 0 ? 'default' : 'destructive'}>
-                                  {(record.actual_hours - record.scheduled_hours).toFixed(2)}h
-                                </Badge>
-                              )}
-                              {column.key === 'pay_rate' && `£${record.pay_rate.toFixed(2)}`}
-                              {column.key === 'total_pay' && `£${record.total_pay.toFixed(2)}`}
-                            </TableCell>
-                          ))}
-                          <TableCell>
-                            {getIssueDisplay(record)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {/* Employee Total Row */}
-                      <TableRow className="bg-gray-50 font-medium">
-                        {enabledColumns.map((column) => (
-                          <TableCell key={column.key}>
-                            {column.key === 'employee_name' && `${records[0].employee_name} - Total`}
-                            {column.key === 'position' && 'All Roles'}
-                            {column.key === 'date' && ''}
-                            {column.key === 'clock_times' && ''}
-                            {column.key === 'scheduled_hours' && `${totalScheduled.toFixed(2)}h`}
-                            {column.key === 'actual_hours' && `${totalActual.toFixed(2)}h`}
-                            {column.key === 'variance' && (
-                              <Badge variant={totalVariance >= 0 ? 'default' : 'destructive'}>
-                                {totalVariance.toFixed(2)}h
-                              </Badge>
-                            )}
-                            {column.key === 'pay_rate' && ''}
-                            {column.key === 'total_pay' && `£${totalPay.toFixed(2)}`}
-                          </TableCell>
-                        ))}
-                        <TableCell></TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  );
-                })}
+                {hoursData.map((record, index) => (
+                  <TableRow key={`${record.employee_id}-${index}`} className={getRowClassName(record)}>
+                    {enabledColumns.map((column) => (
+                      <TableCell key={column.key}>
+                        {column.key === 'employee_name' && record.employee_name}
+                        {column.key === 'position' && (record.job_title || record.position)}
+                        {column.key === 'date' && format(parseISO(record.date), 'dd/MM/yyyy')}
+                        {column.key === 'clock_times' && (
+                          <div className="text-sm">
+                            <div>In: {record.clock_in ? format(parseISO(record.clock_in), 'HH:mm') : 'N/A'}</div>
+                            <div>Out: {record.clock_out ? format(parseISO(record.clock_out), 'HH:mm') : 'N/A'}</div>
+                          </div>
+                        )}
+                        {column.key === 'scheduled_hours' && record.scheduled_hours.toFixed(2)}
+                        {column.key === 'actual_hours' && record.actual_hours.toFixed(2)}
+                        {column.key === 'variance' && (
+                          <Badge variant={record.actual_hours - record.scheduled_hours >= 0 ? 'default' : 'destructive'}>
+                            {(record.actual_hours - record.scheduled_hours).toFixed(2)}h
+                          </Badge>
+                        )}
+                        {column.key === 'pay_rate' && `£${record.pay_rate.toFixed(2)}`}
+                        {column.key === 'total_pay' && `£${record.total_pay.toFixed(2)}`}
+                      </TableCell>
+                    ))}
+                    <TableCell>
+                      {getIssueDisplay(record)}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
