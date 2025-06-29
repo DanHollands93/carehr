@@ -181,7 +181,10 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="job_title">Job Title *</Label>
-              <Select onValueChange={(value) => setValue('job_title', value)}>
+              <Select 
+                value={watch('job_title') || ''} 
+                onValueChange={(value) => setValue('job_title', value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select job title" />
                 </SelectTrigger>
@@ -199,7 +202,10 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             </div>
             <div>
               <Label htmlFor="location">Work Location *</Label>
-              <Select onValueChange={(value) => setValue('location', value)}>
+              <Select 
+                value={watch('location') || ''} 
+                onValueChange={(value) => setValue('location', value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select work location" />
                 </SelectTrigger>
@@ -238,13 +244,16 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
           <div className="grid grid-cols-3 gap-4">
             <div>
               <Label htmlFor="employment_type">Employment Type</Label>
-              <Select onValueChange={(value) => setValue('employment_type', value as any)}>
+              <Select 
+                value={watch('employment_type') || ''} 
+                onValueChange={(value) => setValue('employment_type', value as any)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
                   {lookupsByCategory.employment_types?.map((type) => (
-                    <SelectItem key={type.id} value={type.value}>
+                    <SelectItem key={type.id} value={type.value.toLowerCase()}>
                       {type.value}
                     </SelectItem>
                   ))}
@@ -253,13 +262,16 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             </div>
             <div>
               <Label htmlFor="contract_type">Contract Type</Label>
-              <Select onValueChange={(value) => setValue('contract_type', value as any)}>
+              <Select 
+                value={watch('contract_type') || ''} 
+                onValueChange={(value) => setValue('contract_type', value as any)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
                   {lookupsByCategory.contract_types?.map((type) => (
-                    <SelectItem key={type.id} value={type.value}>
+                    <SelectItem key={type.id} value={type.value.toLowerCase().replace(' ', '_')}>
                       {type.value}
                     </SelectItem>
                   ))}
@@ -281,7 +293,10 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="pay_type">Pay Type *</Label>
-              <Select onValueChange={(value) => setValue('pay_type', value as any)}>
+              <Select 
+                value={watch('pay_type') || ''} 
+                onValueChange={(value) => setValue('pay_type', value as any)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select pay type" />
                 </SelectTrigger>
