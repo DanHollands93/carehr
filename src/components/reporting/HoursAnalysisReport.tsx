@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,22 +76,7 @@ const HoursAnalysisReport = () => {
       // First, get all shifts in the date range
       const { data: shifts, error: shiftsError } = await supabase
         .from('shifts')
-        .select(`
-          id,
-          employee_id,
-          date,
-          start_time,
-          end_time,
-          position,
-          pay_rate,
-          actual_job_role_id,
-          employees (
-            id,
-            first_name,
-            last_name,
-            department
-          )
-        `)
+        .select('*')
         .gte('date', startDate)
         .lte('date', endDate)
         .order('date', { ascending: true });
@@ -104,6 +90,20 @@ const HoursAnalysisReport = () => {
       
       if (!shifts?.length) {
         return [];
+      }
+
+      // Get unique employee IDs from shifts
+      const employeeIds = [...new Set(shifts.map(s => s.employee_id))];
+      
+      // Get employee details
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
+        .select('id, first_name, last_name, department')
+        .in('id', employeeIds);
+        
+      if (employeesError) {
+        console.error('Error fetching employees:', employeesError);
+        throw employeesError;
       }
 
       // Get shift IDs for time clock records lookup
@@ -121,17 +121,19 @@ const HoursAnalysisReport = () => {
       }
       
       // Get employee career history for pay rates
-      const employeeIds = [...new Set(shifts.map(s => s.employee_id))];
       const { data: careerHistory } = await supabase
         .from('career_history')
         .select('employee_id, pay_rate, job_title, start_date, end_date')
         .in('employee_id', employeeIds)
         .is('end_date', null); // Only current positions
       
+      // Create employee lookup map
+      const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
+      
       // Process the data - include ALL shifts
       const processedData: HoursRecord[] = shifts
         .map(shift => {
-          const employee = Array.isArray(shift.employees) ? shift.employees[0] : shift.employees;
+          const employee = employeeMap.get(shift.employee_id);
           
           if (!employee) {
             console.log('Missing employee for shift:', shift.employee_id);
