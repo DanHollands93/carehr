@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, differenceInMinutes } from "date-fns";
-import { Clock, User, AlertCircle, CheckCircle } from "lucide-react";
+import { Clock, User, AlertCircle, CheckCircle, DollarSign, Calendar } from "lucide-react";
 
 interface TimeClockRecord {
   id: string;
@@ -32,6 +32,7 @@ interface TimeClockRecord {
     date: string;
     start_time: string;
     end_time: string;
+    pay_rate: number;
   };
 }
 
@@ -41,6 +42,9 @@ interface DiscrepancyApproval {
   late_overtime_decision?: 'paid' | 'unpaid';
   late_overtime_notes?: string;
   general_notes?: string;
+  manual_start_time?: string;
+  manual_end_time?: string;
+  pay_full_hours?: boolean;
 }
 
 const TimeDiscrepancyManager = () => {
@@ -206,21 +210,56 @@ const TimeDiscrepancyManager = () => {
 
       // Handle case where employee didn't clock in at all
       if (record.discrepancy_type === 'did_not_clock_in') {
+        let updateData: any = {
+          approval_status: 'approved',
+          notes: approval.general_notes || 'Employee did not clock in for scheduled shift',
+          processed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        // If manual times are provided, calculate pay
+        if (approval.manual_start_time && approval.manual_end_time && approval.pay_full_hours) {
+          const shift = record.shift;
+          if (!shift) throw new Error('No shift data found');
+
+          const manualStartTime = parseISO(`${shift.date}T${approval.manual_start_time}`);
+          const manualEndTime = parseISO(`${shift.date}T${approval.manual_end_time}`);
+          const minutesWorked = differenceInMinutes(manualEndTime, manualStartTime);
+
+          updateData = {
+            ...updateData,
+            clock_in_time: manualStartTime.toISOString(),
+            clock_out_time: manualEndTime.toISOString(),
+            scheduled_minutes_paid: minutesWorked,
+            status: 'completed',
+            discrepancy_type: 'manual_time_entry',
+            notes: `${approval.general_notes || ''} - Manual time entry: ${approval.manual_start_time} to ${approval.manual_end_time}`.trim()
+          };
+
+          // Create time segment for manual entry
+          await supabase
+            .from('time_segments')
+            .insert({
+              time_clock_record_id: recordId,
+              segment_type: 'manual_entry',
+              start_time: manualStartTime.toISOString(),
+              end_time: manualEndTime.toISOString(),
+              minutes_worked: minutesWorked,
+              minutes_paid: minutesWorked,
+              pay_status: 'paid'
+            });
+        }
+        
         const { error: updateError } = await supabase
           .from('time_clock_records')
-          .update({
-            approval_status: 'approved',
-            notes: approval.general_notes || 'Employee did not clock in for scheduled shift',
-            processed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
+          .update(updateData)
           .eq('id', recordId);
         
         if (updateError) throw updateError;
         return;
       }
 
-      // Calculate time segments and paid minutes for normal discrepancies
+      // Handle normal discrepancies with actual clock times (keep existing logic)
       const clockInTime = record.clock_in_time ? parseISO(record.clock_in_time) : null;
       const clockOutTime = record.clock_out_time ? parseISO(record.clock_out_time) : null;
       const shift = record.shift;
@@ -232,7 +271,7 @@ const TimeDiscrepancyManager = () => {
       const shiftStartTime = parseISO(`${shift.date}T${shift.start_time}`);
       const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
       
-      // Calculate early, scheduled, and late minutes
+      // Calculate time segments (existing logic)
       let earlyMinutes = 0;
       let scheduledMinutes = 0;
       let lateMinutes = 0;
@@ -240,34 +279,30 @@ const TimeDiscrepancyManager = () => {
       let scheduledPaidMinutes = 0;
       let latePaidMinutes = 0;
       
-      // Early arrival (before scheduled start)
       if (clockInTime < shiftStartTime) {
         earlyMinutes = differenceInMinutes(shiftStartTime, clockInTime);
         earlyPaidMinutes = approval.early_overtime_decision === 'paid' ? earlyMinutes : 0;
       }
       
-      // Scheduled time
       const actualStartTime = clockInTime > shiftStartTime ? clockInTime : shiftStartTime;
       const actualEndTime = clockOutTime < shiftEndTime ? clockOutTime : shiftEndTime;
       if (actualEndTime > actualStartTime) {
         scheduledMinutes = differenceInMinutes(actualEndTime, actualStartTime);
-        scheduledPaidMinutes = scheduledMinutes; // Always pay scheduled time
+        scheduledPaidMinutes = scheduledMinutes;
       }
       
-      // Late departure (after scheduled end)
       if (clockOutTime > shiftEndTime) {
         lateMinutes = differenceInMinutes(clockOutTime, shiftEndTime);
         latePaidMinutes = approval.late_overtime_decision === 'paid' ? lateMinutes : 0;
       }
       
-      // Combine all notes
       const combinedNotes = [
         approval.early_overtime_notes && `Early overtime: ${approval.early_overtime_notes}`,
         approval.late_overtime_notes && `Late overtime: ${approval.late_overtime_notes}`,
         approval.general_notes && `General: ${approval.general_notes}`
       ].filter(Boolean).join('; ');
 
-      // Update the time clock record
+      // Update the time clock record (DON'T CHANGE ACTUAL CLOCK TIMES)
       const { error: updateError } = await supabase
         .from('time_clock_records')
         .update({
@@ -287,7 +322,7 @@ const TimeDiscrepancyManager = () => {
       
       if (updateError) throw updateError;
       
-      // Create time segments for detailed reporting (only if employee actually worked)
+      // Create time segments for detailed reporting
       if (clockInTime && clockOutTime) {
         const segments = [];
         
@@ -327,7 +362,6 @@ const TimeDiscrepancyManager = () => {
           });
         }
         
-        // Insert time segments
         if (segments.length > 0) {
           const { error: segmentsError } = await supabase
             .from('time_segments')
@@ -335,7 +369,6 @@ const TimeDiscrepancyManager = () => {
             
           if (segmentsError) {
             console.error('Error creating time segments:', segmentsError);
-            // Don't throw here as the main approval was successful
           }
         }
       }
@@ -396,7 +429,7 @@ const TimeDiscrepancyManager = () => {
     return differenceInMinutes(actualTime, scheduledDateTime);
   };
 
-  const updateApproval = (recordId: string, field: keyof DiscrepancyApproval, value: string) => {
+  const updateApproval = (recordId: string, field: keyof DiscrepancyApproval, value: string | boolean) => {
     setApprovals(prev => ({
       ...prev,
       [recordId]: {
@@ -413,7 +446,7 @@ const TimeDiscrepancyManager = () => {
 
     // If employee didn't clock in at all, just need general notes
     if (record.discrepancy_type === 'did_not_clock_in') {
-      return true; // Can always approve no-show cases
+      return approval.manual_start_time && approval.manual_end_time; // Can always approve no-show cases
     }
 
     // Check if we have decisions for all required overtime periods
@@ -429,6 +462,12 @@ const TimeDiscrepancyManager = () => {
   const handleApprove = () => {
     if (!selectedRecord) return;
     approveRecordMutation.mutate({ recordId: selectedRecord });
+  };
+
+  const calculateScheduledHours = (shift: any) => {
+    const startTime = parseISO(`${shift.date}T${shift.start_time}`);
+    const endTime = parseISO(`${shift.date}T${shift.end_time}`);
+    return differenceInMinutes(endTime, startTime) / 60;
   };
 
   if (isLoading) {
@@ -497,12 +536,73 @@ const TimeDiscrepancyManager = () => {
                       </div>
                     )}
 
-                    {isNoShow && (
+                    {isNoShow && record.shift && (
                       <div className="border rounded-lg p-4 bg-red-50">
-                        <div className="flex items-center space-x-2 text-red-600 mb-2">
+                        <div className="flex items-center space-x-2 text-red-600 mb-3">
                           <AlertCircle className="w-4 h-4" />
                           <span>Employee did not clock in for scheduled shift</span>
                         </div>
+                        
+                        {/* Scheduled Hours and Pay Information */}
+                        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="w-4 h-4 text-blue-600" />
+                            <span>
+                              Scheduled Hours: {calculateScheduledHours(record.shift).toFixed(1)}h
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <DollarSign className="w-4 h-4 text-green-600" />
+                            <span>
+                              Pay Rate: £{record.shift.pay_rate || 0}/hour
+                            </span>
+                          </div>
+                        </div>
+
+                        {isSelected && (
+                          <div className="space-y-4 border-t pt-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Actual Start Time</Label>
+                                <Input
+                                  type="time"
+                                  value={approval.manual_start_time || record.shift.start_time}
+                                  onChange={(e) => updateApproval(record.id, 'manual_start_time', e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Actual End Time</Label>
+                                <Input
+                                  type="time"
+                                  value={approval.manual_end_time || record.shift.end_time}
+                                  onChange={(e) => updateApproval(record.id, 'manual_end_time', e.target.value)}
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`pay-${record.id}`}
+                                checked={approval.pay_full_hours || false}
+                                onChange={(e) => updateApproval(record.id, 'pay_full_hours', e.target.checked)}
+                                className="rounded"
+                              />
+                              <Label htmlFor={`pay-${record.id}`} className="text-sm">
+                                Pay for actual hours worked
+                              </Label>
+                            </div>
+                            
+                            {approval.pay_full_hours && approval.manual_start_time && approval.manual_end_time && (
+                              <div className="p-2 bg-green-50 rounded text-sm text-green-700">
+                                <DollarSign className="w-4 h-4 inline mr-1" />
+                                Estimated pay: £{(
+                                  (parseISO(`2000-01-01T${approval.manual_end_time}`) - parseISO(`2000-01-01T${approval.manual_start_time}`)) / (1000 * 60 * 60) * (record.shift.pay_rate || 0)
+                                ).toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 
