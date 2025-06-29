@@ -37,6 +37,7 @@ interface CareerHistoryRecord {
   currency: string;
   start_date: string;
   end_date: string | null;
+  job_role_id: string | null;
 }
 
 interface ShiftCreationPopupProps {
@@ -127,8 +128,8 @@ const ShiftCreationPopup = ({
       setSelectedCareerRecord('');
       
       // Auto-select career record if employee has only one active position
-      if (careerHistory && careerHistory.length === 1) {
-        setSelectedCareerRecord(careerHistory[0].id);
+      if (careerHistory && careerHistory.length === 1 && careerHistory[0].job_role_id) {
+        setSelectedCareerRecord(careerHistory[0].job_role_id);
       }
     }
   }, [existingShift, shiftTemplates, isOpen, careerHistory]);
@@ -144,7 +145,7 @@ const ShiftCreationPopup = ({
 
   const handleSubmit = () => {
     console.log('Submit clicked');
-    console.log('Selected career record ID:', selectedCareerRecord);
+    console.log('Selected career record ID (job_role_id):', selectedCareerRecord);
     console.log('Career history:', careerHistory);
     
     if (!startTime || !endTime || !selectedCareerRecord) {
@@ -152,11 +153,12 @@ const ShiftCreationPopup = ({
       return;
     }
 
-    const selectedRecord = careerHistory?.find(record => record.id === selectedCareerRecord);
+    // Find the career record that has the selected job_role_id
+    const selectedRecord = careerHistory?.find(record => record.job_role_id === selectedCareerRecord);
     console.log('Selected record:', selectedRecord);
     
     if (!selectedRecord) {
-      console.log('No selected record found');
+      console.log('No selected record found for job_role_id:', selectedCareerRecord);
       return;
     }
 
@@ -164,7 +166,7 @@ const ShiftCreationPopup = ({
       start_time: startTime,
       end_time: endTime,
       position: selectedRecord.job_title,
-      job_role_id: selectedCareerRecord,
+      job_role_id: selectedCareerRecord, // This is now the actual job_role_id
       pay_rate: selectedRecord.pay_rate || 0
     };
     
@@ -180,7 +182,10 @@ const ShiftCreationPopup = ({
     onClose();
   };
 
-  const selectedRecord = careerHistory?.find(record => record.id === selectedCareerRecord);
+  const selectedRecord = careerHistory?.find(record => record.job_role_id === selectedCareerRecord);
+
+  // Filter out career records that don't have a job_role_id
+  const validCareerHistory = careerHistory?.filter(record => record.job_role_id) || [];
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -228,7 +233,7 @@ const ShiftCreationPopup = ({
           )}
 
           {/* Career History Selection */}
-          {!isLoading && careerHistory && careerHistory.length > 0 && (
+          {!isLoading && validCareerHistory.length > 0 && (
             <div className="space-y-2">
               <Label>Job Position * (From Career History)</Label>
               <Select value={selectedCareerRecord} onValueChange={setSelectedCareerRecord}>
@@ -236,8 +241,8 @@ const ShiftCreationPopup = ({
                   <SelectValue placeholder="Select job position" />
                 </SelectTrigger>
                 <SelectContent>
-                  {careerHistory.map((record) => (
-                    <SelectItem key={record.id} value={record.id}>
+                  {validCareerHistory.map((record) => (
+                    <SelectItem key={record.id} value={record.job_role_id!}>
                       {record.job_title} - £{record.pay_rate.toFixed(2)}/hr
                     </SelectItem>
                   ))}
@@ -255,10 +260,10 @@ const ShiftCreationPopup = ({
             </div>
           )}
 
-          {/* No Career History Warning */}
-          {!isLoading && (!careerHistory || careerHistory.length === 0) && employeeId && (
+          {/* No Valid Career History Warning */}
+          {!isLoading && validCareerHistory.length === 0 && employeeId && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-              This employee has no active job roles assigned. Please assign a job role in their career history before creating shifts.
+              This employee has no active job roles with proper job role assignments. Please ensure their career history records are linked to job roles before creating shifts.
             </div>
           )}
 

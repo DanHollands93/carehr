@@ -128,6 +128,7 @@ export type Database = {
           end_date: string | null
           hours_per_week: number | null
           id: string
+          job_role_id: string | null
           job_title: string
           location: string
           notice_period_weeks: number | null
@@ -146,6 +147,7 @@ export type Database = {
           end_date?: string | null
           hours_per_week?: number | null
           id?: string
+          job_role_id?: string | null
           job_title: string
           location: string
           notice_period_weeks?: number | null
@@ -164,6 +166,7 @@ export type Database = {
           end_date?: string | null
           hours_per_week?: number | null
           id?: string
+          job_role_id?: string | null
           job_title?: string
           location?: string
           notice_period_weeks?: number | null
@@ -186,6 +189,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "career_history_job_role_id_fkey"
+            columns: ["job_role_id"]
+            isOneToOne: false
+            referencedRelation: "job_roles"
             referencedColumns: ["id"]
           },
           {
