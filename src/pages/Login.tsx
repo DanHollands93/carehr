@@ -87,14 +87,14 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
+    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 overflow-hidden">
       <div className="w-full max-w-md">
         {/* Logo Section */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-lg mb-4">
-            <Users className="w-8 h-8 text-teal-600" />
+        <div className="text-center mb-4 md:mb-8">
+          <div className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 bg-white rounded-full shadow-lg mb-2 md:mb-4">
+            <Users className="w-6 h-6 md:w-8 md:h-8 text-teal-600" />
           </div>
-          <h1 className="text-3xl font-bold mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4">
             <span className="text-slate-800">Care</span>
             <span className="text-teal-600">HR</span>
           </h1>
@@ -102,15 +102,15 @@ const Login = () => {
 
         {/* Login Card */}
         <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader className="text-center pb-4">
-            <CardTitle className="text-2xl font-semibold text-gray-800">Welcome Back</CardTitle>
-            <CardDescription className="text-gray-600">
+          <CardHeader className="text-center pb-3 md:pb-4">
+            <CardTitle className="text-xl md:text-2xl font-semibold text-gray-800">Welcome Back</CardTitle>
+            <CardDescription className="text-gray-600 text-sm md:text-base">
               Sign in to access your account
             </CardDescription>
           </CardHeader>
           
-          <CardContent className="space-y-6">
-            <form onSubmit={handleSubmit} className="space-y-5">
+          <CardContent className="space-y-4 md:space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium text-gray-700">
                   Email Address
@@ -124,7 +124,7 @@ const Login = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="Enter your email"
-                    className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                    className="pl-10 h-10 md:h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -142,14 +142,14 @@ const Login = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     placeholder="Enter your password"
-                    className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                    className="pl-10 h-10 md:h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               <Button
                 type="submit"
-                className="w-full h-11 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-medium shadow-lg transition-all duration-200"
+                className="w-full h-10 md:h-11 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-medium shadow-lg transition-all duration-200"
                 disabled={loading}
               >
                 {loading ? (
@@ -163,14 +163,14 @@ const Login = () => {
               </Button>
             </form>
 
-            <Separator className="my-6" />
+            <Separator className="my-4 md:my-6" />
             
             
           </CardContent>
         </Card>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-sm text-gray-500">
+        <div className="text-center mt-4 md:mt-8 text-xs md:text-sm text-gray-500">
           <p>&copy; 2024 CareHR. All rights reserved.</p>
         </div>
       </div>
