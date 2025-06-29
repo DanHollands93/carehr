@@ -599,6 +599,7 @@ const Roster = () => {
           onDeleteShift={shiftPopup.existingShift ? handleDeleteShiftFromPopup : undefined}
           shiftTemplates={shiftTemplates || []}
           employeeName={shiftPopup.employeeName}
+          employeeId={shiftPopup.employeeId}
           date={shiftPopup.date}
           existingShift={shiftPopup.existingShift}
         />

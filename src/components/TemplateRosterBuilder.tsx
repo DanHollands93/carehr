@@ -560,6 +560,7 @@ const TemplateRosterBuilder = ({
         onDeleteShift={shiftPopup.existingShift ? handleDeleteShiftFromPopup : undefined}
         shiftTemplates={shiftTemplates || []}
         employeeName={shiftPopup.employeeName}
+        employeeId={shiftPopup.employeeId}
         date={`Day ${shiftPopup.dayIndex + 1}`}
         existingShift={shiftPopup.existingShift ? convertTemplateShiftForPopup(shiftPopup.existingShift) : undefined}
       />
