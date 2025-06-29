@@ -40,6 +40,7 @@ interface EmployeeData {
 
 interface CareerHistoryEntry {
   id: string;
+  employee_id: string;
   job_title: string;
   location: string;
   pay_rate: number;
