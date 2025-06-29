@@ -55,6 +55,10 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
   const isEditMode = !!record;
 
   const payType = watch('pay_type');
+  const jobTitle = watch('job_title');
+  const location = watch('location');
+  const employmentType = watch('employment_type');
+  const contractType = watch('contract_type');
 
   // Fetch lookup lists from settings
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
@@ -182,13 +186,13 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             <div>
               <Label htmlFor="job_title">Job Title *</Label>
               <Select 
-                value={watch('job_title') || ''} 
+                value={jobTitle || ''} 
                 onValueChange={(value) => setValue('job_title', value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-white">
                   <SelectValue placeholder="Select job title" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
                   {lookupsByCategory.positions?.map((position) => (
                     <SelectItem key={position.id} value={position.value}>
                       {position.value}
@@ -203,13 +207,13 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             <div>
               <Label htmlFor="location">Work Location *</Label>
               <Select 
-                value={watch('location') || ''} 
+                value={location || ''} 
                 onValueChange={(value) => setValue('location', value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-white">
                   <SelectValue placeholder="Select work location" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
                   {lookupsByCategory.locations?.map((location) => (
                     <SelectItem key={location.id} value={location.value}>
                       {location.value}
@@ -245,13 +249,13 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             <div>
               <Label htmlFor="employment_type">Employment Type</Label>
               <Select 
-                value={watch('employment_type') || ''} 
+                value={employmentType || ''} 
                 onValueChange={(value) => setValue('employment_type', value as any)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-white">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
                   {lookupsByCategory.employment_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase()}>
                       {type.value}
@@ -263,13 +267,13 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             <div>
               <Label htmlFor="contract_type">Contract Type</Label>
               <Select 
-                value={watch('contract_type') || ''} 
+                value={contractType || ''} 
                 onValueChange={(value) => setValue('contract_type', value as any)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-white">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
                   {lookupsByCategory.contract_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase().replace(' ', '_')}>
                       {type.value}
@@ -294,13 +298,13 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             <div>
               <Label htmlFor="pay_type">Pay Type *</Label>
               <Select 
-                value={watch('pay_type') || ''} 
+                value={payType || ''} 
                 onValueChange={(value) => setValue('pay_type', value as any)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-white">
                   <SelectValue placeholder="Select pay type" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
                   {lookupsByCategory.pay_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase()}>
                       {type.value}
