@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, differenceInMinutes } from "date-fns";
-import { Clock, User, AlertCircle, CheckCircle, DollarSign, Calendar } from "lucide-react";
+import { Clock, User, AlertCircle, CheckCircle, Calendar } from "lucide-react";
 
 interface TimeClockRecord {
   id: string;
@@ -218,7 +218,7 @@ const TimeDiscrepancyManager = () => {
         };
 
         // If manual times are provided, calculate pay
-        if (approval.manual_start_time && approval.manual_end_time && approval.pay_full_hours) {
+        if (approval.manual_start_time && approval.manual_end_time) {
           const shift = record.shift;
           if (!shift) throw new Error('No shift data found');
 
@@ -444,9 +444,9 @@ const TimeDiscrepancyManager = () => {
     const approval = approvals[recordId];
     if (!record || !approval) return false;
 
-    // If employee didn't clock in at all, just need general notes
+    // If employee didn't clock in at all, need manual times
     if (record.discrepancy_type === 'did_not_clock_in') {
-      return approval.manual_start_time && approval.manual_end_time; // Can always approve no-show cases
+      return approval.manual_start_time && approval.manual_end_time;
     }
 
     // Check if we have decisions for all required overtime periods
@@ -543,19 +543,42 @@ const TimeDiscrepancyManager = () => {
                           <span>Employee did not clock in for scheduled shift</span>
                         </div>
                         
-                        {/* Scheduled Hours and Pay Information */}
-                        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                        {/* Shift Information */}
+                        <div className="grid grid-cols-3 gap-4 mb-4 text-sm">
                           <div className="flex items-center space-x-2">
                             <Calendar className="w-4 h-4 text-blue-600" />
-                            <span>
-                              Scheduled Hours: {calculateScheduledHours(record.shift).toFixed(1)}h
-                            </span>
+                            <div>
+                              <div className="font-medium">Scheduled Hours</div>
+                              <div>{calculateScheduledHours(record.shift).toFixed(1)}h</div>
+                            </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <DollarSign className="w-4 h-4 text-green-600" />
-                            <span>
-                              Pay Rate: £{record.shift.pay_rate || 0}/hour
-                            </span>
+                            <Clock className="w-4 h-4 text-orange-600" />
+                            <div>
+                              <div className="font-medium">Shift Value</div>
+                              <div>£{(calculateScheduledHours(record.shift) * (record.shift.pay_rate || 0)).toFixed(2)}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <User className="w-4 h-4 text-green-600" />
+                            <div>
+                              <div className="font-medium">Pay Rate</div>
+                              <div>£{record.shift.pay_rate || 0}/hour</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Break Deduction and Final Pay Length */}
+                        <div className="grid grid-cols-2 gap-4 mb-4 text-sm bg-white p-3 rounded border">
+                          <div>
+                            <div className="font-medium text-gray-600">Break Deduction</div>
+                            <div className="text-sm">0.5h (automatic)</div>
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-600">Final Pay Length</div>
+                            <div className="text-sm font-medium text-green-600">
+                              {(calculateScheduledHours(record.shift) - 0.5).toFixed(1)}h
+                            </div>
                           </div>
                         </div>
 
@@ -580,22 +603,9 @@ const TimeDiscrepancyManager = () => {
                               </div>
                             </div>
                             
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                id={`pay-${record.id}`}
-                                checked={approval.pay_full_hours || false}
-                                onChange={(e) => updateApproval(record.id, 'pay_full_hours', e.target.checked)}
-                                className="rounded"
-                              />
-                              <Label htmlFor={`pay-${record.id}`} className="text-sm">
-                                Pay for actual hours worked
-                              </Label>
-                            </div>
-                            
-                            {approval.pay_full_hours && approval.manual_start_time && approval.manual_end_time && (
+                            {approval.manual_start_time && approval.manual_end_time && (
                               <div className="p-2 bg-green-50 rounded text-sm text-green-700">
-                                <DollarSign className="w-4 h-4 inline mr-1" />
+                                <Clock className="w-4 h-4 inline mr-1" />
                                 Estimated pay: £{(
                                   differenceInMinutes(
                                     parseISO(`2000-01-01T${approval.manual_end_time}`), 
