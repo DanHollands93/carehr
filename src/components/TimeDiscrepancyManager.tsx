@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -398,6 +398,27 @@ const TimeDiscrepancyManager = () => {
       });
     }
   });
+
+  // Auto-populate default values when a "did not clock in" record is selected
+  useEffect(() => {
+    if (selectedRecord && discrepancyRecords) {
+      const record = discrepancyRecords.find(r => r.id === selectedRecord);
+      if (record && record.discrepancy_type === 'did_not_clock_in' && record.shift) {
+        // Only set defaults if not already set
+        if (!approvals[selectedRecord]?.manual_start_time) {
+          setApprovals(prev => ({
+            ...prev,
+            [selectedRecord]: {
+              ...prev[selectedRecord],
+              manual_start_time: record.shift!.start_time,
+              manual_end_time: record.shift!.end_time,
+              break_deduction_minutes: record.shift!.break_minutes || 60
+            }
+          }));
+        }
+      }
+    }
+  }, [selectedRecord, discrepancyRecords]);
 
   const getOvertimeOptions = (type: 'early' | 'late') => [
     { value: 'paid', label: `Pay ${type} overtime` },
