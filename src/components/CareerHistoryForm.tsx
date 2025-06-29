@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
@@ -400,8 +401,33 @@ const CareerHistoryEditForm = ({
     return acc;
   }, {} as Record<string, typeof lookupLists>);
 
-  const handleSave = () => {
-    onSuccess(formData);
+  const handleSave = async () => {
+    try {
+      const { error } = await supabase
+        .from('career_history')
+        .update({
+          job_title: formData.job_title,
+          location: formData.location,
+          pay_rate: formData.pay_rate,
+          pay_type: formData.pay_type,
+          employment_type: formData.employment_type,
+          contract_type: formData.contract_type,
+          hours_per_week: formData.hours_per_week,
+          start_date: formData.start_date,
+          end_date: formData.end_date,
+          probation_end_date: formData.probation_end_date,
+          notice_period_weeks: formData.notice_period_weeks
+        })
+        .eq('id', formData.id);
+
+      if (error) throw error;
+      
+      toast.success("Career history updated successfully!");
+      onSuccess(formData);
+    } catch (error) {
+      console.error('Error updating career history:', error);
+      toast.error("Failed to update career history. Please try again.");
+    }
   };
 
   if (isLoadingLookups) {
@@ -424,42 +450,44 @@ const CareerHistoryEditForm = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <Label htmlFor="job_title">Job Title</Label>
-            <Select 
-              value={formData.job_title} 
-              onValueChange={(value) => setFormData({ ...formData, job_title: value })}
-            >
-              <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
-                <SelectValue placeholder="Select job title" />
-              </SelectTrigger>
-              <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
-                {lookupsByCategory.positions?.map((position) => (
-                  <SelectItem key={position.id} value={position.value}>
-                    {position.value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="job_title">Job Title</Label>
+              <Select 
+                value={formData.job_title} 
+                onValueChange={(value) => setFormData({ ...formData, job_title: value })}
+              >
+                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
+                  <SelectValue placeholder="Select job title" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
+                  {lookupsByCategory.positions?.map((position) => (
+                    <SelectItem key={position.id} value={position.value}>
+                      {position.value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div>
-            <Label htmlFor="location">Location</Label>
-            <Select 
-              value={formData.location} 
-              onValueChange={(value) => setFormData({ ...formData, location: value })}
-            >
-              <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
-                <SelectValue placeholder="Select work location" />
-              </SelectTrigger>
-              <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
-                {lookupsByCategory.locations?.map((location) => (
-                  <SelectItem key={location.id} value={location.value}>
-                    {location.value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <Label htmlFor="location">Location</Label>
+              <Select 
+                value={formData.location} 
+                onValueChange={(value) => setFormData({ ...formData, location: value })}
+              >
+                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
+                  <SelectValue placeholder="Select work location" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
+                  {lookupsByCategory.locations?.map((location) => (
+                    <SelectItem key={location.id} value={location.value}>
+                      {location.value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
