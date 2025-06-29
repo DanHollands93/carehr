@@ -62,11 +62,12 @@ const TimeDiscrepancyManager = () => {
       
       const now = new Date();
       
-      // First, get all shifts that have ended but might not have time clock records
+      // First, get all shifts that have ended
       const { data: shifts, error: shiftsError } = await supabase
         .from('shifts')
         .select(`
           *,
+          employees!inner(first_name, last_name),
           employee_job_roles!inner(pay_rate)
         `)
         .lte('date', format(now, 'yyyy-MM-dd'))
@@ -149,7 +150,7 @@ const TimeDiscrepancyManager = () => {
             timeRecord.discrepancy_type = 'did_not_clock_in';
           }
           
-          // Add shift data with pay rate
+          // Add shift data with pay rate from employee_job_roles
           const shiftWithPayRate = {
             ...shift,
             pay_rate: shift.employee_job_roles?.[0]?.pay_rate || 0,
@@ -157,44 +158,22 @@ const TimeDiscrepancyManager = () => {
             paid_break_minutes: 0
           };
           
+          // Add employee data
+          const employeeData = {
+            first_name: shift.employees?.first_name || 'Unknown',
+            last_name: shift.employees?.last_name || 'Employee'
+          };
+          
           validRecords.push({
             ...timeRecord,
-            shift: shiftWithPayRate
+            shift: shiftWithPayRate,
+            employee: employeeData
           });
         }
       }
       
-      // Get employee details for all valid records
-      const employeeIds = [...new Set(validRecords.map(r => r.employee_id))];
-      console.log('Employee IDs for valid records:', employeeIds);
-      
-      if (employeeIds.length === 0) {
-        return [];
-      }
-      
-      const { data: employees, error: employeesError } = await supabase
-        .from('employees')
-        .select('id, first_name, last_name')
-        .in('id', employeeIds);
-      
-      if (employeesError) {
-        console.error('Error fetching employees:', employeesError);
-        throw employeesError;
-      }
-      
-      console.log('Employees for valid records:', employees);
-      
-      // Create lookup map
-      const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
-      
-      // Combine the data
-      const transformedRecords = validRecords.map(record => ({
-        ...record,
-        employee: employeeMap.get(record.employee_id)
-      })) as TimeClockRecord[];
-      
-      console.log('Final transformed records:', transformedRecords);
-      return transformedRecords;
+      console.log('Final valid records:', validRecords);
+      return validRecords as TimeClockRecord[];
     }
   });
 
