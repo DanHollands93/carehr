@@ -47,7 +47,10 @@ const HRHeader = ({ isMobileOpen, setIsMobileOpen }: HRHeaderProps) => {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <h1 className="text-xl font-semibold text-gray-800">Welcome to HR Portal</h1>
+        <h1 className="text-xl font-semibold">
+          <span className="text-primary">Care</span>
+          <span className="text-secondary">HR</span>
+        </h1>
       </div>
       <div className="flex items-center space-x-4">
         <div className="relative">

@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -5,10 +6,12 @@ import { Menu, User, Bell, LogOut, UserCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
+
 interface DashboardHeaderProps {
   isMobileOpen: boolean;
   setIsMobileOpen: (isOpen: boolean) => void;
 }
+
 const DashboardHeader = ({
   isMobileOpen,
   setIsMobileOpen
@@ -36,7 +39,10 @@ const DashboardHeader = ({
         <Button variant="ghost" size="icon" className="md:hidden mr-2" onClick={() => setIsMobileOpen(!isMobileOpen)}>
           <Menu className="h-5 w-5" />
         </Button>
-        <h1 className="text-xl font-semibold">CareHR</h1>
+        <h1 className="text-xl font-semibold">
+          <span className="text-primary">Care</span>
+          <span className="text-secondary">HR</span>
+        </h1>
       </div>
       <div className="flex items-center space-x-4">
         <div className="relative">
@@ -70,4 +76,5 @@ const DashboardHeader = ({
       </div>
     </header>;
 };
+
 export default DashboardHeader;

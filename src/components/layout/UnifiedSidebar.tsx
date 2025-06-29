@@ -1,3 +1,4 @@
+
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,7 @@ const UnifiedSidebar = ({
   isMobileOpen,
   setIsMobileOpen
 }: UnifiedSidebarProps) => {
-  const { signOut, userRole } = useAuth();
+  const { signOut, user } = useAuth();
   const { hasPermission, loading: permissionsLoading, permissions } = usePermissions();
   const isMobile = useIsMobile();
 
@@ -101,13 +102,17 @@ const UnifiedSidebar = ({
 
   const sidebarContent = (
     <>
-      <div className="p-6 border-b bg-blue-50">
-        <h2 className="text-xl font-bold text-blue-900">
-          {userRole === 'admin' ? 'Admin Portal' : 'HR System'}
-        </h2>
-        <p className="text-sm text-blue-700">
-          {userRole === 'admin' ? 'System Administration' : 'Employee Portal'}
-        </p>
+      <div className="p-4 border-b">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+            <User className="w-4 h-4 text-primary-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {user?.email || 'Employee'}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
