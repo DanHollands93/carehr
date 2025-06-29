@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
@@ -361,6 +360,328 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
         </form>
       </DialogContent>
     </Dialog>
+  );
+};
+
+// Career History Edit Form Component
+const CareerHistoryEditForm = ({ 
+  entry, 
+  onClose, 
+  onSuccess 
+}: { 
+  entry: CareerHistoryEntry; 
+  onClose: () => void; 
+  onSuccess: (entry: CareerHistoryEntry) => void;
+}) => {
+  const [formData, setFormData] = useState<CareerHistoryEntry>(entry);
+
+  // Fetch lookup lists from settings
+  const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
+    queryKey: ['lookup-lists-all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lookup_lists')
+        .select('*')
+        .eq('is_active', true)
+        .order('category, value');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Group lookup lists by category
+  const lookupsByCategory = lookupLists.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = [];
+    }
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<string, typeof lookupLists>);
+
+  const handleSave = () => {
+    onSuccess(formData);
+  };
+
+  if (isLoadingLookups) {
+    return (
+      <Dialog open={true} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-center p-8">
+            <div>Loading form data...</div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Career History Entry</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="job_title">Job Title</Label>
+            <Select 
+              value={formData.job_title} 
+              onValueChange={(value) => setFormData({ ...formData, job_title: value })}
+            >
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Select job title" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                {lookupsByCategory.positions?.map((position) => (
+                  <SelectItem key={position.id} value={position.value}>
+                    {position.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="location">Location</Label>
+            <Select 
+              value={formData.location} 
+              onValueChange={(value) => setFormData({ ...formData, location: value })}
+            >
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Select work location" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                {lookupsByCategory.locations?.map((location) => (
+                  <SelectItem key={location.id} value={location.value}>
+                    {location.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="pay_type">Pay Type</Label>
+              <Select 
+                value={formData.pay_type} 
+                onValueChange={(value) => setFormData({ ...formData, pay_type: value })}
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Select pay type" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                  {lookupsByCategory.pay_types?.map((type) => (
+                    <SelectItem key={type.id} value={type.value.toLowerCase()}>
+                      {type.value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="pay_rate">Pay Rate</Label>
+              <Input
+                id="pay_rate"
+                type="number"
+                step="0.01"
+                value={formData.pay_rate}
+                onChange={(e) => setFormData({ ...formData, pay_rate: parseFloat(e.target.value) })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="employment_type">Employment Type</Label>
+              <Select 
+                value={formData.employment_type} 
+                onValueChange={(value) => setFormData({ ...formData, employment_type: value })}
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Select employment type" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                  {lookupsByCategory.employment_types?.map((type) => (
+                    <SelectItem key={type.id} value={type.value.toLowerCase()}>
+                      {type.value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="contract_type">Contract Type</Label>
+              <Select 
+                value={formData.contract_type} 
+                onValueChange={(value) => setFormData({ ...formData, contract_type: value })}
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Select contract type" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                  {lookupsByCategory.contract_types?.map((type) => (
+                    <SelectItem key={type.id} value={type.value.toLowerCase().replace(' ', '_')}>
+                      {type.value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="hours_per_week">Hours per Week</Label>
+            <Input
+              id="hours_per_week"
+              type="number"
+              step="0.5"
+              value={formData.hours_per_week}
+              onChange={(e) => setFormData({ ...formData, hours_per_week: parseFloat(e.target.value) })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="start_date">Start Date</Label>
+              <Input
+                id="start_date"
+                type="date"
+                value={formData.start_date.split('T')[0]}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="end_date">End Date</Label>
+              <Input
+                id="end_date"
+                type="date"
+                value={formData.end_date ? formData.end_date.split('T')[0] : ''}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value || undefined })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="probation_end_date">Probation End Date</Label>
+              <Input
+                id="probation_end_date"
+                type="date"
+                value={formData.probation_end_date || ''}
+                onChange={(e) => setFormData({ ...formData, probation_end_date: e.target.value || undefined })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="notice_period_weeks">Notice Period (weeks)</Label>
+              <Input
+                id="notice_period_weeks"
+                type="number"
+                value={formData.notice_period_weeks || ''}
+                onChange={(e) => setFormData({ ...formData, notice_period_weeks: parseInt(e.target.value) || undefined })}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-4 pt-4">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>
+              <Check className="w-4 h-4 mr-2" />
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Simple address form component - now without Card wrapper since it's in a dialog
+const AddressForm = ({ onClose, onSave }: { onClose: () => void; onSave: (data: any) => void }) => {
+  const [addressData, setAddressData] = useState({
+    line_1: '',
+    line_2: '',
+    city: '',
+    postcode: '',
+    country: 'United Kingdom',
+    start_date: new Date().toISOString().split('T')[0]
+  });
+
+  const handleSave = () => {
+    if (!addressData.line_1 || !addressData.city || !addressData.postcode || !addressData.start_date) {
+      toast.error("Please fill in required fields (Address Line 1, City, Postcode, Start Date)");
+      return;
+    }
+    onSave(addressData);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="line_1">Address Line 1 *</Label>
+        <Input
+          id="line_1"
+          value={addressData.line_1}
+          onChange={(e) => setAddressData({...addressData, line_1: e.target.value})}
+        />
+      </div>
+      <div>
+        <Label htmlFor="line_2">Address Line 2</Label>
+        <Input
+          id="line_2"
+          value={addressData.line_2}
+          onChange={(e) => setAddressData({...addressData, line_2: e.target.value})}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="city">City *</Label>
+          <Input
+            id="city"
+            value={addressData.city}
+            onChange={(e) => setAddressData({...addressData, city: e.target.value})}
+          />
+        </div>
+        <div>
+          <Label htmlFor="postcode">Postcode *</Label>
+          <Input
+            id="postcode"
+            value={addressData.postcode}
+            onChange={(e) => setAddressData({...addressData, postcode: e.target.value})}
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="country">Country</Label>
+          <Input
+            id="country"
+            value={addressData.country}
+            onChange={(e) => setAddressData({...addressData, country: e.target.value})}
+          />
+        </div>
+        <div>
+          <Label htmlFor="start_date">Start Date *</Label>
+          <Input
+            id="start_date"
+            type="date"
+            value={addressData.start_date}
+            onChange={(e) => setAddressData({...addressData, start_date: e.target.value})}
+          />
+        </div>
+      </div>
+      <div className="flex justify-end space-x-2 pt-4">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave}>
+          Add Address
+        </Button>
+      </div>
+    </div>
   );
 };
 
