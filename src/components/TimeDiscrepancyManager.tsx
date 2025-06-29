@@ -448,14 +448,16 @@ const TimeDiscrepancyManager = () => {
   const canApprove = (recordId: string) => {
     const record = discrepancyRecords?.find(r => r.id === recordId);
     const approval = approvals[recordId];
-    if (!record || !approval) return false;
+    if (!record) return false;
 
-    // If employee didn't clock in at all, need manual times
+    // If employee didn't clock in at all, we need manual times to approve
     if (record.discrepancy_type === 'did_not_clock_in') {
-      return approval.manual_start_time && approval.manual_end_time;
+      return approval?.manual_start_time && approval?.manual_end_time;
     }
 
-    // Check if we have decisions for all required overtime periods
+    // For actual clock time discrepancies, check if we have decisions for required overtime periods
+    if (!approval) return false;
+    
     const hasEarlyOvertime = record.clock_in_time && record.shift && 
       parseISO(record.clock_in_time) < parseISO(`${record.shift.date}T${record.shift.start_time}`);
     const hasLateOvertime = record.clock_out_time && record.shift && 
