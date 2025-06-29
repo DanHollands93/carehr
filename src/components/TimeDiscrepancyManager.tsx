@@ -33,6 +33,8 @@ interface TimeClockRecord {
     start_time: string;
     end_time: string;
     pay_rate: number;
+    break_minutes?: number;
+    paid_break_minutes?: number;
   };
 }
 
@@ -44,7 +46,7 @@ interface DiscrepancyApproval {
   general_notes?: string;
   manual_start_time?: string;
   manual_end_time?: string;
-  pay_full_hours?: boolean;
+  break_deduction_minutes?: number;
 }
 
 const TimeDiscrepancyManager = () => {
@@ -80,17 +82,27 @@ const TimeDiscrepancyManager = () => {
         return [];
       }
       
-      // Get shift details for all records
+      // Get shift details for all records - including break information
       const shiftIds = records.map(r => r.shift_id).filter(Boolean);
       console.log('Shift IDs to fetch:', shiftIds);
       
       const { data: shifts } = await supabase
         .from('shifts')
-        .select('*')
+        .select(`
+          *,
+          employee_job_roles!inner(pay_rate)
+        `)
         .in('id', shiftIds);
       
-      console.log('Found shifts:', shifts);
-      const shiftsMap = new Map(shifts?.map(s => [s.id, s]) || []);
+      console.log('Found shifts with pay rates:', shifts);
+      const shiftsMap = new Map(shifts?.map(s => ({
+        ...s,
+        pay_rate: s.employee_job_roles?.[0]?.pay_rate || 0,
+        // Calculate break information from shift duration
+        // For now, we'll assume 1 hour unpaid break for shifts over 5 hours
+        break_minutes: 60, // This should come from actual shift data
+        paid_break_minutes: 0
+      })).map(s => [s.id, s]) || []);
       
       // Get all employees to check for Elizabeth Davis specifically
       const { data: allEmployees } = await supabase
@@ -224,16 +236,18 @@ const TimeDiscrepancyManager = () => {
 
           const manualStartTime = parseISO(`${shift.date}T${approval.manual_start_time}`);
           const manualEndTime = parseISO(`${shift.date}T${approval.manual_end_time}`);
-          const minutesWorked = differenceInMinutes(manualEndTime, manualStartTime);
+          const totalMinutesWorked = differenceInMinutes(manualEndTime, manualStartTime);
+          const breakDeductionMinutes = approval.break_deduction_minutes || shift.break_minutes || 60;
+          const paidMinutes = Math.max(0, totalMinutesWorked - breakDeductionMinutes);
 
           updateData = {
             ...updateData,
             clock_in_time: manualStartTime.toISOString(),
             clock_out_time: manualEndTime.toISOString(),
-            scheduled_minutes_paid: minutesWorked,
+            scheduled_minutes_paid: paidMinutes,
             status: 'completed',
             discrepancy_type: 'manual_time_entry',
-            notes: `${approval.general_notes || ''} - Manual time entry: ${approval.manual_start_time} to ${approval.manual_end_time}`.trim()
+            notes: `${approval.general_notes || ''} - Manual time entry: ${approval.manual_start_time} to ${approval.manual_end_time}. Break deduction: ${breakDeductionMinutes} minutes`.trim()
           };
 
           // Create time segment for manual entry
@@ -244,8 +258,8 @@ const TimeDiscrepancyManager = () => {
               segment_type: 'manual_entry',
               start_time: manualStartTime.toISOString(),
               end_time: manualEndTime.toISOString(),
-              minutes_worked: minutesWorked,
-              minutes_paid: minutesWorked,
+              minutes_worked: totalMinutesWorked,
+              minutes_paid: paidMinutes,
               pay_status: 'paid'
             });
         }
@@ -429,7 +443,7 @@ const TimeDiscrepancyManager = () => {
     return differenceInMinutes(actualTime, scheduledDateTime);
   };
 
-  const updateApproval = (recordId: string, field: keyof DiscrepancyApproval, value: string | boolean) => {
+  const updateApproval = (recordId: string, field: keyof DiscrepancyApproval, value: string | boolean | number) => {
     setApprovals(prev => ({
       ...prev,
       [recordId]: {
@@ -468,6 +482,29 @@ const TimeDiscrepancyManager = () => {
     const startTime = parseISO(`${shift.date}T${shift.start_time}`);
     const endTime = parseISO(`${shift.date}T${shift.end_time}`);
     return differenceInMinutes(endTime, startTime) / 60;
+  };
+
+  const getBreakDeductionHours = (shift: any) => {
+    return (shift.break_minutes || 60) / 60; // Convert minutes to hours, default to 1 hour
+  };
+
+  const calculateFinalPayLength = (recordId: string, shift: any) => {
+    const approval = approvals[recordId];
+    if (!approval || !approval.manual_start_time || !approval.manual_end_time) {
+      // Default calculation
+      const scheduledHours = calculateScheduledHours(shift);
+      const breakDeductionHours = getBreakDeductionHours(shift);
+      return Math.max(0, scheduledHours - breakDeductionHours);
+    }
+
+    // Calculate from manual times
+    const manualHours = differenceInMinutes(
+      parseISO(`2000-01-01T${approval.manual_end_time}`), 
+      parseISO(`2000-01-01T${approval.manual_start_time}`)
+    ) / 60;
+    
+    const breakDeductionHours = (approval.break_deduction_minutes || shift.break_minutes || 60) / 60;
+    return Math.max(0, manualHours - breakDeductionHours);
   };
 
   if (isLoading) {
@@ -572,12 +609,12 @@ const TimeDiscrepancyManager = () => {
                         <div className="grid grid-cols-2 gap-4 mb-4 text-sm bg-white p-3 rounded border">
                           <div>
                             <div className="font-medium text-gray-600">Break Deduction</div>
-                            <div className="text-sm">0.5h (automatic)</div>
+                            <div className="text-sm">{getBreakDeductionHours(record.shift).toFixed(1)}h</div>
                           </div>
                           <div>
                             <div className="font-medium text-gray-600">Final Pay Length</div>
                             <div className="text-sm font-medium text-green-600">
-                              {(calculateScheduledHours(record.shift) - 0.5).toFixed(1)}h
+                              {calculateFinalPayLength(record.id, record.shift).toFixed(1)}h
                             </div>
                           </div>
                         </div>
@@ -603,15 +640,22 @@ const TimeDiscrepancyManager = () => {
                               </div>
                             </div>
                             
+                            <div className="space-y-2">
+                              <Label>Break Deduction (minutes)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="15"
+                                value={approval.break_deduction_minutes || record.shift.break_minutes || 60}
+                                onChange={(e) => updateApproval(record.id, 'break_deduction_minutes', parseInt(e.target.value) || 0)}
+                              />
+                            </div>
+                            
                             {approval.manual_start_time && approval.manual_end_time && (
                               <div className="p-2 bg-green-50 rounded text-sm text-green-700">
                                 <Clock className="w-4 h-4 inline mr-1" />
-                                Estimated pay: £{(
-                                  differenceInMinutes(
-                                    parseISO(`2000-01-01T${approval.manual_end_time}`), 
-                                    parseISO(`2000-01-01T${approval.manual_start_time}`)
-                                  ) / 60 * (record.shift.pay_rate || 0)
-                                ).toFixed(2)}
+                                Final pay length: {calculateFinalPayLength(record.id, record.shift).toFixed(1)}h 
+                                (£{(calculateFinalPayLength(record.id, record.shift) * (record.shift.pay_rate || 0)).toFixed(2)})
                               </div>
                             )}
                           </div>
