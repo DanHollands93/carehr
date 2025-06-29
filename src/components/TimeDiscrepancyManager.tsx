@@ -597,7 +597,10 @@ const TimeDiscrepancyManager = () => {
                               <div className="p-2 bg-green-50 rounded text-sm text-green-700">
                                 <DollarSign className="w-4 h-4 inline mr-1" />
                                 Estimated pay: £{(
-                                  (parseISO(`2000-01-01T${approval.manual_end_time}`) - parseISO(`2000-01-01T${approval.manual_start_time}`)) / (1000 * 60 * 60) * (record.shift.pay_rate || 0)
+                                  differenceInMinutes(
+                                    parseISO(`2000-01-01T${approval.manual_end_time}`), 
+                                    parseISO(`2000-01-01T${approval.manual_start_time}`)
+                                  ) / 60 * (record.shift.pay_rate || 0)
                                 ).toFixed(2)}
                               </div>
                             )}
