@@ -6,8 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
 
 interface ShiftTemplate {
@@ -63,14 +61,21 @@ const ShiftCreationPopup = ({
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
   const [selectedJobRole, setSelectedJobRole] = useState<string>('');
+  const [position, setPosition] = useState<string>('');
 
-  // Get employee's job roles
-  const { data: employeeJobRoles } = useEmployeeJobRoles(employeeId);
+  // Get employee's job roles - only fetch if employeeId is provided
+  const { data: employeeJobRoles, isLoading, error } = useEmployeeJobRoles(employeeId);
+
+  console.log('ShiftCreationPopup - Employee ID:', employeeId);
+  console.log('ShiftCreationPopup - Job Roles:', employeeJobRoles);
+  console.log('ShiftCreationPopup - Loading:', isLoading);
+  console.log('ShiftCreationPopup - Error:', error);
 
   useEffect(() => {
     if (existingShift) {
       setStartTime(existingShift.start_time);
       setEndTime(existingShift.end_time);
+      setPosition(existingShift.position);
       setSelectedJobRole(existingShift.job_role_id);
       
       // Find matching template
@@ -88,15 +93,19 @@ const ShiftCreationPopup = ({
       setStartTime('09:00');
       setEndTime('17:00');
       setSelectedJobRole('');
+      setPosition('');
       
       // Auto-select job role if employee has only one
       if (employeeJobRoles && employeeJobRoles.length === 1) {
-        setSelectedJobRole(employeeJobRoles[0].job_role_id);
+        const role = employeeJobRoles[0];
+        setSelectedJobRole(role.job_role_id);
+        setPosition(role.job_roles?.title || '');
       } else if (employeeJobRoles && employeeJobRoles.length > 1) {
         // Find primary role
         const primaryRole = employeeJobRoles.find(role => role.is_primary);
         if (primaryRole) {
           setSelectedJobRole(primaryRole.job_role_id);
+          setPosition(primaryRole.job_roles?.title || '');
         }
       }
     }
@@ -108,6 +117,18 @@ const ShiftCreationPopup = ({
       setSelectedTemplate(templateId);
       setStartTime(template.start_time);
       setEndTime(template.end_time);
+      // Don't override position if we have a selected job role
+      if (!selectedJobRole) {
+        setPosition(template.position);
+      }
+    }
+  };
+
+  const handleJobRoleSelect = (jobRoleId: string) => {
+    setSelectedJobRole(jobRoleId);
+    const selectedRole = employeeJobRoles?.find(role => role.job_role_id === jobRoleId);
+    if (selectedRole?.job_roles?.title) {
+      setPosition(selectedRole.job_roles.title);
     }
   };
 
@@ -117,15 +138,12 @@ const ShiftCreationPopup = ({
     const selectedRole = employeeJobRoles?.find(role => role.job_role_id === selectedJobRole);
     if (!selectedRole) return;
 
-    // Use job role title as position
-    const position = selectedRole.job_roles?.title || 'Unknown';
-
     onCreateShift({
       start_time: startTime,
       end_time: endTime,
-      position: position,
+      position: position || selectedRole.job_roles?.title || 'Unknown',
       job_role_id: selectedJobRole,
-      pay_rate: selectedRole.pay_rate
+      pay_rate: selectedRole.pay_rate || 0
     });
   };
 
@@ -134,6 +152,7 @@ const ShiftCreationPopup = ({
     setStartTime('09:00');
     setEndTime('17:00');
     setSelectedJobRole('');
+    setPosition('');
     onClose();
   };
 
@@ -170,11 +189,25 @@ const ShiftCreationPopup = ({
             </Select>
           </div>
 
+          {/* Loading State */}
+          {isLoading && (
+            <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+              Loading employee job roles...
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+              Error loading job roles: {error.message}
+            </div>
+          )}
+
           {/* Job Role Selection */}
-          {employeeJobRoles && employeeJobRoles.length > 0 && (
+          {!isLoading && employeeJobRoles && employeeJobRoles.length > 0 && (
             <div className="space-y-2">
               <Label>Job Role *</Label>
-              <Select value={selectedJobRole} onValueChange={setSelectedJobRole}>
+              <Select value={selectedJobRole} onValueChange={handleJobRoleSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select job role" />
                 </SelectTrigger>
@@ -189,7 +222,7 @@ const ShiftCreationPopup = ({
               </Select>
               {selectedRole && (
                 <div className="text-sm text-gray-600">
-                  Pay Rate: £{selectedRole.pay_rate.toFixed(2)}/hr ({selectedRole.currency})
+                  Pay Rate: £{selectedRole.pay_rate.toFixed(2)}/hr ({selectedRole.currency || 'GBP'})
                   <br />
                   Department: {selectedRole.job_roles?.department || 'Unknown'}
                 </div>
@@ -198,9 +231,16 @@ const ShiftCreationPopup = ({
           )}
 
           {/* No Job Roles Warning */}
-          {(!employeeJobRoles || employeeJobRoles.length === 0) && (
+          {!isLoading && (!employeeJobRoles || employeeJobRoles.length === 0) && employeeId && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
               This employee has no active job roles assigned. Please assign a job role before creating shifts.
+            </div>
+          )}
+
+          {/* No Employee ID Warning */}
+          {!employeeId && (
+            <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded">
+              Employee ID not provided. Job role selection unavailable.
             </div>
           )}
 
@@ -224,17 +264,21 @@ const ShiftCreationPopup = ({
             </div>
           </div>
 
-          {/* Position Display (Read-only, derived from job role) */}
-          {selectedRole && (
-            <div className="space-y-2">
-              <Label>Position (from Job Role)</Label>
-              <Input
-                value={selectedRole.job_roles?.title || 'Unknown'}
-                readOnly
-                className="bg-gray-50"
-              />
-            </div>
-          )}
+          {/* Position Display */}
+          <div className="space-y-2">
+            <Label>Position</Label>
+            <Input
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              placeholder="Position will be set from job role"
+              className={selectedRole ? "bg-gray-50" : ""}
+            />
+            {selectedRole && (
+              <div className="text-xs text-gray-500">
+                Position automatically set from selected job role
+              </div>
+            )}
+          </div>
 
           {/* Actions */}
           <div className="flex justify-between pt-4">
@@ -256,7 +300,7 @@ const ShiftCreationPopup = ({
               </Button>
               <Button 
                 onClick={handleSubmit}
-                disabled={!startTime || !endTime || !selectedJobRole || !employeeJobRoles?.length}
+                disabled={!startTime || !endTime || !selectedJobRole || isLoading}
               >
                 {existingShift ? 'Update' : 'Create'} Shift
               </Button>
