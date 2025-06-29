@@ -572,27 +572,13 @@ const TimeDiscrepancyManager = () => {
                           <span>Employee did not clock in for scheduled shift</span>
                         </div>
                         
-                        {/* Shift Information */}
-                        <div className="grid grid-cols-3 gap-4 mb-4 text-sm">
+                        {/* Simplified Shift Information - removed financial details */}
+                        <div className="grid grid-cols-1 gap-4 mb-4 text-sm">
                           <div className="flex items-center space-x-2">
                             <Calendar className="w-4 h-4 text-blue-600" />
                             <div>
                               <div className="font-medium">Scheduled Hours</div>
                               <div>{calculateScheduledHours(record.shift).toFixed(1)}h</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Clock className="w-4 h-4 text-orange-600" />
-                            <div>
-                              <div className="font-medium">Shift Value</div>
-                              <div>£{(calculateScheduledHours(record.shift) * (record.shift.pay_rate || 0)).toFixed(2)}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <User className="w-4 h-4 text-green-600" />
-                            <div>
-                              <div className="font-medium">Pay Rate</div>
-                              <div>£{record.shift.pay_rate || 0}/hour</div>
                             </div>
                           </div>
                         </div>
@@ -646,8 +632,7 @@ const TimeDiscrepancyManager = () => {
                             {approval.manual_start_time && approval.manual_end_time && (
                               <div className="p-2 bg-green-50 rounded text-sm text-green-700">
                                 <Clock className="w-4 h-4 inline mr-1" />
-                                Final pay length: {calculateFinalPayLength(record.id, record.shift).toFixed(1)}h 
-                                (£{(calculateFinalPayLength(record.id, record.shift) * (record.shift.pay_rate || 0)).toFixed(2)})
+                                Final pay length: {calculateFinalPayLength(record.id, record.shift).toFixed(1)}h
                               </div>
                             )}
                           </div>
