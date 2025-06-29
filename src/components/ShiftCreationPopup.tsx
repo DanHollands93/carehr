@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Trash2 } from "lucide-react";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface ShiftTemplate {
   id: string;
@@ -65,6 +67,7 @@ const ShiftCreationPopup = ({
   date,
   existingShift
 }: ShiftCreationPopupProps) => {
+  const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
@@ -131,14 +134,50 @@ const ShiftCreationPopup = ({
     }
   };
 
+  const findBestJobRoleMatch = (careerEntry: any, jobRoles: JobRole[]) => {
+    // First, try exact match by job_role_id if it exists
+    if (careerEntry.job_role_id) {
+      const exactMatch = jobRoles.find(role => role.id === careerEntry.job_role_id);
+      if (exactMatch) {
+        console.log('Found exact job_role_id match:', exactMatch);
+        return exactMatch;
+      }
+    }
+
+    // Try exact title and location match
+    let match = jobRoles.find(role => 
+      role.title === careerEntry.job_title && 
+      role.location === careerEntry.location
+    );
+    
+    if (match) {
+      console.log('Found exact title + location match:', match);
+      return match;
+    }
+
+    // Try just title match (most flexible)
+    match = jobRoles.find(role => role.title === careerEntry.job_title);
+    
+    if (match) {
+      console.log('Found title-only match:', match);
+      return match;
+    }
+
+    console.log('No job role match found for:', careerEntry.job_title, careerEntry.location);
+    return null;
+  };
+
   const handleSubmit = () => {
     console.log('Submit clicked');
     console.log('Selected career history ID:', selectedCareerHistoryId);
-    console.log('Career history:', careerHistory);
-    console.log('Job roles:', jobRoles);
     
     if (!startTime || !endTime || !selectedCareerHistoryId) {
       console.log('Missing required fields:', { startTime, endTime, selectedCareerHistoryId });
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -148,41 +187,53 @@ const ShiftCreationPopup = ({
     
     if (!selectedCareerEntry) {
       console.log('No selected career entry found for ID:', selectedCareerHistoryId);
+      toast({
+        title: "Error",
+        description: "Selected career history entry not found",
+        variant: "destructive"
+      });
       return;
     }
 
-    // Try to find a matching job role based on title and location
-    let jobRoleId: string;
+    // Find the best matching job role
+    const matchingJobRole = findBestJobRoleMatch(selectedCareerEntry, jobRoles || []);
     
-    if (selectedCareerEntry.job_role_id) {
-      // If career history has a job_role_id, use it
-      jobRoleId = selectedCareerEntry.job_role_id;
-    } else {
-      // Otherwise, try to find a matching job role by title and location
-      const matchingJobRole = jobRoles?.find(role => 
-        role.title === selectedCareerEntry.job_title && 
-        role.location === selectedCareerEntry.location
-      );
+    if (!matchingJobRole) {
+      console.log('No matching job role found for:', selectedCareerEntry.job_title, selectedCareerEntry.location);
+      console.log('Available job roles:', jobRoles);
       
-      if (matchingJobRole) {
-        jobRoleId = matchingJobRole.id;
-      } else {
-        console.log('No matching job role found for:', selectedCareerEntry.job_title, selectedCareerEntry.location);
-        console.log('Available job roles:', jobRoles);
-        return;
-      }
+      toast({
+        title: "Job Role Not Found",
+        description: `No matching job role found for "${selectedCareerEntry.job_title}" at "${selectedCareerEntry.location}". Please ensure a job role exists with matching title.`,
+        variant: "destructive"
+      });
+      return;
     }
 
     const shiftData = {
       start_time: startTime,
       end_time: endTime,
       position: selectedCareerEntry.job_title,
-      job_role_id: jobRoleId,
+      job_role_id: matchingJobRole.id,
       pay_rate: selectedCareerEntry.pay_rate || 0
     };
     
     console.log('Creating shift with data:', shiftData);
-    onCreateShift(shiftData);
+    
+    try {
+      onCreateShift(shiftData);
+      toast({
+        title: "Success",
+        description: "Shift created successfully"
+      });
+    } catch (error) {
+      console.error('Error creating shift:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create shift. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleClose = () => {
@@ -271,7 +322,7 @@ const ShiftCreationPopup = ({
                   {selectedCareerEntry.job_role_id ? (
                     <><br /><strong>Status:</strong> <span className="text-green-600">Linked to job role</span></>
                   ) : (
-                    <><br /><strong>Status:</strong> <span className="text-orange-600">Will auto-link to matching job role</span></>
+                    <><br /><strong>Status:</strong> <span className="text-orange-600">Will auto-match to job role by title</span></>
                   )}
                 </div>
               )}
