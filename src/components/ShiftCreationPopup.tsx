@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
-import { useEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ShiftTemplate {
   id: string;
@@ -26,6 +27,16 @@ interface Shift {
   end_time: string;
   position: string;
   job_role_id: string;
+}
+
+interface CareerHistoryRecord {
+  id: string;
+  job_title: string;
+  location: string;
+  pay_rate: number;
+  currency: string;
+  start_date: string;
+  end_date: string | null;
 }
 
 interface ShiftCreationPopupProps {
@@ -60,13 +71,29 @@ const ShiftCreationPopup = ({
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
-  const [selectedJobRole, setSelectedJobRole] = useState<string>('');
+  const [selectedCareerRecord, setSelectedCareerRecord] = useState<string>('');
 
-  // Get employee's job roles - only fetch if employeeId is provided
-  const { data: employeeJobRoles, isLoading, error } = useEmployeeJobRoles(employeeId);
+  // Get employee's career history
+  const { data: careerHistory, isLoading, error } = useQuery({
+    queryKey: ['career-history', employeeId],
+    queryFn: async () => {
+      if (!employeeId) return [];
+      
+      const { data, error } = await supabase
+        .from('career_history')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .is('end_date', null) // Only active positions
+        .order('start_date', { ascending: false });
+      
+      if (error) throw error;
+      return data as CareerHistoryRecord[];
+    },
+    enabled: !!employeeId
+  });
 
   console.log('ShiftCreationPopup - Employee ID:', employeeId);
-  console.log('ShiftCreationPopup - Job Roles:', employeeJobRoles);
+  console.log('ShiftCreationPopup - Career History:', careerHistory);
   console.log('ShiftCreationPopup - Loading:', isLoading);
   console.log('ShiftCreationPopup - Error:', error);
 
@@ -74,7 +101,7 @@ const ShiftCreationPopup = ({
     if (existingShift) {
       setStartTime(existingShift.start_time);
       setEndTime(existingShift.end_time);
-      setSelectedJobRole(existingShift.job_role_id);
+      setSelectedCareerRecord(existingShift.job_role_id);
       
       // Find matching template
       const matchingTemplate = shiftTemplates.find(t => 
@@ -90,20 +117,14 @@ const ShiftCreationPopup = ({
       setSelectedTemplate('');
       setStartTime('09:00');
       setEndTime('17:00');
-      setSelectedJobRole('');
+      setSelectedCareerRecord('');
       
-      // Auto-select job role if employee has only one
-      if (employeeJobRoles && employeeJobRoles.length === 1) {
-        setSelectedJobRole(employeeJobRoles[0].job_role_id);
-      } else if (employeeJobRoles && employeeJobRoles.length > 1) {
-        // Find primary role
-        const primaryRole = employeeJobRoles.find(role => role.is_primary);
-        if (primaryRole) {
-          setSelectedJobRole(primaryRole.job_role_id);
-        }
+      // Auto-select career record if employee has only one active position
+      if (careerHistory && careerHistory.length === 1) {
+        setSelectedCareerRecord(careerHistory[0].id);
       }
     }
-  }, [existingShift, shiftTemplates, isOpen, employeeJobRoles]);
+  }, [existingShift, shiftTemplates, isOpen, careerHistory]);
 
   const handleTemplateSelect = (templateId: string) => {
     const template = shiftTemplates.find(t => t.id === templateId);
@@ -115,17 +136,17 @@ const ShiftCreationPopup = ({
   };
 
   const handleSubmit = () => {
-    if (!startTime || !endTime || !selectedJobRole) return;
+    if (!startTime || !endTime || !selectedCareerRecord) return;
 
-    const selectedRole = employeeJobRoles?.find(role => role.job_role_id === selectedJobRole);
-    if (!selectedRole) return;
+    const selectedRecord = careerHistory?.find(record => record.id === selectedCareerRecord);
+    if (!selectedRecord) return;
 
     onCreateShift({
       start_time: startTime,
       end_time: endTime,
-      position: selectedRole.job_roles?.title || 'Unknown',
-      job_role_id: selectedJobRole,
-      pay_rate: selectedRole.pay_rate || 0
+      position: selectedRecord.job_title,
+      job_role_id: selectedCareerRecord,
+      pay_rate: selectedRecord.pay_rate || 0
     });
   };
 
@@ -133,11 +154,11 @@ const ShiftCreationPopup = ({
     setSelectedTemplate('');
     setStartTime('09:00');
     setEndTime('17:00');
-    setSelectedJobRole('');
+    setSelectedCareerRecord('');
     onClose();
   };
 
-  const selectedRole = employeeJobRoles?.find(role => role.job_role_id === selectedJobRole);
+  const selectedRecord = careerHistory?.find(record => record.id === selectedCareerRecord);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -173,57 +194,56 @@ const ShiftCreationPopup = ({
           {/* Loading State */}
           {isLoading && (
             <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
-              Loading employee job roles...
+              Loading employee career history...
             </div>
           )}
 
           {/* Error State */}
           {error && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-              Error loading job roles: {error.message}
+              Error loading career history: {error.message}
             </div>
           )}
 
-          {/* Job Role Selection - This is mandatory and determines the position */}
-          {!isLoading && employeeJobRoles && employeeJobRoles.length > 0 && (
+          {/* Career History Selection - This determines the position */}
+          {!isLoading && careerHistory && careerHistory.length > 0 && (
             <div className="space-y-2">
-              <Label>Job Role * (This determines the position)</Label>
-              <Select value={selectedJobRole} onValueChange={setSelectedJobRole}>
+              <Label>Job Position * (From Career History)</Label>
+              <Select value={selectedCareerRecord} onValueChange={setSelectedCareerRecord}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select job role" />
+                  <SelectValue placeholder="Select job position" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employeeJobRoles.map((role) => (
-                    <SelectItem key={role.job_role_id} value={role.job_role_id}>
-                      {role.job_roles?.title || 'Unknown'} - £{role.pay_rate.toFixed(2)}/hr
-                      {role.is_primary && <span className="text-xs text-blue-600 ml-2">(Primary)</span>}
+                  {careerHistory.map((record) => (
+                    <SelectItem key={record.id} value={record.id}>
+                      {record.job_title} - £{record.pay_rate.toFixed(2)}/hr
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {selectedRole && (
+              {selectedRecord && (
                 <div className="text-sm text-gray-600 bg-blue-50 p-2 rounded">
-                  <strong>Position:</strong> {selectedRole.job_roles?.title}
+                  <strong>Position:</strong> {selectedRecord.job_title}
                   <br />
-                  <strong>Pay Rate:</strong> £{selectedRole.pay_rate.toFixed(2)}/hr ({selectedRole.currency || 'GBP'})
+                  <strong>Pay Rate:</strong> £{selectedRecord.pay_rate.toFixed(2)}/hr ({selectedRecord.currency || 'GBP'})
                   <br />
-                  <strong>Department:</strong> {selectedRole.job_roles?.department || 'Unknown'}
+                  <strong>Location:</strong> {selectedRecord.location}
                 </div>
               )}
             </div>
           )}
 
-          {/* No Job Roles Warning */}
-          {!isLoading && (!employeeJobRoles || employeeJobRoles.length === 0) && employeeId && (
+          {/* No Career History Warning */}
+          {!isLoading && (!careerHistory || careerHistory.length === 0) && employeeId && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-              This employee has no active job roles assigned. Please assign a job role in their career history before creating shifts.
+              This employee has no active positions in their career history. Please add a career history record before creating shifts.
             </div>
           )}
 
           {/* No Employee ID Warning */}
           {!employeeId && (
             <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded">
-              Employee ID not provided. Job role selection unavailable.
+              Employee ID not provided. Career history selection unavailable.
             </div>
           )}
 
@@ -267,7 +287,7 @@ const ShiftCreationPopup = ({
               </Button>
               <Button 
                 onClick={handleSubmit}
-                disabled={!startTime || !endTime || !selectedJobRole || isLoading}
+                disabled={!startTime || !endTime || !selectedCareerRecord || isLoading}
               >
                 {existingShift ? 'Update' : 'Create'} Shift
               </Button>
