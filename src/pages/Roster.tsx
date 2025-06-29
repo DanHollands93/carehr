@@ -234,7 +234,7 @@ const Roster = () => {
           end_time: shiftData.end_time,
           position: shiftData.position,
           job_role_id: shiftData.job_role_id,
-          actual_job_role_id: shiftData.job_role_id,
+          actual_job_role_id: shiftData.job_role_id, // Set actual_job_role_id to the same value
           pay_rate: shiftData.pay_rate,
           category_id: selectedCategoryId
         }]);
@@ -363,17 +363,18 @@ const Roster = () => {
       console.log('Dropping shift:', { employeeId, originalDate: date, formattedDate });
       
       if (draggedTemplate) {
-        await createShiftMutation.mutateAsync({
+        // When dropping a template, we need to open the shift creation popup
+        // to select the job role since templates don't have job role info
+        const employee = employees?.find(e => e.id === employeeId);
+        const employeeName = employee ? `${employee.first_name} ${employee.last_name}` : '';
+        
+        setShiftPopup({
+          isOpen: true,
           employeeId,
-          date: formattedDate,
-          shiftData: {
-            start_time: draggedTemplate.start_time,
-            end_time: draggedTemplate.end_time,
-            position: draggedTemplate.position,
-            job_role_id: '00000000-0000-0000-0000-000000000000', // default placeholder, will be set in popup
-            pay_rate: draggedTemplate.pay_value
-          }
+          employeeName,
+          date: formattedDate
         });
+        
         setDraggedTemplate(null);
       } else if (draggedShift) {
         await updateShiftMutation.mutateAsync({
@@ -810,8 +811,7 @@ const Roster = () => {
                                   <div 
                                     className={cn(
                                       "min-h-16 border-2 border-dashed border-gray-200 rounded p-2 transition-colors relative group",
-                                      canEditRoster && "cursor-pointer hover:border-gray-300",
-                                      !canEditRoster && "cursor-default"
+                                      canEditRoster ? "cursor-pointer hover:border-gray-300" : "cursor-default"
                                     )}
                                     style={{
                                       backgroundColor: (canEditRoster && !isMobile && (draggedTemplate || draggedShift)) ? '#f0f9ff' : 'transparent'

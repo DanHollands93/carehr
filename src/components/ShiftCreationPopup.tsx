@@ -61,7 +61,6 @@ const ShiftCreationPopup = ({
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
   const [selectedJobRole, setSelectedJobRole] = useState<string>('');
-  const [position, setPosition] = useState<string>('');
 
   // Get employee's job roles - only fetch if employeeId is provided
   const { data: employeeJobRoles, isLoading, error } = useEmployeeJobRoles(employeeId);
@@ -75,7 +74,6 @@ const ShiftCreationPopup = ({
     if (existingShift) {
       setStartTime(existingShift.start_time);
       setEndTime(existingShift.end_time);
-      setPosition(existingShift.position);
       setSelectedJobRole(existingShift.job_role_id);
       
       // Find matching template
@@ -93,19 +91,15 @@ const ShiftCreationPopup = ({
       setStartTime('09:00');
       setEndTime('17:00');
       setSelectedJobRole('');
-      setPosition('');
       
       // Auto-select job role if employee has only one
       if (employeeJobRoles && employeeJobRoles.length === 1) {
-        const role = employeeJobRoles[0];
-        setSelectedJobRole(role.job_role_id);
-        setPosition(role.job_roles?.title || '');
+        setSelectedJobRole(employeeJobRoles[0].job_role_id);
       } else if (employeeJobRoles && employeeJobRoles.length > 1) {
         // Find primary role
         const primaryRole = employeeJobRoles.find(role => role.is_primary);
         if (primaryRole) {
           setSelectedJobRole(primaryRole.job_role_id);
-          setPosition(primaryRole.job_roles?.title || '');
         }
       }
     }
@@ -117,18 +111,6 @@ const ShiftCreationPopup = ({
       setSelectedTemplate(templateId);
       setStartTime(template.start_time);
       setEndTime(template.end_time);
-      // Don't override position if we have a selected job role
-      if (!selectedJobRole) {
-        setPosition(template.position);
-      }
-    }
-  };
-
-  const handleJobRoleSelect = (jobRoleId: string) => {
-    setSelectedJobRole(jobRoleId);
-    const selectedRole = employeeJobRoles?.find(role => role.job_role_id === jobRoleId);
-    if (selectedRole?.job_roles?.title) {
-      setPosition(selectedRole.job_roles.title);
     }
   };
 
@@ -141,7 +123,7 @@ const ShiftCreationPopup = ({
     onCreateShift({
       start_time: startTime,
       end_time: endTime,
-      position: position || selectedRole.job_roles?.title || 'Unknown',
+      position: selectedRole.job_roles?.title || 'Unknown',
       job_role_id: selectedJobRole,
       pay_rate: selectedRole.pay_rate || 0
     });
@@ -152,7 +134,6 @@ const ShiftCreationPopup = ({
     setStartTime('09:00');
     setEndTime('17:00');
     setSelectedJobRole('');
-    setPosition('');
     onClose();
   };
 
@@ -203,11 +184,11 @@ const ShiftCreationPopup = ({
             </div>
           )}
 
-          {/* Job Role Selection */}
+          {/* Job Role Selection - This is mandatory and determines the position */}
           {!isLoading && employeeJobRoles && employeeJobRoles.length > 0 && (
             <div className="space-y-2">
-              <Label>Job Role *</Label>
-              <Select value={selectedJobRole} onValueChange={handleJobRoleSelect}>
+              <Label>Job Role * (This determines the position)</Label>
+              <Select value={selectedJobRole} onValueChange={setSelectedJobRole}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select job role" />
                 </SelectTrigger>
@@ -221,10 +202,12 @@ const ShiftCreationPopup = ({
                 </SelectContent>
               </Select>
               {selectedRole && (
-                <div className="text-sm text-gray-600">
-                  Pay Rate: £{selectedRole.pay_rate.toFixed(2)}/hr ({selectedRole.currency || 'GBP'})
+                <div className="text-sm text-gray-600 bg-blue-50 p-2 rounded">
+                  <strong>Position:</strong> {selectedRole.job_roles?.title}
                   <br />
-                  Department: {selectedRole.job_roles?.department || 'Unknown'}
+                  <strong>Pay Rate:</strong> £{selectedRole.pay_rate.toFixed(2)}/hr ({selectedRole.currency || 'GBP'})
+                  <br />
+                  <strong>Department:</strong> {selectedRole.job_roles?.department || 'Unknown'}
                 </div>
               )}
             </div>
@@ -233,7 +216,7 @@ const ShiftCreationPopup = ({
           {/* No Job Roles Warning */}
           {!isLoading && (!employeeJobRoles || employeeJobRoles.length === 0) && employeeId && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-              This employee has no active job roles assigned. Please assign a job role before creating shifts.
+              This employee has no active job roles assigned. Please assign a job role in their career history before creating shifts.
             </div>
           )}
 
@@ -262,22 +245,6 @@ const ShiftCreationPopup = ({
                 onChange={(e) => setEndTime(e.target.value)}
               />
             </div>
-          </div>
-
-          {/* Position Display */}
-          <div className="space-y-2">
-            <Label>Position</Label>
-            <Input
-              value={position}
-              onChange={(e) => setPosition(e.target.value)}
-              placeholder="Position will be set from job role"
-              className={selectedRole ? "bg-gray-50" : ""}
-            />
-            {selectedRole && (
-              <div className="text-xs text-gray-500">
-                Position automatically set from selected job role
-              </div>
-            )}
           </div>
 
           {/* Actions */}
