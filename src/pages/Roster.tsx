@@ -28,6 +28,10 @@ interface Employee {
   department: string;
 }
 
+interface EmployeeWithJobRole extends Employee {
+  primary_job_role?: string;
+}
+
 interface ShiftTemplate {
   id: string;
   name: string;
@@ -93,17 +97,47 @@ const Roster = () => {
   // Get assigned employees for selected category
   const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
 
-  // Get all employees
+  // Get all employees with their primary job roles
   const { data: allEmployees } = useQuery({
-    queryKey: ['employees'],
+    queryKey: ['employees-with-roles'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('employees')
-        .select('id, first_name, last_name, department')
+        .select(`
+          id, 
+          first_name, 
+          last_name, 
+          department,
+          employee_job_roles!inner(
+            job_roles(title),
+            is_primary
+          )
+        `)
         .order('first_name');
       
       if (error) throw error;
-      return data as Employee[];
+      
+      // Transform the data to include primary job role
+      return (data || []).map(emp => ({
+        ...emp,
+        primary_job_role: emp.employee_job_roles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
+                         emp.employee_job_roles?.[0]?.job_roles?.title || 
+                         'No Role Assigned'
+      })) as EmployeeWithJobRole[];
+    }
+  });
+
+  // Get job roles for displaying in shifts
+  const { data: jobRoles } = useQuery({
+    queryKey: ['job-roles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_roles')
+        .select('id, title')
+        .order('title');
+      
+      if (error) throw error;
+      return data;
     }
   });
 
@@ -122,7 +156,7 @@ const Roster = () => {
       case 'last_name':
         return [...filteredEmployees].sort((a, b) => a.last_name.localeCompare(b.last_name));
       case 'department':
-        return [...filteredEmployees].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
+        return [...filteredEmployees].sort((a, b) => (a.primary_job_role || '').localeCompare(b.primary_job_role || ''));
       case 'custom':
         if (customOrder.length === 0) return filteredEmployees;
         return [...filteredEmployees].sort((a, b) => {
@@ -190,6 +224,11 @@ const Roster = () => {
   // Permission checks
   const canViewRoster = hasPermission('view_roster') || hasPermission('edit_roster');
   const canEditRoster = hasPermission('edit_roster');
+
+  // Helper function to get job role title by ID
+  const getJobRoleTitle = (jobRoleId: string) => {
+    return jobRoles?.find(role => role.id === jobRoleId)?.title || 'Unknown Role';
+  };
 
   // Helper function to check for time overlaps
   const hasTimeOverlap = (newStart: string, newEnd: string, existingShifts: Shift[], excludeShiftId?: string) => {
@@ -750,7 +789,7 @@ const Roster = () => {
                       <SelectContent>
                         <SelectItem value="first_name">First Name</SelectItem>
                         <SelectItem value="last_name">Last Name</SelectItem>
-                        <SelectItem value="department">Job Title</SelectItem>
+                        <SelectItem value="department">Job Role</SelectItem>
                         <SelectItem value="custom">Custom Order</SelectItem>
                       </SelectContent>
                     </Select>
@@ -791,7 +830,7 @@ const Roster = () => {
                           <tr key={employee.id} className="border-b">
                             <td className="p-3 font-medium min-w-[160px]">
                               <div>{employee.first_name} {employee.last_name}</div>
-                              <div className="text-sm text-gray-500">{employee.department}</div>
+                              <div className="text-sm text-gray-500">{employee.primary_job_role}</div>
                             </td>
                             {weekDays.map((day) => {
                               const employeeShifts = getShiftsForEmployeeAndDate(employee.id, day.toISOString()) as ShiftWithTimeRecord[];
@@ -832,6 +871,7 @@ const Roster = () => {
                                           );
                                           const statusColor = getShiftStatusColor(shift);
                                           const statusText = getShiftStatusText(shift);
+                                          const jobRoleTitle = getJobRoleTitle(shift.job_role_id);
                                           
                                           return (
                                             <div
@@ -863,7 +903,7 @@ const Roster = () => {
                                               }}
                                               title={canEditRoster ? (isMobile ? "Tap to edit or remove" : "Click to edit, drag to move, or double-click to delete") : "View only"}
                                             >
-                                              <div className="font-medium text-xs">{shift.position}</div>
+                                              <div className="font-medium text-xs">{jobRoleTitle}</div>
                                               <div className="text-xs">{shift.start_time} - {shift.end_time}</div>
                                               {statusText && (
                                                 <div className="text-xs mt-1 font-medium" style={{ color: statusColor }}>
