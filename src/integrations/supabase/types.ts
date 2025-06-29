@@ -1264,11 +1264,24 @@ export type Database = {
           clock_out_time: string | null
           created_at: string | null
           discrepancy_type: string | null
+          early_minutes_paid: number | null
+          early_minutes_worked: number | null
+          early_overtime_status:
+            | Database["public"]["Enums"]["overtime_status"]
+            | null
           employee_id: string
           expected_end_time: string | null
           expected_start_time: string | null
           id: string
+          late_minutes_paid: number | null
+          late_minutes_worked: number | null
+          late_overtime_status:
+            | Database["public"]["Enums"]["overtime_status"]
+            | null
           notes: string | null
+          processed_at: string | null
+          processed_by: string | null
+          scheduled_minutes_paid: number | null
           shift_date: string | null
           shift_id: string | null
           status: string
@@ -1281,11 +1294,24 @@ export type Database = {
           clock_out_time?: string | null
           created_at?: string | null
           discrepancy_type?: string | null
+          early_minutes_paid?: number | null
+          early_minutes_worked?: number | null
+          early_overtime_status?:
+            | Database["public"]["Enums"]["overtime_status"]
+            | null
           employee_id: string
           expected_end_time?: string | null
           expected_start_time?: string | null
           id?: string
+          late_minutes_paid?: number | null
+          late_minutes_worked?: number | null
+          late_overtime_status?:
+            | Database["public"]["Enums"]["overtime_status"]
+            | null
           notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          scheduled_minutes_paid?: number | null
           shift_date?: string | null
           shift_id?: string | null
           status?: string
@@ -1298,11 +1324,24 @@ export type Database = {
           clock_out_time?: string | null
           created_at?: string | null
           discrepancy_type?: string | null
+          early_minutes_paid?: number | null
+          early_minutes_worked?: number | null
+          early_overtime_status?:
+            | Database["public"]["Enums"]["overtime_status"]
+            | null
           employee_id?: string
           expected_end_time?: string | null
           expected_start_time?: string | null
           id?: string
+          late_minutes_paid?: number | null
+          late_minutes_worked?: number | null
+          late_overtime_status?:
+            | Database["public"]["Enums"]["overtime_status"]
+            | null
           notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          scheduled_minutes_paid?: number | null
           shift_date?: string | null
           shift_id?: string | null
           status?: string
@@ -1314,6 +1353,50 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_segments: {
+        Row: {
+          created_at: string | null
+          end_time: string
+          id: string
+          minutes_paid: number
+          minutes_worked: number
+          pay_status: Database["public"]["Enums"]["overtime_status"] | null
+          segment_type: string
+          start_time: string
+          time_clock_record_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          end_time: string
+          id?: string
+          minutes_paid?: number
+          minutes_worked: number
+          pay_status?: Database["public"]["Enums"]["overtime_status"] | null
+          segment_type: string
+          start_time: string
+          time_clock_record_id: string
+        }
+        Update: {
+          created_at?: string | null
+          end_time?: string
+          id?: string
+          minutes_paid?: number
+          minutes_worked?: number
+          pay_status?: Database["public"]["Enums"]["overtime_status"] | null
+          segment_type?: string
+          start_time?: string
+          time_clock_record_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_segments_time_clock_record_id_fkey"
+            columns: ["time_clock_record_id"]
+            isOneToOne: false
+            referencedRelation: "time_clock_records"
             referencedColumns: ["id"]
           },
         ]
@@ -1660,6 +1743,7 @@ export type Database = {
       }
     }
     Enums: {
+      overtime_status: "unpaid" | "paid" | "pending"
       user_role: "admin" | "hr_user"
     }
     CompositeTypes: {
@@ -1776,6 +1860,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      overtime_status: ["unpaid", "paid", "pending"],
       user_role: ["admin", "hr_user"],
     },
   },

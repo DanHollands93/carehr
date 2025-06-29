@@ -15,6 +15,16 @@ import { CalendarIcon, Download, Printer, Settings, BarChart3, AlertTriangle } f
 import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 
+interface TimeSegment {
+  id: string;
+  segment_type: 'early_overtime' | 'scheduled' | 'late_overtime';
+  start_time: string;
+  end_time: string;
+  minutes_worked: number;
+  minutes_paid: number;
+  pay_status: 'unpaid' | 'paid' | 'pending';
+}
+
 interface HoursRecord {
   employee_id: string;
   employee_name: string;
@@ -25,13 +35,15 @@ interface HoursRecord {
   clock_in: string | null;
   clock_out: string | null;
   scheduled_hours: number;
-  actual_hours: number;
+  paid_hours: number;
   pay_rate: number;
   total_pay: number;
   has_issue: boolean;
   issue_type?: string;
   exception_status?: string;
   job_title?: string;
+  segment_type?: string;
+  segment_description?: string;
 }
 
 interface ColumnConfig {
@@ -47,10 +59,11 @@ const defaultColumns: ColumnConfig[] = [
   { key: 'date', label: 'Date', enabled: true, width: '120px' },
   { key: 'clock_times', label: 'Clock In/Out', enabled: true, width: '160px' },
   { key: 'scheduled_hours', label: 'Scheduled Hours', enabled: true, width: '130px' },
-  { key: 'actual_hours', label: 'Actual Hours', enabled: true, width: '120px' },
+  { key: 'paid_hours', label: 'Paid Hours', enabled: true, width: '120px' },
   { key: 'variance', label: 'Variance', enabled: true, width: '100px' },
   { key: 'pay_rate', label: 'Pay Rate', enabled: true, width: '100px' },
-  { key: 'total_pay', label: 'Total Pay', enabled: true, width: '120px' }
+  { key: 'total_pay', label: 'Total Pay', enabled: true, width: '120px' },
+  { key: 'segment_info', label: 'Time Segment', enabled: true, width: '150px' }
 ];
 
 const HoursAnalysisReport = () => {
@@ -61,11 +74,11 @@ const HoursAnalysisReport = () => {
   const [columns, setColumns] = useState<ColumnConfig[]>(defaultColumns);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Fetch hours data including all shifts
+  // Fetch detailed hours data with time segments
   const { data: hoursData, isLoading: isLoadingHours } = useQuery({
-    queryKey: ['hours-analysis', dateRange.from, dateRange.to],
+    queryKey: ['hours-analysis-detailed', dateRange.from, dateRange.to],
     queryFn: async () => {
-      console.log('Fetching hours analysis data for date range:', {
+      console.log('Fetching detailed hours analysis data for date range:', {
         from: format(dateRange.from, 'yyyy-MM-dd'),
         to: format(dateRange.to, 'yyyy-MM-dd')
       });
@@ -73,7 +86,7 @@ const HoursAnalysisReport = () => {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
       
-      // First, get all shifts in the date range
+      // Get all shifts in the date range
       const { data: shifts, error: shiftsError } = await supabase
         .from('shifts')
         .select('*')
@@ -109,15 +122,25 @@ const HoursAnalysisReport = () => {
       // Get shift IDs for time clock records lookup
       const shiftIds = shifts.map(s => s.id);
       
-      // Get time clock records for these shifts
+      // Get time clock records with time segments
       const { data: timeRecords, error: timeError } = await supabase
         .from('time_clock_records')
-        .select('*')
+        .select(`
+          *,
+          time_segments (
+            id,
+            segment_type,
+            start_time,
+            end_time,
+            minutes_worked,
+            minutes_paid,
+            pay_status
+          )
+        `)
         .in('shift_id', shiftIds);
         
       if (timeError) {
         console.error('Error fetching time records:', timeError);
-        // Don't throw here, just log - we can still show shifts without time records
       }
       
       // Get employee career history for pay rates
@@ -125,92 +148,156 @@ const HoursAnalysisReport = () => {
         .from('career_history')
         .select('employee_id, pay_rate, job_title, start_date, end_date')
         .in('employee_id', employeeIds)
-        .is('end_date', null); // Only current positions
+        .is('end_date', null);
       
       // Create employee lookup map
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
       
-      // Process the data - include ALL shifts
-      const processedData: HoursRecord[] = shifts
-        .map(shift => {
-          const employee = employeeMap.get(shift.employee_id);
+      // Process the data - create detailed records with time segments
+      const processedData: HoursRecord[] = [];
+      
+      for (const shift of shifts) {
+        const employee = employeeMap.get(shift.employee_id);
+        
+        if (!employee) {
+          console.log('Missing employee for shift:', shift.employee_id);
+          continue;
+        }
+        
+        // Calculate scheduled hours
+        const shiftStart = parseISO(`${shift.date}T${shift.start_time}`);
+        const shiftEnd = parseISO(`${shift.date}T${shift.end_time}`);
+        const scheduledMinutes = differenceInMinutes(shiftEnd, shiftStart);
+        const scheduledHours = Math.round((scheduledMinutes / 60) * 100) / 100;
+        
+        // Get time clock record if exists
+        const timeRecord = timeRecords?.find(tr => tr.shift_id === shift.id);
+        
+        // Get pay rate
+        const employeeCareer = careerHistory?.find(ch => ch.employee_id === employee.id);
+        const payRate = employeeCareer?.pay_rate || shift.pay_rate || 0;
+        const jobTitle = employeeCareer?.job_title || 'Unknown';
+        
+        let hasIssue = false;
+        let issueType = '';
+        let exceptionStatus = '';
+        
+        if (timeRecord) {
+          exceptionStatus = timeRecord.approval_status || 'pending';
           
-          if (!employee) {
-            console.log('Missing employee for shift:', shift.employee_id);
-            return null;
+          // Check if shift has ended and no clock times - only then mark as discrepancy
+          const now = new Date();
+          const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
+          
+          if (!timeRecord.clock_in_time && !timeRecord.clock_out_time && now > shiftEndTime) {
+            hasIssue = true;
+            issueType = 'Did not clock in';
+          } else if (timeRecord.clock_in_time && !timeRecord.clock_out_time && now > shiftEndTime) {
+            hasIssue = true;
+            issueType = 'Missing clock out';
+          } else if (timeRecord.discrepancy_type && exceptionStatus !== 'approved') {
+            hasIssue = true;
+            issueType = timeRecord.discrepancy_type;
           }
           
-          // Calculate scheduled hours
-          const shiftStart = parseISO(`${shift.date}T${shift.start_time}`);
-          const shiftEnd = parseISO(`${shift.date}T${shift.end_time}`);
-          const scheduledMinutes = differenceInMinutes(shiftEnd, shiftStart);
-          const scheduledHours = Math.round((scheduledMinutes / 60) * 100) / 100;
-          
-          // Get time clock record if exists
-          const timeRecord = timeRecords?.find(tr => tr.shift_id === shift.id);
-          
-          let actualHours = 0;
-          let hasIssue = false;
-          let issueType = '';
-          let exceptionStatus = '';
-          
-          if (timeRecord) {
-            // Check if exception has been cleared
-            exceptionStatus = timeRecord.approval_status || 'pending';
+          // Process time segments if they exist
+          if (timeRecord.time_segments && timeRecord.time_segments.length > 0) {
+            for (const segment of timeRecord.time_segments as TimeSegment[]) {
+              const segmentHours = Math.round((segment.minutes_worked / 60) * 100) / 100;
+              const paidHours = Math.round((segment.minutes_paid / 60) * 100) / 100;
+              const totalPay = paidHours * payRate;
+              
+              let segmentDescription = '';
+              switch (segment.segment_type) {
+                case 'early_overtime':
+                  segmentDescription = segment.pay_status === 'paid' ? 'Paid overtime (early)' : 
+                                      segment.pay_status === 'unpaid' ? 'Unpaid overtime (early)' : 'Pending overtime (early)';
+                  break;
+                case 'scheduled':
+                  segmentDescription = 'Scheduled time';
+                  break;
+                case 'late_overtime':
+                  segmentDescription = segment.pay_status === 'paid' ? 'Paid overtime (late)' : 
+                                      segment.pay_status === 'unpaid' ? 'Unpaid overtime (late)' : 'Pending overtime (late)';
+                  break;
+              }
+              
+              processedData.push({
+                employee_id: employee.id,
+                employee_name: `${employee.first_name} ${employee.last_name}`,
+                position: shift.position || employee.department || 'Unknown',
+                job_title: jobTitle,
+                date: shift.date,
+                shift_start: shift.start_time,
+                shift_end: shift.end_time,
+                clock_in: timeRecord.clock_in_time || null,
+                clock_out: timeRecord.clock_out_time || null,
+                scheduled_hours: segment.segment_type === 'scheduled' ? segmentHours : 0,
+                paid_hours: paidHours,
+                pay_rate: payRate,
+                total_pay: totalPay,
+                has_issue: hasIssue && segment.segment_type === 'scheduled', // Only show issue on main scheduled row
+                issue_type: issueType,
+                exception_status: exceptionStatus,
+                segment_type: segment.segment_type,
+                segment_description: segmentDescription
+              });
+            }
+          } else {
+            // No segments - create basic record
+            let paidHours = 0;
             
             if (timeRecord.clock_in_time && timeRecord.clock_out_time) {
-              // Both times exist - calculate actual hours
               const clockIn = parseISO(timeRecord.clock_in_time);
               const clockOut = parseISO(timeRecord.clock_out_time);
               const actualMinutes = differenceInMinutes(clockOut, clockIn);
-              actualHours = Math.round((actualMinutes / 60) * 100) / 100;
               
-              // Check for discrepancies
-              if (timeRecord.discrepancy_type && exceptionStatus !== 'approved') {
-                hasIssue = true;
-                issueType = timeRecord.discrepancy_type;
-              }
-            } else if (timeRecord.clock_in_time && !timeRecord.clock_out_time) {
-              // Clocked in but not out
-              hasIssue = true;
-              issueType = 'Missing clock out';
-            } else if (!timeRecord.clock_in_time && timeRecord.clock_out_time) {
-              // Clocked out but not in (unusual)
-              hasIssue = true;
-              issueType = 'Missing clock in';
-            } else {
-              // No clock times at all
-              const now = new Date();
-              const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
-              
-              if (now > shiftEndTime) {
-                hasIssue = true;
-                issueType = 'Did not clock in';
+              // If processed and approved, use processed paid time
+              if (timeRecord.processed_at && exceptionStatus === 'approved') {
+                paidHours = Math.round(((timeRecord.scheduled_minutes_paid || 0) + 
+                                      (timeRecord.early_minutes_paid || 0) + 
+                                      (timeRecord.late_minutes_paid || 0)) / 60 * 100) / 100;
               } else {
-                issueType = 'Scheduled';
+                // Default to actual worked hours if not processed
+                paidHours = Math.round((actualMinutes / 60) * 100) / 100;
               }
             }
-          } else {
-            // No time record at all - check if shift time has passed
-            const now = new Date();
-            const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
             
-            if (now > shiftEndTime) {
-              hasIssue = true;
-              issueType = 'Did not clock in';
-            } else {
-              issueType = 'Scheduled';
-            }
+            const totalPay = paidHours * payRate;
+            
+            processedData.push({
+              employee_id: employee.id,
+              employee_name: `${employee.first_name} ${employee.last_name}`,
+              position: shift.position || employee.department || 'Unknown',
+              job_title: jobTitle,
+              date: shift.date,
+              shift_start: shift.start_time,
+              shift_end: shift.end_time,
+              clock_in: timeRecord.clock_in_time || null,
+              clock_out: timeRecord.clock_out_time || null,
+              scheduled_hours: scheduledHours,
+              paid_hours: paidHours,
+              pay_rate: payRate,
+              total_pay: totalPay,
+              has_issue: hasIssue,
+              issue_type: issueType,
+              exception_status: exceptionStatus,
+              segment_description: 'Full shift'
+            });
           }
-
-          // Get pay rate - prioritize career history, then shift pay_rate
-          const employeeCareer = careerHistory?.find(ch => ch.employee_id === employee.id);
-          const payRate = employeeCareer?.pay_rate || shift.pay_rate || 0;
-          const totalPay = actualHours * payRate;
+        } else {
+          // No time record - check if shift has ended
+          const now = new Date();
+          const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
           
-          const jobTitle = employeeCareer?.job_title || 'Unknown';
+          if (now > shiftEndTime) {
+            hasIssue = true;
+            issueType = 'Did not clock in';
+          } else {
+            issueType = 'Scheduled';
+          }
           
-          return {
+          processedData.push({
             employee_id: employee.id,
             employee_name: `${employee.first_name} ${employee.last_name}`,
             position: shift.position || employee.department || 'Unknown',
@@ -218,20 +305,21 @@ const HoursAnalysisReport = () => {
             date: shift.date,
             shift_start: shift.start_time,
             shift_end: shift.end_time,
-            clock_in: timeRecord?.clock_in_time || null,
-            clock_out: timeRecord?.clock_out_time || null,
+            clock_in: null,
+            clock_out: null,
             scheduled_hours: scheduledHours,
-            actual_hours: actualHours,
+            paid_hours: 0, // No pay if didn't clock in
             pay_rate: payRate,
-            total_pay: totalPay,
+            total_pay: 0,
             has_issue: hasIssue,
             issue_type: issueType,
-            exception_status: exceptionStatus
-          };
-        })
-        .filter(Boolean) as HoursRecord[];
+            exception_status: 'pending',
+            segment_description: 'No time record'
+          });
+        }
+      }
       
-      console.log('Processed hours data:', processedData.length, 'records');
+      console.log('Processed detailed hours data:', processedData.length, 'records');
       return processedData;
     }
   });
@@ -265,17 +353,20 @@ const HoursAnalysisReport = () => {
           case 'scheduled_hours':
             row[col.label] = record.scheduled_hours;
             break;
-          case 'actual_hours':
-            row[col.label] = record.actual_hours;
+          case 'paid_hours':
+            row[col.label] = record.paid_hours;
             break;
           case 'variance':
-            row[col.label] = record.actual_hours - record.scheduled_hours;
+            row[col.label] = record.paid_hours - record.scheduled_hours;
             break;
           case 'pay_rate':
             row[col.label] = record.pay_rate;
             break;
           case 'total_pay':
             row[col.label] = record.total_pay;
+            break;
+          case 'segment_info':
+            row[col.label] = record.segment_description;
             break;
         }
       });
@@ -300,6 +391,9 @@ const HoursAnalysisReport = () => {
     }
     if (record.exception_status === 'approved') {
       return 'bg-green-50 border-l-4 border-l-green-500';
+    }
+    if (record.segment_type === 'early_overtime' || record.segment_type === 'late_overtime') {
+      return 'bg-blue-50 border-l-4 border-l-blue-500';
     }
     return '';
   };
@@ -339,7 +433,7 @@ const HoursAnalysisReport = () => {
             <BarChart3 className="h-6 w-6" />
             Hours Analysis Report
           </h2>
-          <p className="text-gray-600 mt-1">Analyze hours worked by employees across different roles</p>
+          <p className="text-gray-600 mt-1">Analyze paid hours by employees with detailed time segments</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -442,7 +536,7 @@ const HoursAnalysisReport = () => {
       <Card>
         <CardContent className="p-0">
           {isLoadingHours ? (
-            <div className="text-center py-8">Loading hours analysis...</div>
+            <div className="text-center py-8">Loading detailed hours analysis...</div>
           ) : !hoursData?.length ? (
             <div className="text-center py-8 text-gray-500">
               <p>No shifts found for the selected period</p>
@@ -464,7 +558,7 @@ const HoursAnalysisReport = () => {
               </TableHeader>
               <TableBody>
                 {hoursData.map((record, index) => (
-                  <TableRow key={`${record.employee_id}-${index}`} className={getRowClassName(record)}>
+                  <TableRow key={`${record.employee_id}-${record.date}-${index}`} className={getRowClassName(record)}>
                     {enabledColumns.map((column) => (
                       <TableCell key={column.key}>
                         {column.key === 'employee_name' && record.employee_name}
@@ -477,14 +571,19 @@ const HoursAnalysisReport = () => {
                           </div>
                         )}
                         {column.key === 'scheduled_hours' && record.scheduled_hours.toFixed(2)}
-                        {column.key === 'actual_hours' && record.actual_hours.toFixed(2)}
+                        {column.key === 'paid_hours' && record.paid_hours.toFixed(2)}
                         {column.key === 'variance' && (
-                          <Badge variant={record.actual_hours - record.scheduled_hours >= 0 ? 'default' : 'destructive'}>
-                            {(record.actual_hours - record.scheduled_hours).toFixed(2)}h
+                          <Badge variant={record.paid_hours - record.scheduled_hours >= 0 ? 'default' : 'destructive'}>
+                            {(record.paid_hours - record.scheduled_hours).toFixed(2)}h
                           </Badge>
                         )}
                         {column.key === 'pay_rate' && `£${record.pay_rate.toFixed(2)}`}
                         {column.key === 'total_pay' && `£${record.total_pay.toFixed(2)}`}
+                        {column.key === 'segment_info' && (
+                          <Badge variant={record.segment_type === 'scheduled' ? 'default' : 'secondary'}>
+                            {record.segment_description}
+                          </Badge>
+                        )}
                       </TableCell>
                     ))}
                     <TableCell>

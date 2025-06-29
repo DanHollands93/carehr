@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,8 @@ interface TimeClockRecord {
   discrepancy_type: string | null;
   approval_status: 'pending' | 'approved' | 'rejected';
   notes: string | null;
+  early_overtime_status: 'unpaid' | 'paid' | 'pending';
+  late_overtime_status: 'unpaid' | 'paid' | 'pending';
   employee?: {
     first_name: string;
     last_name: string;
@@ -32,24 +35,12 @@ interface TimeClockRecord {
   };
 }
 
-interface Employee {
-  id: string;
-  first_name: string;
-  last_name: string;
-}
-
-interface Shift {
-  id: string;
-  date: string;
-  start_time: string;
-  end_time: string;
-}
-
 interface DiscrepancyApproval {
-  clock_in_action?: string;
-  clock_in_notes?: string;
-  clock_out_action?: string;
-  clock_out_notes?: string;
+  early_overtime_decision?: 'paid' | 'unpaid';
+  early_overtime_notes?: string;
+  late_overtime_decision?: 'paid' | 'unpaid';
+  late_overtime_notes?: string;
+  general_notes?: string;
 }
 
 const TimeDiscrepancyManager = () => {
@@ -59,11 +50,11 @@ const TimeDiscrepancyManager = () => {
   const [approvals, setApprovals] = useState<Record<string, DiscrepancyApproval>>({});
 
   const { data: discrepancyRecords, isLoading } = useQuery({
-    queryKey: ['time-discrepancies'],
+    queryKey: ['time-discrepancies-new'],
     queryFn: async () => {
       console.log('Fetching discrepancy records...');
       
-      // First, get the discrepancy records
+      // Get discrepancy records that need approval - only for shifts that have ended
       const { data: records, error: recordsError } = await supabase
         .from('time_clock_records')
         .select('*')
@@ -82,9 +73,31 @@ const TimeDiscrepancyManager = () => {
         return [];
       }
       
-      // Get unique employee IDs and shift IDs
-      const employeeIds = [...new Set(records.map(r => r.employee_id))];
-      const shiftIds = [...new Set(records.map(r => r.shift_id).filter(Boolean))];
+      // Filter records to only include those where the shift has ended
+      const now = new Date();
+      const validRecords = [];
+      
+      for (const record of records) {
+        // Get shift details to check if it has ended
+        const { data: shift } = await supabase
+          .from('shifts')
+          .select('date, start_time, end_time')
+          .eq('id', record.shift_id)
+          .single();
+        
+        if (shift) {
+          const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
+          if (now > shiftEndTime) {
+            validRecords.push({
+              ...record,
+              shift
+            });
+          }
+        }
+      }
+      
+      // Get unique employee IDs
+      const employeeIds = [...new Set(validRecords.map(r => r.employee_id))];
       
       // Fetch employees
       const { data: employees, error: employeesError } = await supabase
@@ -97,29 +110,16 @@ const TimeDiscrepancyManager = () => {
         throw employeesError;
       }
       
-      // Fetch shifts
-      const { data: shifts, error: shiftsError } = await supabase
-        .from('shifts')
-        .select('id, date, start_time, end_time')
-        .in('id', shiftIds);
-      
-      if (shiftsError) {
-        console.error('Error fetching shifts:', shiftsError);
-        throw shiftsError;
-      }
-      
-      // Create lookup maps
+      // Create lookup map
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
-      const shiftMap = new Map(shifts?.map(shift => [shift.id, shift]) || []);
       
       // Combine the data
-      const transformedRecords = records.map(record => ({
+      const transformedRecords = validRecords.map(record => ({
         ...record,
-        employee: employeeMap.get(record.employee_id),
-        shift: shiftMap.get(record.shift_id || '')
+        employee: employeeMap.get(record.employee_id)
       })) as TimeClockRecord[];
       
-      console.log('Transformed records with employee and shift data:', transformedRecords);
+      console.log('Transformed records with employee data:', transformedRecords);
       return transformedRecords;
     }
   });
@@ -127,28 +127,132 @@ const TimeDiscrepancyManager = () => {
   const approveRecordMutation = useMutation({
     mutationFn: async ({ recordId }: { recordId: string }) => {
       const approval = approvals[recordId];
-      if (!approval) throw new Error('No approval data found');
+      const record = discrepancyRecords?.find(r => r.id === recordId);
+      
+      if (!approval || !record) throw new Error('No approval data or record found');
 
-      // Combine all notes into one
+      // Calculate time segments and paid minutes
+      const clockInTime = record.clock_in_time ? parseISO(record.clock_in_time) : null;
+      const clockOutTime = record.clock_out_time ? parseISO(record.clock_out_time) : null;
+      const shift = record.shift;
+      
+      if (!shift || !clockInTime || !clockOutTime) {
+        throw new Error('Missing shift or clock times');
+      }
+      
+      const shiftStartTime = parseISO(`${shift.date}T${shift.start_time}`);
+      const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
+      
+      // Calculate early, scheduled, and late minutes
+      let earlyMinutes = 0;
+      let scheduledMinutes = 0;
+      let lateMinutes = 0;
+      let earlyPaidMinutes = 0;
+      let scheduledPaidMinutes = 0;
+      let latePaidMinutes = 0;
+      
+      // Early arrival (before scheduled start)
+      if (clockInTime < shiftStartTime) {
+        earlyMinutes = differenceInMinutes(shiftStartTime, clockInTime);
+        earlyPaidMinutes = approval.early_overtime_decision === 'paid' ? earlyMinutes : 0;
+      }
+      
+      // Scheduled time
+      const actualStartTime = clockInTime > shiftStartTime ? clockInTime : shiftStartTime;
+      const actualEndTime = clockOutTime < shiftEndTime ? clockOutTime : shiftEndTime;
+      if (actualEndTime > actualStartTime) {
+        scheduledMinutes = differenceInMinutes(actualEndTime, actualStartTime);
+        scheduledPaidMinutes = scheduledMinutes; // Always pay scheduled time
+      }
+      
+      // Late departure (after scheduled end)
+      if (clockOutTime > shiftEndTime) {
+        lateMinutes = differenceInMinutes(clockOutTime, shiftEndTime);
+        latePaidMinutes = approval.late_overtime_decision === 'paid' ? lateMinutes : 0;
+      }
+      
+      // Combine all notes
       const combinedNotes = [
-        approval.clock_in_notes && `Clock In: ${approval.clock_in_notes}`,
-        approval.clock_out_notes && `Clock Out: ${approval.clock_out_notes}`
+        approval.early_overtime_notes && `Early overtime: ${approval.early_overtime_notes}`,
+        approval.late_overtime_notes && `Late overtime: ${approval.late_overtime_notes}`,
+        approval.general_notes && `General: ${approval.general_notes}`
       ].filter(Boolean).join('; ');
 
-      const { error } = await supabase
+      // Update the time clock record
+      const { error: updateError } = await supabase
         .from('time_clock_records')
         .update({
           approval_status: 'approved',
           notes: combinedNotes,
+          early_minutes_worked: earlyMinutes,
+          early_minutes_paid: earlyPaidMinutes,
+          late_minutes_worked: lateMinutes,
+          late_minutes_paid: latePaidMinutes,
+          scheduled_minutes_paid: scheduledPaidMinutes,
+          early_overtime_status: approval.early_overtime_decision || 'pending',
+          late_overtime_status: approval.late_overtime_decision || 'pending',
+          processed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', recordId);
       
-      if (error) throw error;
+      if (updateError) throw updateError;
+      
+      // Create time segments for detailed reporting
+      const segments = [];
+      
+      if (earlyMinutes > 0) {
+        segments.push({
+          time_clock_record_id: recordId,
+          segment_type: 'early_overtime',
+          start_time: clockInTime.toISOString(),
+          end_time: shiftStartTime.toISOString(),
+          minutes_worked: earlyMinutes,
+          minutes_paid: earlyPaidMinutes,
+          pay_status: approval.early_overtime_decision || 'pending'
+        });
+      }
+      
+      if (scheduledMinutes > 0) {
+        segments.push({
+          time_clock_record_id: recordId,
+          segment_type: 'scheduled',
+          start_time: actualStartTime.toISOString(),
+          end_time: actualEndTime.toISOString(),
+          minutes_worked: scheduledMinutes,
+          minutes_paid: scheduledPaidMinutes,
+          pay_status: 'paid'
+        });
+      }
+      
+      if (lateMinutes > 0) {
+        segments.push({
+          time_clock_record_id: recordId,
+          segment_type: 'late_overtime',
+          start_time: shiftEndTime.toISOString(),
+          end_time: clockOutTime.toISOString(),
+          minutes_worked: lateMinutes,
+          minutes_paid: latePaidMinutes,
+          pay_status: approval.late_overtime_decision || 'pending'
+        });
+      }
+      
+      // Insert time segments
+      if (segments.length > 0) {
+        const { error: segmentsError } = await supabase
+          .from('time_segments')
+          .insert(segments);
+          
+        if (segmentsError) {
+          console.error('Error creating time segments:', segmentsError);
+          // Don't throw here as the main approval was successful
+        }
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['time-discrepancies'] });
-      toast({ title: "Record approved successfully" });
+      queryClient.invalidateQueries({ queryKey: ['time-discrepancies-new'] });
+      queryClient.invalidateQueries({ queryKey: ['hours-analysis-detailed'] });
+      toast({ title: "Time discrepancy processed successfully" });
       setSelectedRecord(null);
       setApprovals(prev => {
         const updated = { ...prev };
@@ -158,58 +262,17 @@ const TimeDiscrepancyManager = () => {
     },
     onError: (error) => {
       toast({ 
-        title: "Error approving record", 
+        title: "Error processing discrepancy", 
         description: error.message,
         variant: "destructive" 
       });
     }
   });
 
-  const getClockInOptions = (record: TimeClockRecord) => {
-    if (!record.shift || !record.clock_in_time) return [];
-    
-    const today = record.shift.date;
-    const shiftStartDateTime = parseISO(`${today}T${record.shift.start_time}`);
-    const clockInTime = parseISO(record.clock_in_time);
-    const minutesDiff = differenceInMinutes(clockInTime, shiftStartDateTime);
-    
-    if (minutesDiff < 0) {
-      // Early clock in
-      return [
-        { value: 'pay_from_scheduled', label: 'Pay from scheduled time (ignore early arrival)' },
-        { value: 'pay_from_actual', label: 'Pay from actual clock in time (pay for early arrival)' }
-      ];
-    } else {
-      // Late clock in
-      return [
-        { value: 'pay_from_scheduled', label: 'Pay from scheduled time (excuse lateness)' },
-        { value: 'pay_from_actual', label: 'Pay from actual clock in time (deduct late arrival)' }
-      ];
-    }
-  };
-
-  const getClockOutOptions = (record: TimeClockRecord) => {
-    if (!record.shift || !record.clock_out_time) return [];
-    
-    const today = record.shift.date;
-    const shiftEndDateTime = parseISO(`${today}T${record.shift.end_time}`);
-    const clockOutTime = parseISO(record.clock_out_time);
-    const minutesDiff = differenceInMinutes(clockOutTime, shiftEndDateTime);
-    
-    if (minutesDiff < 0) {
-      // Early clock out
-      return [
-        { value: 'pay_until_scheduled', label: 'Pay until scheduled time (ignore early departure)' },
-        { value: 'pay_until_actual', label: 'Pay until actual clock out time (deduct early departure)' }
-      ];
-    } else {
-      // Late clock out
-      return [
-        { value: 'pay_until_scheduled', label: 'Pay until scheduled time (no overtime)' },
-        { value: 'pay_until_actual', label: 'Pay until actual clock out time (approve overtime)' }
-      ];
-    }
-  };
+  const getOvertimeOptions = (type: 'early' | 'late') => [
+    { value: 'paid', label: `Pay ${type} overtime` },
+    { value: 'unpaid', label: `Don't pay ${type} overtime` }
+  ];
 
   const formatDiscrepancyType = (type: string) => {
     if (!type) return 'Unknown discrepancy';
@@ -234,21 +297,6 @@ const TimeDiscrepancyManager = () => {
       .join(', ');
   };
 
-  const getDiscrepancyTypes = (record: TimeClockRecord) => {
-    if (!record.discrepancy_type) return [];
-    return record.discrepancy_type.split(',').map(t => t.trim());
-  };
-
-  const hasClockInDiscrepancy = (record: TimeClockRecord) => {
-    const types = getDiscrepancyTypes(record);
-    return types.some(t => t === 'early_clock_in' || t === 'late_clock_in');
-  };
-
-  const hasClockOutDiscrepancy = (record: TimeClockRecord) => {
-    const types = getDiscrepancyTypes(record);
-    return types.some(t => t === 'early_clock_out' || t === 'late_clock_out');
-  };
-
   const getTimeDifference = (actual: string, scheduled: string, date: string) => {
     const actualTime = parseISO(actual);
     const scheduledDateTime = parseISO(`${date}T${scheduled}`);
@@ -270,11 +318,14 @@ const TimeDiscrepancyManager = () => {
     const approval = approvals[recordId];
     if (!record || !approval) return false;
 
-    const needsClockInApproval = hasClockInDiscrepancy(record);
-    const needsClockOutApproval = hasClockOutDiscrepancy(record);
+    // Check if we have decisions for all required overtime periods
+    const hasEarlyOvertime = record.clock_in_time && record.shift && 
+      parseISO(record.clock_in_time) < parseISO(`${record.shift.date}T${record.shift.start_time}`);
+    const hasLateOvertime = record.clock_out_time && record.shift && 
+      parseISO(record.clock_out_time) > parseISO(`${record.shift.date}T${record.shift.end_time}`);
 
-    return (!needsClockInApproval || approval.clock_in_action) &&
-           (!needsClockOutApproval || approval.clock_out_action);
+    return (!hasEarlyOvertime || approval.early_overtime_decision) &&
+           (!hasLateOvertime || approval.late_overtime_decision);
   };
 
   const handleApprove = () => {
@@ -300,6 +351,12 @@ const TimeDiscrepancyManager = () => {
           {discrepancyRecords.map((record) => {
             const isSelected = selectedRecord === record.id;
             const approval = approvals[record.id] || {};
+            
+            // Calculate overtime periods
+            const hasEarlyOvertime = record.clock_in_time && record.shift && 
+              parseISO(record.clock_in_time) < parseISO(`${record.shift.date}T${record.shift.start_time}`);
+            const hasLateOvertime = record.clock_out_time && record.shift && 
+              parseISO(record.clock_out_time) > parseISO(`${record.shift.date}T${record.shift.end_time}`);
             
             return (
               <Card key={record.id} className={`${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
@@ -328,77 +385,34 @@ const TimeDiscrepancyManager = () => {
                       </span>
                     </div>
                     
-                    {/* Clock In Section */}
-                    {record.clock_in_time && hasClockInDiscrepancy(record) && (
-                      <div className="border rounded-lg p-4 bg-red-50">
-                        <div className="flex items-center space-x-2 text-red-600 mb-2">
-                          <User className="w-4 h-4" />
-                          <span>
-                            Clocked in: {format(parseISO(record.clock_in_time), 'HH:mm')}
-                            {record.shift && (
-                              <span className="ml-2 text-sm">
-                                ({getTimeDifference(record.clock_in_time, record.shift.start_time, record.shift.date) > 0 ? '+' : ''}
-                                {getTimeDifference(record.clock_in_time, record.shift.start_time, record.shift.date)} min)
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        {isSelected && (
-                          <div className="space-y-2">
-                            <Label>Clock In Action</Label>
-                            <Select 
-                              value={approval.clock_in_action || ''} 
-                              onValueChange={(value) => updateApproval(record.id, 'clock_in_action', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="What to do with this clock in time..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {getClockInOptions(record).map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Textarea
-                              placeholder="Notes for clock in decision..."
-                              value={approval.clock_in_notes || ''}
-                              onChange={(e) => updateApproval(record.id, 'clock_in_notes', e.target.value)}
-                              rows={2}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      <User className="w-4 h-4" />
+                      <span>
+                        Actual: {record.clock_in_time ? format(parseISO(record.clock_in_time), 'HH:mm') : 'N/A'} - {record.clock_out_time ? format(parseISO(record.clock_out_time), 'HH:mm') : 'N/A'}
+                      </span>
+                    </div>
 
-                    {/* Clock Out Section */}
-                    {record.clock_out_time && hasClockOutDiscrepancy(record) && (
+                    {/* Early Overtime Section */}
+                    {hasEarlyOvertime && (
                       <div className="border rounded-lg p-4 bg-blue-50">
                         <div className="flex items-center space-x-2 text-blue-600 mb-2">
-                          <User className="w-4 h-4" />
+                          <AlertCircle className="w-4 h-4" />
                           <span>
-                            Clocked out: {format(parseISO(record.clock_out_time), 'HH:mm')}
-                            {record.shift && (
-                              <span className="ml-2 text-sm">
-                                ({getTimeDifference(record.clock_out_time, record.shift.end_time, record.shift.date) > 0 ? '+' : ''}
-                                {getTimeDifference(record.clock_out_time, record.shift.end_time, record.shift.date)} min)
-                              </span>
-                            )}
+                            Early arrival: {Math.abs(getTimeDifference(record.clock_in_time!, record.shift!.start_time, record.shift!.date))} minutes early
                           </span>
                         </div>
                         {isSelected && (
                           <div className="space-y-2">
-                            <Label>Clock Out Action</Label>
+                            <Label>Early Overtime Decision</Label>
                             <Select 
-                              value={approval.clock_out_action || ''} 
-                              onValueChange={(value) => updateApproval(record.id, 'clock_out_action', value)}
+                              value={approval.early_overtime_decision || ''} 
+                              onValueChange={(value) => updateApproval(record.id, 'early_overtime_decision', value as 'paid' | 'unpaid')}
                             >
                               <SelectTrigger>
-                                <SelectValue placeholder="What to do with this clock out time..." />
+                                <SelectValue placeholder="Choose payment for early arrival..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {getClockOutOptions(record).map((option) => (
+                                {getOvertimeOptions('early').map((option) => (
                                   <SelectItem key={option.value} value={option.value}>
                                     {option.label}
                                   </SelectItem>
@@ -406,9 +420,9 @@ const TimeDiscrepancyManager = () => {
                               </SelectContent>
                             </Select>
                             <Textarea
-                              placeholder="Notes for clock out decision..."
-                              value={approval.clock_out_notes || ''}
-                              onChange={(e) => updateApproval(record.id, 'clock_out_notes', e.target.value)}
+                              placeholder="Notes for early overtime decision..."
+                              value={approval.early_overtime_notes || ''}
+                              onChange={(e) => updateApproval(record.id, 'early_overtime_notes', e.target.value)}
                               rows={2}
                             />
                           </div>
@@ -416,10 +430,54 @@ const TimeDiscrepancyManager = () => {
                       </div>
                     )}
 
-                    {!hasClockInDiscrepancy(record) && !hasClockOutDiscrepancy(record) && (
-                      <div className="flex items-center space-x-2 text-amber-600">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>General discrepancy: {formatDiscrepancyType(record.discrepancy_type || '')}</span>
+                    {/* Late Overtime Section */}
+                    {hasLateOvertime && (
+                      <div className="border rounded-lg p-4 bg-orange-50">
+                        <div className="flex items-center space-x-2 text-orange-600 mb-2">
+                          <AlertCircle className="w-4 h-4" />
+                          <span>
+                            Late departure: {getTimeDifference(record.clock_out_time!, record.shift!.end_time, record.shift!.date)} minutes late
+                          </span>
+                        </div>
+                        {isSelected && (
+                          <div className="space-y-2">
+                            <Label>Late Overtime Decision</Label>
+                            <Select 
+                              value={approval.late_overtime_decision || ''} 
+                              onValueChange={(value) => updateApproval(record.id, 'late_overtime_decision', value as 'paid' | 'unpaid')}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose payment for late departure..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {getOvertimeOptions('late').map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Textarea
+                              placeholder="Notes for late overtime decision..."
+                              value={approval.late_overtime_notes || ''}
+                              onChange={(e) => updateApproval(record.id, 'late_overtime_notes', e.target.value)}
+                              rows={2}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* General Notes */}
+                    {isSelected && (
+                      <div className="space-y-2">
+                        <Label>General Notes</Label>
+                        <Textarea
+                          placeholder="Additional notes for this time record..."
+                          value={approval.general_notes || ''}
+                          onChange={(e) => updateApproval(record.id, 'general_notes', e.target.value)}
+                          rows={2}
+                        />
                       </div>
                     )}
                   </div>
@@ -431,7 +489,7 @@ const TimeDiscrepancyManager = () => {
                         disabled={!canApprove(record.id) || approveRecordMutation.isPending}
                         className="flex-1"
                       >
-                        {approveRecordMutation.isPending ? 'Processing...' : 'Approve Decisions'}
+                        {approveRecordMutation.isPending ? 'Processing...' : 'Process Time Record'}
                       </Button>
                       <Button
                         variant="outline"
@@ -455,7 +513,7 @@ const TimeDiscrepancyManager = () => {
                       onClick={() => setSelectedRecord(record.id)}
                       className="w-full"
                     >
-                      Review & Approve
+                      Review & Process
                     </Button>
                   )}
                 </CardContent>
