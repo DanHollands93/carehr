@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,32 +15,33 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, user, userRole, loading: authLoading } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    console.log('Login useEffect - user:', user?.email, 'userRole:', userRole, 'authLoading:', authLoading);
+    console.log('Login useEffect - user:', user?.email, 'userRole:', userRole, 'authLoading:', authLoading, 'permissionsLoading:', permissionsLoading);
     
-    // Only redirect if we have a user and auth is not loading
-    if (user && !authLoading) {
-      console.log('User is authenticated and auth finished loading');
+    // Only redirect if we have a user and both auth and permissions are not loading
+    if (user && !authLoading && !permissionsLoading) {
+      console.log('User is authenticated and both auth and permissions finished loading');
       
-      // Give a small delay to ensure role is fetched, then redirect based on role or default
+      // Give a small delay to ensure permissions are fully loaded, then redirect based on permissions
       setTimeout(() => {
-        if (userRole === 'admin') {
-          console.log('Redirecting admin to dashboard');
+        if (hasPermission('view_dashboard')) {
+          console.log('User has dashboard permission, redirecting to dashboard');
           navigate('/');
-        } else if (userRole === 'hr_user') {
-          console.log('Redirecting HR user to HR dashboard');
-          navigate('/hr');
+        } else if (hasPermission('view_staff_shifts')) {
+          console.log('User has staff shifts permission, redirecting to My Shifts');
+          navigate('/staff/shifts');
         } else {
-          // Default redirect if role is still null or unknown
-          console.log('Redirecting to default dashboard');
-          navigate('/');
+          // Fallback to HR profile page if no other permissions
+          console.log('User has no dashboard or shifts permission, redirecting to profile');
+          navigate('/hr/profile');
         }
       }, 500);
     }
-  }, [user, userRole, authLoading, navigate]);
+  }, [user, userRole, authLoading, permissionsLoading, hasPermission, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,10 +75,10 @@ const Login = () => {
     }
   };
 
-  // Show loading if authentication is in progress
-  if (authLoading && user) {
+  // Show loading if authentication or permissions are in progress
+  if ((authLoading && user) || (user && permissionsLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-2 text-gray-600">Completing login...</p>
