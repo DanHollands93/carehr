@@ -188,6 +188,17 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
     ]
   },
   {
+    label: "Staff Management",
+    items: [
+      {
+        title: "Employees",
+        path: "/employees",
+        icon: "Users",
+        requiredPermission: "view_employees"
+      }
+    ]
+  },
+  {
     label: "Roster & Time",
     items: [
       {
