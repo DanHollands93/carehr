@@ -49,6 +49,36 @@ interface DiscrepancyApproval {
   break_deduction_minutes?: number;
 }
 
+// Helper function to calculate hours between two times, handling overnight shifts
+const calculateShiftHours = (startTime: string, endTime: string) => {
+  const start = parseISO(`2000-01-01T${startTime}`);
+  const end = parseISO(`2000-01-01T${endTime}`);
+  
+  let minutes = differenceInMinutes(end, start);
+  
+  // If end time is before start time, it's an overnight shift
+  if (minutes < 0) {
+    minutes += 24 * 60; // Add 24 hours worth of minutes
+  }
+  
+  return minutes / 60; // Convert to hours
+};
+
+// Helper function to calculate minutes between manual times, handling overnight shifts
+const calculateManualMinutes = (startTime: string, endTime: string) => {
+  const start = parseISO(`2000-01-01T${startTime}`);
+  const end = parseISO(`2000-01-01T${endTime}`);
+  
+  let minutes = differenceInMinutes(end, start);
+  
+  // If end time is before start time, it's an overnight shift
+  if (minutes < 0) {
+    minutes += 24 * 60; // Add 24 hours worth of minutes
+  }
+  
+  return minutes;
+};
+
 const TimeDiscrepancyManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -228,7 +258,7 @@ const TimeDiscrepancyManager = () => {
 
           const manualStartTime = parseISO(`${shift.date}T${approval.manual_start_time}`);
           const manualEndTime = parseISO(`${shift.date}T${approval.manual_end_time}`);
-          const totalMinutesWorked = differenceInMinutes(manualEndTime, manualStartTime);
+          const totalMinutesWorked = calculateManualMinutes(approval.manual_start_time, approval.manual_end_time);
           const breakDeductionMinutes = approval.break_deduction_minutes || shift.break_minutes || 60;
           const paidMinutes = Math.max(0, totalMinutesWorked - breakDeductionMinutes);
 
@@ -494,9 +524,7 @@ const TimeDiscrepancyManager = () => {
   };
 
   const calculateScheduledHours = (shift: any) => {
-    const startTime = parseISO(`${shift.date}T${shift.start_time}`);
-    const endTime = parseISO(`${shift.date}T${shift.end_time}`);
-    return differenceInMinutes(endTime, startTime) / 60;
+    return calculateShiftHours(shift.start_time, shift.end_time);
   };
 
   const getBreakDeductionHours = (shift: any) => {
@@ -513,11 +541,7 @@ const TimeDiscrepancyManager = () => {
     }
 
     // Calculate from manual times
-    const manualHours = differenceInMinutes(
-      parseISO(`2000-01-01T${approval.manual_end_time}`), 
-      parseISO(`2000-01-01T${approval.manual_start_time}`)
-    ) / 60;
-    
+    const manualHours = calculateShiftHours(approval.manual_start_time, approval.manual_end_time);
     const breakDeductionHours = (approval.break_deduction_minutes || shift.break_minutes || 60) / 60;
     return Math.max(0, manualHours - breakDeductionHours);
   };
