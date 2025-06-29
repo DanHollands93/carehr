@@ -1,4 +1,3 @@
-
 import { LucideIcon } from "lucide-react";
 import {
   BarChart3,
@@ -32,7 +31,7 @@ export const menuConfig: MenuConfig = {
     label: "Dashboard",
     icon: Home,
     href: "/",
-    permissions: []
+    permissions: ["view_dashboard"]
   },
   employees: {
     label: "Employees", 
@@ -183,7 +182,8 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
       {
         title: "Dashboard",
         path: "/",
-        icon: "Home"
+        icon: "Home",
+        requiredPermission: "view_dashboard"
       }
     ]
   },

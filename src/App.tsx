@@ -50,7 +50,11 @@ const App = () => (
                 <DashboardLayout />
               </ProtectedRoute>
             }>
-              <Route index element={<Dashboard />} />
+              <Route index element={
+                <ProtectedRoute requiredPermission="view_dashboard">
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
               <Route path="menu-sets" element={<MenuSets />} />
               <Route path="processes" element={<Processes />} />
               <Route path="settings" element={<Settings />} />
