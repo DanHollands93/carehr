@@ -65,11 +65,7 @@ const TimeDiscrepancyManager = () => {
       // First, get all shifts that have ended
       const { data: shifts, error: shiftsError } = await supabase
         .from('shifts')
-        .select(`
-          *,
-          employees!inner(first_name, last_name),
-          employee_job_roles!inner(pay_rate)
-        `)
+        .select('*')
         .lte('date', format(now, 'yyyy-MM-dd'))
         .order('date', { ascending: false });
       
@@ -150,30 +146,62 @@ const TimeDiscrepancyManager = () => {
             timeRecord.discrepancy_type = 'did_not_clock_in';
           }
           
-          // Add shift data with pay rate from employee_job_roles
+          // Get pay rate from employee_job_roles
+          const { data: employeeJobRole } = await supabase
+            .from('employee_job_roles')
+            .select('pay_rate')
+            .eq('employee_id', shift.employee_id)
+            .eq('is_primary', true)
+            .maybeSingle();
+          
+          // Add shift data with pay rate
           const shiftWithPayRate = {
             ...shift,
-            pay_rate: shift.employee_job_roles?.[0]?.pay_rate || 0,
+            pay_rate: employeeJobRole?.pay_rate || 0,
             break_minutes: 60, // Default break - this should come from shift data eventually
             paid_break_minutes: 0
           };
           
-          // Add employee data
-          const employeeData = {
-            first_name: shift.employees?.first_name || 'Unknown',
-            last_name: shift.employees?.last_name || 'Employee'
-          };
-          
           validRecords.push({
             ...timeRecord,
-            shift: shiftWithPayRate,
-            employee: employeeData
+            shift: shiftWithPayRate
           });
         }
       }
       
-      console.log('Final valid records:', validRecords);
-      return validRecords as TimeClockRecord[];
+      console.log('Valid records before employee lookup:', validRecords);
+      
+      // Get employee details for all valid records
+      const employeeIds = [...new Set(validRecords.map(r => r.employee_id))];
+      console.log('Employee IDs for valid records:', employeeIds);
+      
+      if (employeeIds.length === 0) {
+        return [];
+      }
+      
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
+        .select('id, first_name, last_name')
+        .in('id', employeeIds);
+      
+      if (employeesError) {
+        console.error('Error fetching employees:', employeesError);
+        throw employeesError;
+      }
+      
+      console.log('Employees for valid records:', employees);
+      
+      // Create lookup map
+      const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
+      
+      // Combine the data
+      const transformedRecords = validRecords.map(record => ({
+        ...record,
+        employee: employeeMap.get(record.employee_id)
+      })) as TimeClockRecord[];
+      
+      console.log('Final transformed records:', transformedRecords);
+      return transformedRecords;
     }
   });
 
