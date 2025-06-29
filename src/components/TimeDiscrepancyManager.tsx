@@ -62,131 +62,116 @@ const TimeDiscrepancyManager = () => {
       
       const now = new Date();
       
-      // Get all time clock records that need review
-      const { data: records, error: recordsError } = await supabase
-        .from('time_clock_records')
-        .select('*')
-        .in('status', ['discrepancy', 'scheduled']) // Include both discrepancy and scheduled records
-        .eq('approval_status', 'pending')
-        .order('created_at', { ascending: false });
-      
-      if (recordsError) {
-        console.error('Error fetching time clock records:', recordsError);
-        throw recordsError;
-      }
-      
-      console.log('Found time clock records:', records);
-      
-      if (!records || records.length === 0) {
-        console.log('No time clock records found');
-        return [];
-      }
-      
-      // Get shift details for all records - including break information
-      const shiftIds = records.map(r => r.shift_id).filter(Boolean);
-      console.log('Shift IDs to fetch:', shiftIds);
-      
-      const { data: shifts } = await supabase
+      // First, get all shifts that have ended but might not have time clock records
+      const { data: shifts, error: shiftsError } = await supabase
         .from('shifts')
         .select(`
           *,
           employee_job_roles!inner(pay_rate)
         `)
-        .in('id', shiftIds);
+        .lte('date', format(now, 'yyyy-MM-dd'))
+        .order('date', { ascending: false });
       
-      console.log('Found shifts with pay rates:', shifts);
-      const shiftsMap = new Map(shifts?.map(s => ({
-        ...s,
-        pay_rate: s.employee_job_roles?.[0]?.pay_rate || 0,
-        // Calculate break information from shift duration
-        // For now, we'll assume 1 hour unpaid break for shifts over 5 hours
-        break_minutes: 60, // This should come from actual shift data
-        paid_break_minutes: 0
-      })).map(s => [s.id, s]) || []);
-      
-      // Get all employees to check for Elizabeth Davis specifically
-      const { data: allEmployees } = await supabase
-        .from('employees')
-        .select('*');
-      
-      console.log('All employees:', allEmployees);
-      
-      // Check for Elizabeth Davis specifically
-      const elizabethDavis = allEmployees?.find(emp => 
-        emp.first_name === 'Elizabeth' && emp.last_name === 'Davis'
-      );
-      console.log('Elizabeth Davis employee record:', elizabethDavis);
-      
-      if (elizabethDavis) {
-        // Check for shifts for Elizabeth Davis on June 23rd
-        const { data: elizabethShifts } = await supabase
-          .from('shifts')
-          .select('*')
-          .eq('employee_id', elizabethDavis.id)
-          .eq('date', '2025-06-23');
-        
-        console.log('Elizabeth Davis shifts on June 23rd:', elizabethShifts);
-        
-        // Check for time clock records for Elizabeth Davis
-        const { data: elizabethTimeRecords } = await supabase
-          .from('time_clock_records')
-          .select('*')
-          .eq('employee_id', elizabethDavis.id);
-        
-        console.log('Elizabeth Davis time clock records:', elizabethTimeRecords);
+      if (shiftsError) {
+        console.error('Error fetching shifts:', shiftsError);
+        throw shiftsError;
       }
       
-      // Filter records to only include those that need review
+      console.log('Found shifts:', shifts);
+      
+      if (!shifts || shifts.length === 0) {
+        console.log('No shifts found');
+        return [];
+      }
+      
+      // Filter shifts that have ended
+      const endedShifts = shifts.filter(shift => {
+        const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
+        return now > shiftEndTime;
+      });
+      
+      console.log('Ended shifts:', endedShifts);
+      
       const validRecords = [];
       
-      for (const record of records) {
-        const shift = shiftsMap.get(record.shift_id);
-        if (!shift) {
-          console.log('No shift found for record:', record.id);
+      for (const shift of endedShifts) {
+        // Check if a time clock record exists for this shift
+        let { data: timeRecord, error: recordError } = await supabase
+          .from('time_clock_records')
+          .select('*')
+          .eq('shift_id', shift.id)
+          .maybeSingle();
+        
+        if (recordError) {
+          console.error('Error fetching time clock record for shift:', shift.id, recordError);
           continue;
         }
         
-        const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
-        const hasShiftEnded = now > shiftEndTime;
+        // If no time clock record exists, create one
+        if (!timeRecord) {
+          console.log('Creating time clock record for shift:', shift.id);
+          const { data: newRecord, error: createError } = await supabase
+            .from('time_clock_records')
+            .insert({
+              shift_id: shift.id,
+              employee_id: shift.employee_id,
+              status: 'discrepancy',
+              discrepancy_type: 'did_not_clock_in',
+              approval_status: 'pending'
+            })
+            .select()
+            .single();
+          
+          if (createError) {
+            console.error('Error creating time clock record:', createError);
+            continue;
+          }
+          
+          timeRecord = newRecord;
+        }
         
-        // Include record if:
-        // 1. It's already marked as discrepancy, OR
-        // 2. It's scheduled but shift has ended and no clock in/out recorded
-        const shouldInclude = record.status === 'discrepancy' || 
-          (record.status === 'scheduled' && hasShiftEnded && !record.clock_in_time && !record.clock_out_time);
-        
-        console.log(`Record ${record.id} - Status: ${record.status}, Shift ended: ${hasShiftEnded}, Should include: ${shouldInclude}`);
-        
-        if (shouldInclude) {
-          // If it's a scheduled record that should be a discrepancy, mark it as such
-          if (record.status === 'scheduled' && hasShiftEnded && !record.clock_in_time) {
-            console.log('Marking record as discrepancy:', record.id);
+        // Only include records that need approval
+        if (timeRecord.approval_status === 'pending' && 
+            (timeRecord.status === 'discrepancy' || 
+             (timeRecord.status === 'scheduled' && !timeRecord.clock_in_time))) {
+          
+          // If it's scheduled but should be a discrepancy, update it
+          if (timeRecord.status === 'scheduled' && !timeRecord.clock_in_time) {
             await supabase
               .from('time_clock_records')
               .update({
                 status: 'discrepancy',
-                discrepancy_type: 'did_not_clock_in',
-                updated_at: now.toISOString()
+                discrepancy_type: 'did_not_clock_in'
               })
-              .eq('id', record.id);
+              .eq('id', timeRecord.id);
             
-            // Update the record object for display
-            record.status = 'discrepancy';
-            record.discrepancy_type = 'did_not_clock_in';
+            timeRecord.status = 'discrepancy';
+            timeRecord.discrepancy_type = 'did_not_clock_in';
           }
           
+          // Add shift data with pay rate
+          const shiftWithPayRate = {
+            ...shift,
+            pay_rate: shift.employee_job_roles?.[0]?.pay_rate || 0,
+            break_minutes: 60, // Default break - this should come from shift data eventually
+            paid_break_minutes: 0
+          };
+          
           validRecords.push({
-            ...record,
-            shift
+            ...timeRecord,
+            shift: shiftWithPayRate
           });
         }
       }
       
-      // Get unique employee IDs
+      // Get employee details for all valid records
       const employeeIds = [...new Set(validRecords.map(r => r.employee_id))];
       console.log('Employee IDs for valid records:', employeeIds);
       
-      // Fetch employees
+      if (employeeIds.length === 0) {
+        return [];
+      }
+      
       const { data: employees, error: employeesError } = await supabase
         .from('employees')
         .select('id, first_name, last_name')
