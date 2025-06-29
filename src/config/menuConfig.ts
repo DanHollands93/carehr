@@ -188,23 +188,6 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
     ]
   },
   {
-    label: "Employee Management",
-    items: [
-      {
-        title: "All Employees",
-        path: "/employees",
-        icon: "Users",
-        requiredPermission: "view_employees"
-      },
-      {
-        title: "Add Employee",
-        path: "/employees/new",
-        icon: "UserPlus",
-        requiredPermission: "create_employees"
-      }
-    ]
-  },
-  {
     label: "Roster & Time",
     items: [
       {
@@ -300,12 +283,6 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
   {
     label: "Administration",
     items: [
-      {
-        title: "User Management",
-        path: "/admin/users",
-        icon: "Users",
-        requiredPermission: "manage_users"
-      },
       {
         title: "Email Logs",
         path: "/admin/email-logs",
