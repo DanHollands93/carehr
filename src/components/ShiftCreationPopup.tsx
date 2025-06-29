@@ -79,6 +79,8 @@ const ShiftCreationPopup = ({
     queryFn: async () => {
       if (!employeeId) return [];
       
+      console.log('Fetching career history for employee:', employeeId);
+      
       const { data, error } = await supabase
         .from('career_history')
         .select('*')
@@ -86,7 +88,12 @@ const ShiftCreationPopup = ({
         .is('end_date', null) // Only active positions
         .order('start_date', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching career history:', error);
+        throw error;
+      }
+      
+      console.log('Career history fetched:', data);
       return data as CareerHistoryRecord[];
     },
     enabled: !!employeeId
@@ -136,18 +143,33 @@ const ShiftCreationPopup = ({
   };
 
   const handleSubmit = () => {
-    if (!startTime || !endTime || !selectedCareerRecord) return;
+    console.log('Submit clicked');
+    console.log('Selected career record ID:', selectedCareerRecord);
+    console.log('Career history:', careerHistory);
+    
+    if (!startTime || !endTime || !selectedCareerRecord) {
+      console.log('Missing required fields:', { startTime, endTime, selectedCareerRecord });
+      return;
+    }
 
     const selectedRecord = careerHistory?.find(record => record.id === selectedCareerRecord);
-    if (!selectedRecord) return;
+    console.log('Selected record:', selectedRecord);
+    
+    if (!selectedRecord) {
+      console.log('No selected record found');
+      return;
+    }
 
-    onCreateShift({
+    const shiftData = {
       start_time: startTime,
       end_time: endTime,
       position: selectedRecord.job_title,
       job_role_id: selectedCareerRecord,
       pay_rate: selectedRecord.pay_rate || 0
-    });
+    };
+    
+    console.log('Creating shift with data:', shiftData);
+    onCreateShift(shiftData);
   };
 
   const handleClose = () => {
@@ -205,7 +227,7 @@ const ShiftCreationPopup = ({
             </div>
           )}
 
-          {/* Career History Selection - This determines the position */}
+          {/* Career History Selection */}
           {!isLoading && careerHistory && careerHistory.length > 0 && (
             <div className="space-y-2">
               <Label>Job Position * (From Career History)</Label>
@@ -236,7 +258,7 @@ const ShiftCreationPopup = ({
           {/* No Career History Warning */}
           {!isLoading && (!careerHistory || careerHistory.length === 0) && employeeId && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-              This employee has no active positions in their career history. Please add a career history record before creating shifts.
+              This employee has no active job roles assigned. Please assign a job role in their career history before creating shifts.
             </div>
           )}
 
