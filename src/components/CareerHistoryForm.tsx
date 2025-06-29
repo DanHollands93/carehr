@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
@@ -365,8 +364,8 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
   );
 };
 
-// Career History Edit Form Component
-const CareerHistoryEditForm = ({ 
+// Career History Edit Form Component with dropdowns
+export const CareerHistoryEditForm = ({ 
   entry, 
   onClose, 
   onSuccess 
