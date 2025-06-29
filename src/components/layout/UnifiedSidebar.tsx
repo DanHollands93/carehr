@@ -1,4 +1,5 @@
 
+
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -100,6 +101,17 @@ const UnifiedSidebar = ({
 
   const visibleGroups = getVisibleGroups();
 
+  // Get employee name from user data
+  const getEmployeeName = () => {
+    if (user?.user_metadata?.first_name && user?.user_metadata?.last_name) {
+      return `${user.user_metadata.first_name} ${user.user_metadata.last_name}`;
+    }
+    if (user?.user_metadata?.first_name) {
+      return user.user_metadata.first_name;
+    }
+    return user?.email || 'Employee';
+  };
+
   const sidebarContent = (
     <>
       <div className="p-4 border-b">
@@ -109,7 +121,7 @@ const UnifiedSidebar = ({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">
-              {user?.email || 'Employee'}
+              {getEmployeeName()}
             </p>
           </div>
         </div>
@@ -135,7 +147,12 @@ const UnifiedSidebar = ({
                             to={item.path} 
                             onClick={closeMobileSidebar} 
                             className={({ isActive }) => 
-                              cn("flex items-center gap-3 w-full", isActive && "font-semibold text-sidebar-primary")
+                              cn(
+                                "flex items-center gap-3 w-full transition-colors",
+                                isActive 
+                                  ? "bg-secondary text-secondary-foreground font-semibold" 
+                                  : "hover:bg-secondary/20"
+                              )
                             }
                           >
                             <IconComponent className="w-5 h-5" />
@@ -187,3 +204,4 @@ const UnifiedSidebar = ({
 };
 
 export default UnifiedSidebar;
+
