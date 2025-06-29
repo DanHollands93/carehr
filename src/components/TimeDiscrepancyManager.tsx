@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,24 +72,63 @@ const TimeDiscrepancyManager = () => {
       console.log('Found time clock records:', records);
       
       if (!records || records.length === 0) {
+        console.log('No time clock records found');
         return [];
       }
       
       // Get shift details for all records
       const shiftIds = records.map(r => r.shift_id).filter(Boolean);
+      console.log('Shift IDs to fetch:', shiftIds);
+      
       const { data: shifts } = await supabase
         .from('shifts')
         .select('*')
         .in('id', shiftIds);
       
+      console.log('Found shifts:', shifts);
       const shiftsMap = new Map(shifts?.map(s => [s.id, s]) || []);
+      
+      // Get all employees to check for Elizabeth Davis specifically
+      const { data: allEmployees } = await supabase
+        .from('employees')
+        .select('*');
+      
+      console.log('All employees:', allEmployees);
+      
+      // Check for Elizabeth Davis specifically
+      const elizabethDavis = allEmployees?.find(emp => 
+        emp.first_name === 'Elizabeth' && emp.last_name === 'Davis'
+      );
+      console.log('Elizabeth Davis employee record:', elizabethDavis);
+      
+      if (elizabethDavis) {
+        // Check for shifts for Elizabeth Davis on June 23rd
+        const { data: elizabethShifts } = await supabase
+          .from('shifts')
+          .select('*')
+          .eq('employee_id', elizabethDavis.id)
+          .eq('date', '2025-06-23');
+        
+        console.log('Elizabeth Davis shifts on June 23rd:', elizabethShifts);
+        
+        // Check for time clock records for Elizabeth Davis
+        const { data: elizabethTimeRecords } = await supabase
+          .from('time_clock_records')
+          .select('*')
+          .eq('employee_id', elizabethDavis.id);
+        
+        console.log('Elizabeth Davis time clock records:', elizabethTimeRecords);
+      }
       
       // Filter records to only include those that need review
       const validRecords = [];
       
       for (const record of records) {
         const shift = shiftsMap.get(record.shift_id);
-        if (!shift) continue;
+        if (!shift) {
+          console.log('No shift found for record:', record.id);
+          continue;
+        }
         
         const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
         const hasShiftEnded = now > shiftEndTime;
@@ -98,6 +138,8 @@ const TimeDiscrepancyManager = () => {
         // 2. It's scheduled but shift has ended and no clock in/out recorded
         const shouldInclude = record.status === 'discrepancy' || 
           (record.status === 'scheduled' && hasShiftEnded && !record.clock_in_time && !record.clock_out_time);
+        
+        console.log(`Record ${record.id} - Status: ${record.status}, Shift ended: ${hasShiftEnded}, Should include: ${shouldInclude}`);
         
         if (shouldInclude) {
           // If it's a scheduled record that should be a discrepancy, mark it as such
@@ -126,6 +168,7 @@ const TimeDiscrepancyManager = () => {
       
       // Get unique employee IDs
       const employeeIds = [...new Set(validRecords.map(r => r.employee_id))];
+      console.log('Employee IDs for valid records:', employeeIds);
       
       // Fetch employees
       const { data: employees, error: employeesError } = await supabase
@@ -137,6 +180,8 @@ const TimeDiscrepancyManager = () => {
         console.error('Error fetching employees:', employeesError);
         throw employeesError;
       }
+      
+      console.log('Employees for valid records:', employees);
       
       // Create lookup map
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
