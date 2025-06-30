@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -477,8 +478,8 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
             <Button type="button" variant="outline" onClick={cancelDeleteCareerHistory}>
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={confirmDeleteCareerHistory} disabled={deleteCareerHistory.isLoading}>
-              {deleteCareerHistory.isLoading ? 'Deleting...' : 'Delete'}
+            <Button type="button" variant="destructive" onClick={confirmDeleteCareerHistory} disabled={deleteCareerHistory.isPending}>
+              {deleteCareerHistory.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </div>
         </DialogContent>

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -301,12 +300,7 @@ const Employees = () => {
         {selectedEmployee && (
           <TabsContent value="details">
             <EmployeeDetails 
-              employee={selectedEmployee} 
-              onUpdate={refetch}
-              onBack={() => {
-                setSelectedEmployee(null);
-                setActiveTab("list");
-              }}
+              employeeId={selectedEmployee.id}
             />
           </TabsContent>
         )}
