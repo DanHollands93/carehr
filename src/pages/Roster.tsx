@@ -34,7 +34,10 @@ interface EmployeeWithJobRole extends Employee {
     job_roles: {
       id: string;
       title: string;
-    };
+    } | {
+      id: string;
+      title: string;
+    }[];
     is_primary: boolean;
   }>;
 }
@@ -125,12 +128,20 @@ const Roster = () => {
       if (error) throw error;
       
       // Transform the data to include primary job role with proper typing
-      return (data || []).map(emp => ({
-        ...emp,
-        primary_job_role: emp.employee_job_roles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
-                         emp.employee_job_roles?.[0]?.job_roles?.title || 
-                         'No Role Assigned'
-      })) as EmployeeWithJobRole[];
+      return (data || []).map(emp => {
+        const jobRoles = emp.employee_job_roles?.map((ejr: any) => ({
+          ...ejr,
+          job_roles: Array.isArray(ejr.job_roles) ? ejr.job_roles[0] : ejr.job_roles
+        }));
+        
+        return {
+          ...emp,
+          employee_job_roles: jobRoles,
+          primary_job_role: jobRoles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
+                           jobRoles?.[0]?.job_roles?.title || 
+                           'No Role Assigned'
+        };
+      }) as EmployeeWithJobRole[];
     }
   });
 
