@@ -137,7 +137,7 @@ const Roster = () => {
       // Get unique employees from the shifts data
       const uniqueEmployees = new Map();
       data?.forEach(shift => {
-        const emp = shift.employees as Employee;
+        const emp = shift.employees[0] as Employee; // Fix: Access first element of array
         if (emp && !uniqueEmployees.has(emp.id)) {
           uniqueEmployees.set(emp.id, emp);
         }
