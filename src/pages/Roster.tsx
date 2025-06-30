@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -133,10 +134,10 @@ const Roster = () => {
       
       if (error) throw error;
       
-      // Get unique employees
+      // Get unique employees from the shifts data
       const uniqueEmployees = new Map();
       data?.forEach(shift => {
-        const emp = shift.employees;
+        const emp = shift.employees as Employee;
         if (emp && !uniqueEmployees.has(emp.id)) {
           uniqueEmployees.set(emp.id, emp);
         }
@@ -736,12 +737,20 @@ const Roster = () => {
                               <div>{employee.first_name} {employee.last_name}</div>
                             </td>
                             {weekDays.map((day) => {
-                              const dayShifts = getShiftsForEmployeeAndDate(employee.id, day.toISOString());
+                              const dayShifts = shifts?.filter(shift => 
+                                shift.employee_id === employee.id && 
+                                shift.date === format(day, 'yyyy-MM-dd')
+                              ) || [];
                               return (
                                 <td
                                   key={day.toISOString()}
                                   className="p-2 border-r border-l min-w-32"
-                                  onClick={() => handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, format(day, 'yyyy-MM-dd'))}
+                                  onClick={() => canEditRoster && setShiftPopup({
+                                    isOpen: true,
+                                    employeeId: employee.id,
+                                    employeeName: `${employee.first_name} ${employee.last_name}`,
+                                    date: format(day, 'yyyy-MM-dd'),
+                                  })}
                                 >
                                   <div className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 transition-colors cursor-pointer hover:border-gray-300">
                                     {dayShifts.length > 0 ? (
@@ -752,7 +761,15 @@ const Roster = () => {
                                             className="text-xs bg-blue-100 text-blue-800 p-1 rounded"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, format(day, 'yyyy-MM-dd'), shift);
+                                              if (canEditRoster) {
+                                                setShiftPopup({
+                                                  isOpen: true,
+                                                  employeeId: employee.id,
+                                                  employeeName: `${employee.first_name} ${employee.last_name}`,
+                                                  date: format(day, 'yyyy-MM-dd'),
+                                                  existingShift: shift
+                                                });
+                                              }
                                             }}
                                           >
                                             <div className="font-medium">{shift.position}</div>
@@ -760,11 +777,11 @@ const Roster = () => {
                                           </div>
                                         ))}
                                       </div>
-                                    ) : (
+                                    ) : canEditRoster ? (
                                       <div className="opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center h-full">
                                         <Plus className="w-4 h-4 text-gray-400" />
                                       </div>
-                                    )}
+                                    ) : null}
                                   </div>
                                 </td>
                               );
