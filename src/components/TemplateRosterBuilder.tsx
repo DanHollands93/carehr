@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, Save, Users, Trash2, ArrowUpDown, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, Users, Trash2, ArrowUpDown, Plus, UserPlus, Search, UserMinus } from "lucide-react";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import RoleSelectionDialog from "@/components/RoleSelectionDialog";
@@ -75,6 +78,8 @@ const TemplateRosterBuilder = ({
   const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'department' | 'custom'>('first_name');
   const [customOrder, setCustomOrder] = useState<string[]>([]);
   const [showSortDialog, setShowSortDialog] = useState(false);
+  const [showAddStaffDialog, setShowAddStaffDialog] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [roleSelectionDialog, setRoleSelectionDialog] = useState<{
     isOpen: boolean;
     employeeId: string;
@@ -151,21 +156,32 @@ const TemplateRosterBuilder = ({
     }
   });
 
-  // Apply sorting to all employees
+  // Get employees currently in this roster (who have shifts assigned)
+  const staffInRoster = [...new Set(templateShifts.map(shift => shift.employee_id))];
+  const employeesInRoster = allEmployees?.filter(emp => staffInRoster.includes(emp.id)) || [];
+  const employeesNotInRoster = allEmployees?.filter(emp => !staffInRoster.includes(emp.id)) || [];
+
+  // Filter employees not in roster based on search term
+  const filteredEmployeesNotInRoster = employeesNotInRoster.filter(emp =>
+    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.department?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Apply sorting to employees in roster
   const employees = (() => {
-    if (!allEmployees) return [];
+    if (!employeesInRoster) return [];
 
     // Apply sorting
     switch (sortBy) {
       case 'first_name':
-        return [...allEmployees].sort((a, b) => a.first_name.localeCompare(b.first_name));
+        return [...employeesInRoster].sort((a, b) => a.first_name.localeCompare(b.first_name));
       case 'last_name':
-        return [...allEmployees].sort((a, b) => a.last_name.localeCompare(b.last_name));
+        return [...employeesInRoster].sort((a, b) => a.last_name.localeCompare(b.last_name));
       case 'department':
-        return [...allEmployees].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
+        return [...employeesInRoster].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
       case 'custom':
-        if (customOrder.length === 0) return allEmployees;
-        return [...allEmployees].sort((a, b) => {
+        if (customOrder.length === 0) return employeesInRoster;
+        return [...employeesInRoster].sort((a, b) => {
           const indexA = customOrder.indexOf(a.id);
           const indexB = customOrder.indexOf(b.id);
           if (indexA === -1 && indexB === -1) return 0;
@@ -174,7 +190,7 @@ const TemplateRosterBuilder = ({
           return indexA - indexB;
         });
       default:
-        return allEmployees;
+        return employeesInRoster;
     }
   })();
 
@@ -263,6 +279,19 @@ const TemplateRosterBuilder = ({
     return allEmployeeJobRoles?.filter(ejr => ejr.employee_id === employeeId) || [];
   };
 
+  const handleAddStaff = (employeeId: string) => {
+    // Just close the dialog - employee is now available to have shifts assigned
+    setShowAddStaffDialog(false);
+    setSearchTerm("");
+    toast({ title: "Staff member is now available in the roster" });
+  };
+
+  const handleRemoveStaff = (employeeId: string) => {
+    // Remove all shifts for this employee
+    setTemplateShifts(prev => prev.filter(shift => shift.employee_id !== employeeId));
+    toast({ title: "Staff member removed from roster" });
+  };
+
   const handleDragStart = (template: ShiftTemplate) => {
     if (isMobile) return;
     setDraggedTemplate(template);
@@ -281,7 +310,7 @@ const TemplateRosterBuilder = ({
     if (isMobile) return;
     
     if (draggedTemplate) {
-      const employee = employees.find(e => e.id === employeeId);
+      const employee = allEmployees?.find(e => e.id === employeeId);
       const employeeName = employee ? `${employee.first_name} ${employee.last_name}` : '';
       const employeeJobRoles = getEmployeeJobRoles(employeeId);
       
@@ -528,6 +557,48 @@ const TemplateRosterBuilder = ({
         onSave={handleCustomSort}
       />
 
+      {/* Add Staff Dialog */}
+      <Dialog open={showAddStaffDialog} onOpenChange={setShowAddStaffDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Staff to {templateName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search employees..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {filteredEmployeesNotInRoster.map((employee) => (
+                <div key={employee.id} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
+                  <Checkbox
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        handleAddStaff(employee.id);
+                      }
+                    }}
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium">{employee.first_name} {employee.last_name}</div>
+                    <div className="text-sm text-gray-500">{employee.department}</div>
+                  </div>
+                </div>
+              ))}
+              {filteredEmployeesNotInRoster.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  {searchTerm ? 'No employees found matching search' : 'All employees are already in this roster'}
+                </p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Shift Creation/Edit Popup */}
       <ShiftCreationPopup
         isOpen={shiftPopup.isOpen}
@@ -691,6 +762,7 @@ const TemplateRosterBuilder = ({
                           </div>
                         </th>
                       ))}
+                      <th className="p-3 text-center font-medium border-b">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -746,6 +818,16 @@ const TemplateRosterBuilder = ({
                             </td>
                           );
                         })}
+                        <td className="p-3 text-center">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRemoveStaff(employee.id)}
+                            title="Remove staff member from roster"
+                          >
+                            <UserMinus className="w-4 h-4" />
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -753,9 +835,32 @@ const TemplateRosterBuilder = ({
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-gray-500">No staff available. Please add employees to build roster templates.</p>
+                <p className="text-gray-500">No staff assigned to this roster template.</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Staff Management Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Staff Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-gray-600">
+                  {employees.length} staff member{employees.length !== 1 ? 's' : ''} in this roster template
+                </p>
+              </div>
+              <Button onClick={() => setShowAddStaffDialog(true)}>
+                <UserPlus className="w-4 h-4 mr-2" />
+                Add Staff
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
