@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Calendar, Play } from "lucide-react";
+import { Calendar } from "lucide-react";
 
 interface RosterTemplate {
   id: string;
@@ -51,45 +51,41 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
       <CardHeader>
         <CardTitle className="flex items-center">
           <Calendar className="w-5 h-5 mr-2" />
-          Active Roster Templates
+          Active Rosters
         </CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="text-center py-4">Loading templates...</div>
+          <div className="text-center py-4">Loading rosters...</div>
         ) : activeTemplates && activeTemplates.length > 0 ? (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {activeTemplates.map((template) => (
-              <div key={template.id} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <h4 className="font-medium">{template.name}</h4>
-                    <Badge variant="outline">{getRepeatTypeLabel(template.repeat_type, template.repeat_interval)}</Badge>
-                  </div>
-                  {template.description && (
-                    <p className="text-sm text-gray-600 mt-1">{template.description}</p>
-                  )}
-                  {template.end_date && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Expires: {new Date(template.end_date).toLocaleDateString()}
-                    </p>
-                  )}
+              <Button
+                key={template.id}
+                variant="outline"
+                className="h-auto p-3 flex flex-col items-start text-left"
+                onClick={() => onDeployTemplate(template)}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="font-medium">{template.name}</div>
+                  <Badge variant="outline" className="text-xs">
+                    {getRepeatTypeLabel(template.repeat_type, template.repeat_interval)}
+                  </Badge>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onDeployTemplate(template)}
-                  className="ml-3"
-                >
-                  <Play className="w-4 h-4 mr-1" />
-                  Deploy
-                </Button>
-              </div>
+                {template.description && (
+                  <p className="text-sm text-gray-600 mt-1 text-left">{template.description}</p>
+                )}
+                {template.end_date && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Expires: {new Date(template.end_date).toLocaleDateString()}
+                  </p>
+                )}
+              </Button>
             ))}
           </div>
         ) : (
           <div className="text-center py-8">
-            <p className="text-gray-500">No active roster templates available.</p>
+            <p className="text-gray-500">No active rosters available.</p>
             <p className="text-sm text-gray-400 mt-1">Create roster templates to see them here.</p>
           </div>
         )}

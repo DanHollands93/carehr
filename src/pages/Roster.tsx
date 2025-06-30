@@ -14,14 +14,12 @@ import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDo
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
-import RosterCategoryManager from "@/components/RosterCategoryManager";
 import StaffAssignmentManager from "@/components/StaffAssignmentManager";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import { useRosterCategories } from "@/hooks/useRosterCategories";
 import { useIsMobile } from "@/hooks/use-mobile";
 import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
-import TemplateDeployment from "@/components/TemplateDeployment";
 
 interface Employee {
   id: string;
@@ -88,7 +86,6 @@ const Roster = () => {
   });
   const [showTemplates, setShowTemplates] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [deployingTemplate, setDeployingTemplate] = useState<any>(null);
 
   const { categories, getAssignedEmployees } = useRosterCategories();
 
@@ -529,8 +526,8 @@ const Roster = () => {
     setShowSortDialog(false);
   };
 
-  const handleDeployTemplate = (template: any) => {
-    setDeployingTemplate(template);
+  const handleRosterSelect = (categoryId: string) => {
+    setSelectedCategoryId(categoryId);
   };
 
   useEffect(() => {
@@ -637,7 +634,7 @@ const Roster = () => {
             variant="outline"
             onClick={() => setShowTemplates(!showTemplates)}
           >
-            <Calendar className="w-4 h-4 mr-2" />
+            <CalendarIcon className="w-4 h-4 mr-2" />
             Shift Templates
           </Button>
           <Button onClick={() => setShowCreateDialog(true)}>
@@ -647,8 +644,8 @@ const Roster = () => {
         </div>
       </div>
 
-      {/* Active Roster Templates */}
-      <ActiveRosterTemplates onDeployTemplate={handleDeployTemplate} />
+      {/* Active Rosters - Changed from Active Roster Templates */}
+      <ActiveRosterTemplates onDeployTemplate={handleRosterSelect} />
 
       {/* Week Navigation */}
       <div className="flex items-center justify-center space-x-4 mt-4">
@@ -689,12 +686,6 @@ const Roster = () => {
           <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
-
-      {/* Category Selection - only allow editing if user has edit permissions */}
-      <RosterCategoryManager
-        selectedCategoryId={selectedCategoryId}
-        onCategorySelect={setSelectedCategoryId}
-      />
 
       {/* Staff Assignment for Selected Category - only show if user can edit */}
       {selectedCategory && canEditRoster && (
@@ -935,21 +926,9 @@ const Roster = () => {
       {!selectedCategoryId && (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-gray-500">Select a roster category above to begin {canEditRoster ? 'managing' : 'viewing'} shifts and staff assignments.</p>
+            <p className="text-gray-500">Select an active roster above to begin {canEditRoster ? 'managing' : 'viewing'} shifts and staff assignments.</p>
           </CardContent>
         </Card>
-      )}
-
-      {/* Template Deployment Dialog */}
-      {deployingTemplate && (
-        <TemplateDeployment
-          templateId={deployingTemplate.id}
-          templateName={deployingTemplate.name}
-          repeatType={deployingTemplate.repeat_type}
-          repeatInterval={deployingTemplate.repeat_interval}
-          isOpen={!!deployingTemplate}
-          onClose={() => setDeployingTemplate(null)}
-        />
       )}
     </div>
   );
