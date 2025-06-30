@@ -27,13 +27,20 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
     queryFn: async () => {
       const { data, error } = await supabase
         .from('roster_templates')
-        .select('*')
+        .select(`
+          *,
+          roster_categories (
+            id,
+            name
+          )
+        `)
         .eq('is_active', true)
         .or('end_date.is.null,end_date.gte.' + new Date().toISOString().split('T')[0])
         .order('name');
       
       if (error) throw error;
-      return data as RosterTemplate[];
+      console.log('Active roster templates:', data);
+      return data as (RosterTemplate & { roster_categories?: { id: string; name: string } })[];
     }
   });
 
@@ -45,6 +52,17 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
       case 'custom': return `${interval} weeks`;
       default: return type;
     }
+  };
+
+  const handleTemplateClick = (template: RosterTemplate & { roster_categories?: { id: string; name: string } }) => {
+    console.log('Template clicked:', template);
+    // Pass the template with the correct category_id structure
+    const templateWithCategory = {
+      ...template,
+      category_id: template.category_id || template.roster_categories?.id
+    };
+    console.log('Passing template to deploy:', templateWithCategory);
+    onDeployTemplate(templateWithCategory);
   };
 
   return (
@@ -65,7 +83,7 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
                 key={template.id}
                 variant="outline"
                 className="h-auto p-3 flex flex-col items-start text-left"
-                onClick={() => onDeployTemplate(template)}
+                onClick={() => handleTemplateClick(template)}
               >
                 <div className="flex items-center justify-between w-full">
                   <div className="font-medium">{template.name}</div>
@@ -75,6 +93,11 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
                 </div>
                 {template.description && (
                   <p className="text-sm text-gray-600 mt-1 text-left">{template.description}</p>
+                )}
+                {template.roster_categories && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Category: {template.roster_categories.name}
+                  </p>
                 )}
                 {template.end_date && (
                   <p className="text-xs text-gray-500 mt-1">

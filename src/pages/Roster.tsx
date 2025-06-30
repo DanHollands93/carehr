@@ -548,8 +548,12 @@ const Roster = () => {
   };
 
   const handleRosterSelect = (template: { category_id?: string }) => {
+    console.log('handleRosterSelect called with:', template);
     if (template.category_id) {
+      console.log('Setting selectedCategoryId to:', template.category_id);
       setSelectedCategoryId(template.category_id);
+    } else {
+      console.log('No category_id found in template:', template);
     }
   };
 
