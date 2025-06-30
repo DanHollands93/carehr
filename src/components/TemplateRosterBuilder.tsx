@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -81,6 +82,15 @@ const TemplateRosterBuilder = ({
   const [showAddStaffDialog, setShowAddStaffDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [staffInRoster, setStaffInRoster] = useState<Set<string>>(new Set());
+  const [removeStaffDialog, setRemoveStaffDialog] = useState<{
+    isOpen: boolean;
+    employeeId: string;
+    employeeName: string;
+  }>({
+    isOpen: false,
+    employeeId: '',
+    employeeName: ''
+  });
   const [roleSelectionDialog, setRoleSelectionDialog] = useState<{
     isOpen: boolean;
     employeeId: string;
@@ -302,7 +312,16 @@ const TemplateRosterBuilder = ({
       newSet.delete(employeeId);
       return newSet;
     });
+    setRemoveStaffDialog({ isOpen: false, employeeId: '', employeeName: '' });
     toast({ title: "Staff member removed from roster" });
+  };
+
+  const openRemoveStaffDialog = (employeeId: string, employeeName: string) => {
+    setRemoveStaffDialog({
+      isOpen: true,
+      employeeId,
+      employeeName
+    });
   };
 
   const handleDragStart = (template: ShiftTemplate) => {
@@ -533,6 +552,25 @@ const TemplateRosterBuilder = ({
 
   return (
     <div className="space-y-6">
+      {/* Remove Staff Confirmation Dialog */}
+      <AlertDialog open={removeStaffDialog.isOpen} onOpenChange={(open) => !open && setRemoveStaffDialog({ isOpen: false, employeeId: '', employeeName: '' })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Staff Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <strong>{removeStaffDialog.employeeName}</strong> from this roster template? 
+              This will also remove all their assigned shifts.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleRemoveStaff(removeStaffDialog.employeeId)}>
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Role Selection Dialog */}
       <RoleSelectionDialog
         isOpen={roleSelectionDialog.isOpen}
@@ -774,15 +812,25 @@ const TemplateRosterBuilder = ({
                           </div>
                         </th>
                       ))}
-                      <th className="p-3 text-center font-medium border-b">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {employees.map((employee) => (
                       <tr key={employee.id} className="border-b">
                         <td className="p-3 font-medium">
-                          <div>{employee.first_name} {employee.last_name}</div>
-                          <div className="text-sm text-gray-500">{employee.department}</div>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div>{employee.first_name} {employee.last_name}</div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openRemoveStaffDialog(employee.id, `${employee.first_name} ${employee.last_name}`)}
+                              title="Remove staff member from roster"
+                            >
+                              <UserMinus className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </td>
                         {weekDays.map((dayIndex) => {
                           const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
@@ -830,16 +878,6 @@ const TemplateRosterBuilder = ({
                             </td>
                           );
                         })}
-                        <td className="p-3 text-center">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRemoveStaff(employee.id)}
-                            title="Remove staff member from roster"
-                          >
-                            <UserMinus className="w-4 h-4" />
-                          </Button>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
