@@ -8,13 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
 import { ChevronLeft, ChevronRight, Save, Users, Trash2, ArrowUpDown, Plus } from "lucide-react";
-import RosterCategoryManager from "@/components/RosterCategoryManager";
-import StaffAssignmentManager from "@/components/StaffAssignmentManager";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import RoleSelectionDialog from "@/components/RoleSelectionDialog";
-import { useRosterCategories } from "@/hooks/useRosterCategories";
-import { useEmployeeJobRoles, useAllEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
+import { useAllEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Employee {
@@ -74,7 +71,6 @@ const TemplateRosterBuilder = ({
   const [draggedShift, setDraggedShift] = useState<TemplateShift | null>(null);
   const [templateShifts, setTemplateShifts] = useState<TemplateShift[]>([]);
   const [currentWeek, setCurrentWeek] = useState(0);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [showDeleteBin, setShowDeleteBin] = useState(false);
   const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'department' | 'custom'>('first_name');
   const [customOrder, setCustomOrder] = useState<string[]>([]);
@@ -105,7 +101,6 @@ const TemplateRosterBuilder = ({
     dayIndex: 0
   });
   
-  const { categories, getAssignedEmployees } = useRosterCategories();
   const { data: allEmployeeJobRoles } = useAllEmployeeJobRoles();
 
   // Calculate period length in days
@@ -126,9 +121,6 @@ const TemplateRosterBuilder = ({
   const currentWeekStartDay = currentWeek * 7;
   const currentWeekDays = Math.min(7, periodDays - currentWeekStartDay);
   const weekDays = Array.from({ length: currentWeekDays }, (_, i) => currentWeekStartDay + i);
-
-  // Get assigned employees for selected category
-  const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
 
   const { data: allEmployees } = useQuery({
     queryKey: ['employees'],
@@ -159,25 +151,21 @@ const TemplateRosterBuilder = ({
     }
   });
 
-  // Filter and sort employees based on category selection and sorting preference
+  // Apply sorting to all employees
   const employees = (() => {
-    let filteredEmployees = selectedCategoryId 
-      ? allEmployees?.filter(emp => assignedEmployeeIds.includes(emp.id))
-      : allEmployees;
-
-    if (!filteredEmployees) return [];
+    if (!allEmployees) return [];
 
     // Apply sorting
     switch (sortBy) {
       case 'first_name':
-        return [...filteredEmployees].sort((a, b) => a.first_name.localeCompare(b.first_name));
+        return [...allEmployees].sort((a, b) => a.first_name.localeCompare(b.first_name));
       case 'last_name':
-        return [...filteredEmployees].sort((a, b) => a.last_name.localeCompare(b.last_name));
+        return [...allEmployees].sort((a, b) => a.last_name.localeCompare(b.last_name));
       case 'department':
-        return [...filteredEmployees].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
+        return [...allEmployees].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
       case 'custom':
-        if (customOrder.length === 0) return filteredEmployees;
-        return [...filteredEmployees].sort((a, b) => {
+        if (customOrder.length === 0) return allEmployees;
+        return [...allEmployees].sort((a, b) => {
           const indexA = customOrder.indexOf(a.id);
           const indexB = customOrder.indexOf(b.id);
           if (indexA === -1 && indexB === -1) return 0;
@@ -186,7 +174,7 @@ const TemplateRosterBuilder = ({
           return indexA - indexB;
         });
       default:
-        return filteredEmployees;
+        return allEmployees;
     }
   })();
 
@@ -239,16 +227,6 @@ const TemplateRosterBuilder = ({
         .eq('roster_template_id', templateId);
       
       if (deleteError) throw deleteError;
-
-      // Update template with category
-      if (selectedCategoryId) {
-        const { error: updateError } = await supabase
-          .from('roster_templates')
-          .update({ category_id: selectedCategoryId })
-          .eq('id', templateId);
-        
-        if (updateError) throw updateError;
-      }
 
       // Insert new assignments
       if (templateShifts.length > 0) {
@@ -412,8 +390,6 @@ const TemplateRosterBuilder = ({
     acc[template.position].push(template);
     return acc;
   }, {} as Record<string, ShiftTemplate[]>) || {};
-
-  const selectedCategory = categories?.find(cat => cat.id === selectedCategoryId);
 
   const handleCustomSort = (newOrder: string[]) => {
     setCustomOrder(newOrder);
@@ -584,20 +560,6 @@ const TemplateRosterBuilder = ({
         </div>
       </div>
 
-      {/* Category Selection */}
-      <RosterCategoryManager
-        selectedCategoryId={selectedCategoryId}
-        onCategorySelect={setSelectedCategoryId}
-      />
-
-      {/* Staff Assignment for Selected Category */}
-      {selectedCategory && (
-        <StaffAssignmentManager
-          categoryId={selectedCategory.id}
-          categoryName={selectedCategory.name}
-        />
-      )}
-
       {/* Week Navigation - only show if more than one week */}
       {totalWeeks > 1 && (
         <Card>
@@ -638,180 +600,165 @@ const TemplateRosterBuilder = ({
         </Card>
       )}
 
-      {selectedCategoryId && (
-        <div className="space-y-6">
-          {/* Shift Templates Panel - only show on desktop */}
-          {!isMobile && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Shift Templates</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Accordion type="multiple" className="w-full">
-                  {Object.entries(groupedTemplates).map(([position, templates]) => (
-                    <AccordionItem value={position} key={position}>
-                      <AccordionTrigger className="text-sm font-medium">
-                        {position}
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="grid grid-cols-2 gap-2">
-                          {templates.map((template) => (
-                            <div
-                              key={template.id}
-                              draggable={!isMobile}
-                              onDragStart={() => handleDragStart(template)}
-                              className="p-2 rounded border cursor-move hover:shadow-md transition-shadow text-xs"
-                              style={{ 
-                                backgroundColor: template.color + '20',
-                                borderColor: template.color 
-                              }}
-                            >
-                              <div className="font-medium truncate">{template.name}</div>
-                              <div className="text-xs text-gray-600 truncate">
-                                {template.start_time} - {template.end_time}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Current Week Roster Grid */}
+      <div className="space-y-6">
+        {/* Shift Templates Panel - only show on desktop */}
+        {!isMobile && (
           <Card>
             <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>
-                  {totalWeeks > 1 ? `Week ${currentWeek + 1} - ${selectedCategory?.name} Template` : `${selectedCategory?.name} Template`}
-                </CardTitle>
-                {!isMobile && (
-                  <div className="flex items-center space-x-2">
-                    <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Sort by..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="first_name">First Name</SelectItem>
-                        <SelectItem value="last_name">Last Name</SelectItem>
-                        <SelectItem value="department">Job Title</SelectItem>
-                        <SelectItem value="custom">Custom Order</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowSortDialog(true)}
-                    >
-                      <ArrowUpDown className="w-4 h-4 mr-2" />
-                      Custom Sort
-                    </Button>
-                  </div>
-                )}
-              </div>
+              <CardTitle>Shift Templates</CardTitle>
             </CardHeader>
             <CardContent>
-              {employees && employees.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="p-3 text-left font-medium border-b">Staff</th>
-                        {weekDays.map((dayIndex) => (
-                          <th key={dayIndex} className="p-3 text-center font-medium border-b min-w-24">
-                            <div className="text-sm">{getDayLabel(dayIndex)}</div>
-                            <div className="text-xs text-gray-500">Day {dayIndex + 1}</div>
-                            <div className="flex items-center justify-center mt-1 text-xs text-blue-600">
-                              <Users className="w-3 h-3 mr-1" />
-                              {getStaffCountForDay(dayIndex)}
+              <Accordion type="multiple" className="w-full">
+                {Object.entries(groupedTemplates).map(([position, templates]) => (
+                  <AccordionItem value={position} key={position}>
+                    <AccordionTrigger className="text-sm font-medium">
+                      {position}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-2">
+                        {templates.map((template) => (
+                          <div
+                            key={template.id}
+                            draggable={!isMobile}
+                            onDragStart={() => handleDragStart(template)}
+                            className="p-2 rounded border cursor-move hover:shadow-md transition-shadow text-xs"
+                            style={{ 
+                              backgroundColor: template.color + '20',
+                              borderColor: template.color 
+                            }}
+                          >
+                            <div className="font-medium truncate">{template.name}</div>
+                            <div className="text-xs text-gray-600 truncate">
+                              {template.start_time} - {template.end_time}
                             </div>
-                          </th>
+                          </div>
                         ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {employees.map((employee) => (
-                        <tr key={employee.id} className="border-b">
-                          <td className="p-3 font-medium">
-                            <div>{employee.first_name} {employee.last_name}</div>
-                            <div className="text-sm text-gray-500">{employee.department}</div>
-                          </td>
-                          {weekDays.map((dayIndex) => {
-                            const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
-                            const template = shift ? shiftTemplates?.find(t => t.id === shift.shift_template_id) : null;
-                            
-                            return (
-                              <td
-                                key={dayIndex}
-                                className="p-2 border-r border-l"
-                                onDrop={!isMobile ? () => handleDrop(employee.id, dayIndex) : undefined}
-                                onDragOver={!isMobile ? handleDragOver : undefined}
-                              >
-                                <div 
-                                  className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors cursor-pointer"
-                                  style={{
-                                    backgroundColor: (!isMobile && (draggedTemplate || draggedShift)) ? '#f0f9ff' : 'transparent'
-                                  }}
-                                  onClick={() => handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, dayIndex)}
-                                >
-                                  {shift && template ? (
-                                    <div 
-                                      draggable={!isMobile}
-                                      onDragStart={!isMobile ? () => handleShiftDragStart(shift) : undefined}
-                                      onDragEnd={!isMobile ? handleDragEnd : undefined}
-                                      className="p-2 rounded text-xs cursor-pointer hover:shadow-md transition-shadow"
-                                      style={{ 
-                                        backgroundColor: template.color + '20',
-                                        borderColor: template.color
-                                      }}
-                                      onDoubleClick={!isMobile ? () => removeShift(shift) : undefined}
-                                      title={isMobile ? "Tap to edit or remove" : "Drag to move or delete, double-click to remove"}
-                                    >
-                                      <div className="font-medium">{template.position}</div>
-                                      <div>{template.start_time} - {template.end_time}</div>
-                                      {shift.pay_rate && (
-                                        <div className="text-xs text-gray-500">£{shift.pay_rate}/hr</div>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div className="opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center h-full">
-                                      <Plus className="w-4 h-4 text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">
-                    {selectedCategory ? 
-                      `No staff assigned to ${selectedCategory.name}. Add staff using the button above.` :
-                      'Select a category to build roster templates.'
-                    }
-                  </p>
-                </div>
-              )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
             </CardContent>
           </Card>
-        </div>
-      )}
+        )}
 
-      {!selectedCategoryId && (
+        {/* Current Week Roster Grid */}
         <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-gray-500">Select a roster category above to begin building your template.</p>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>
+                {totalWeeks > 1 ? `Week ${currentWeek + 1} - ${templateName} Template` : `${templateName} Template`}
+              </CardTitle>
+              {!isMobile && (
+                <div className="flex items-center space-x-2">
+                  <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Sort by..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="first_name">First Name</SelectItem>
+                      <SelectItem value="last_name">Last Name</SelectItem>
+                      <SelectItem value="department">Job Title</SelectItem>
+                      <SelectItem value="custom">Custom Order</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSortDialog(true)}
+                  >
+                    <ArrowUpDown className="w-4 h-4 mr-2" />
+                    Custom Sort
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {employees && employees.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="p-3 text-left font-medium border-b">Staff</th>
+                      {weekDays.map((dayIndex) => (
+                        <th key={dayIndex} className="p-3 text-center font-medium border-b min-w-24">
+                          <div className="text-sm">{getDayLabel(dayIndex)}</div>
+                          <div className="text-xs text-gray-500">Day {dayIndex + 1}</div>
+                          <div className="flex items-center justify-center mt-1 text-xs text-blue-600">
+                            <Users className="w-3 h-3 mr-1" />
+                            {getStaffCountForDay(dayIndex)}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employees.map((employee) => (
+                      <tr key={employee.id} className="border-b">
+                        <td className="p-3 font-medium">
+                          <div>{employee.first_name} {employee.last_name}</div>
+                          <div className="text-sm text-gray-500">{employee.department}</div>
+                        </td>
+                        {weekDays.map((dayIndex) => {
+                          const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
+                          const template = shift ? shiftTemplates?.find(t => t.id === shift.shift_template_id) : null;
+                          
+                          return (
+                            <td
+                              key={dayIndex}
+                              className="p-2 border-r border-l"
+                              onDrop={!isMobile ? () => handleDrop(employee.id, dayIndex) : undefined}
+                              onDragOver={!isMobile ? handleDragOver : undefined}
+                            >
+                              <div 
+                                className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors cursor-pointer"
+                                style={{
+                                  backgroundColor: (!isMobile && (draggedTemplate || draggedShift)) ? '#f0f9ff' : 'transparent'
+                                }}
+                                onClick={() => handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, dayIndex)}
+                              >
+                                {shift && template ? (
+                                  <div 
+                                    draggable={!isMobile}
+                                    onDragStart={!isMobile ? () => handleShiftDragStart(shift) : undefined}
+                                    onDragEnd={!isMobile ? handleDragEnd : undefined}
+                                    className="p-2 rounded text-xs cursor-pointer hover:shadow-md transition-shadow"
+                                    style={{ 
+                                      backgroundColor: template.color + '20',
+                                      borderColor: template.color
+                                    }}
+                                    onDoubleClick={!isMobile ? () => removeShift(shift) : undefined}
+                                    title={isMobile ? "Tap to edit or remove" : "Drag to move or delete, double-click to remove"}
+                                  >
+                                    <div className="font-medium">{template.position}</div>
+                                    <div>{template.start_time} - {template.end_time}</div>
+                                    {shift.pay_rate && (
+                                      <div className="text-xs text-gray-500">£{shift.pay_rate}/hr</div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center h-full">
+                                    <Plus className="w-4 h-4 text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No staff available. Please add employees to build roster templates.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
+      </div>
     </div>
   );
 };
