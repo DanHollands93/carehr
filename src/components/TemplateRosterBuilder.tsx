@@ -80,6 +80,7 @@ const TemplateRosterBuilder = ({
   const [showSortDialog, setShowSortDialog] = useState(false);
   const [showAddStaffDialog, setShowAddStaffDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [staffInRoster, setStaffInRoster] = useState<Set<string>>(new Set());
   const [roleSelectionDialog, setRoleSelectionDialog] = useState<{
     isOpen: boolean;
     employeeId: string;
@@ -156,10 +157,15 @@ const TemplateRosterBuilder = ({
     }
   });
 
-  // Get employees currently in this roster (who have shifts assigned)
-  const staffInRoster = [...new Set(templateShifts.map(shift => shift.employee_id))];
-  const employeesInRoster = allEmployees?.filter(emp => staffInRoster.includes(emp.id)) || [];
-  const employeesNotInRoster = allEmployees?.filter(emp => !staffInRoster.includes(emp.id)) || [];
+  // Update staff in roster set when template shifts change
+  useEffect(() => {
+    const staffIds = new Set(templateShifts.map(shift => shift.employee_id));
+    setStaffInRoster(staffIds);
+  }, [templateShifts]);
+
+  // Get employees currently in this roster and not in roster
+  const employeesInRoster = allEmployees?.filter(emp => staffInRoster.has(emp.id)) || [];
+  const employeesNotInRoster = allEmployees?.filter(emp => !staffInRoster.has(emp.id)) || [];
 
   // Filter employees not in roster based on search term
   const filteredEmployeesNotInRoster = employeesNotInRoster.filter(emp =>
@@ -280,15 +286,22 @@ const TemplateRosterBuilder = ({
   };
 
   const handleAddStaff = (employeeId: string) => {
-    // Just close the dialog - employee is now available to have shifts assigned
+    // Add the staff member to the roster
+    setStaffInRoster(prev => new Set([...prev, employeeId]));
     setShowAddStaffDialog(false);
     setSearchTerm("");
-    toast({ title: "Staff member is now available in the roster" });
+    toast({ title: "Staff member added to roster" });
   };
 
   const handleRemoveStaff = (employeeId: string) => {
     // Remove all shifts for this employee
     setTemplateShifts(prev => prev.filter(shift => shift.employee_id !== employeeId));
+    // Remove from staff in roster set
+    setStaffInRoster(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(employeeId);
+      return newSet;
+    });
     toast({ title: "Staff member removed from roster" });
   };
 
@@ -575,18 +588,17 @@ const TemplateRosterBuilder = ({
             </div>
             <div className="max-h-64 overflow-y-auto space-y-2">
               {filteredEmployeesNotInRoster.map((employee) => (
-                <div key={employee.id} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
-                  <Checkbox
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        handleAddStaff(employee.id);
-                      }
-                    }}
-                  />
+                <div key={employee.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
                   <div className="flex-1">
                     <div className="font-medium">{employee.first_name} {employee.last_name}</div>
                     <div className="text-sm text-gray-500">{employee.department}</div>
                   </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAddStaff(employee.id)}
+                  >
+                    Add
+                  </Button>
                 </div>
               ))}
               {filteredEmployeesNotInRoster.length === 0 && (
@@ -836,6 +848,7 @@ const TemplateRosterBuilder = ({
             ) : (
               <div className="text-center py-8">
                 <p className="text-gray-500">No staff assigned to this roster template.</p>
+                <p className="text-sm text-gray-400 mt-2">Click "Add Staff" below to get started.</p>
               </div>
             )}
           </CardContent>
