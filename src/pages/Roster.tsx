@@ -123,6 +123,8 @@ const Roster = () => {
     queryFn: async () => {
       if (!selectedRosterTemplate?.category_id) return [];
       
+      console.log('Fetching roster employees for category:', selectedRosterTemplate.category_id);
+      
       const { data, error } = await supabase
         .from('shifts')
         .select(`
@@ -131,7 +133,12 @@ const Roster = () => {
         `)
         .eq('category_id', selectedRosterTemplate.category_id);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching roster employees:', error);
+        throw error;
+      }
+      
+      console.log('Raw roster employees data:', data);
       
       // Get unique employees from the shifts data
       const uniqueEmployees = new Map<string, Employee>();
@@ -143,7 +150,9 @@ const Roster = () => {
         }
       });
       
-      return Array.from(uniqueEmployees.values());
+      const result = Array.from(uniqueEmployees.values());
+      console.log('Processed roster employees:', result);
+      return result;
     },
     enabled: !!selectedRosterTemplate?.category_id
   });
@@ -172,6 +181,9 @@ const Roster = () => {
       const startDate = format(weekStart, 'yyyy-MM-dd');
       const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
       
+      console.log('Fetching shifts for date range:', startDate, 'to', endDate);
+      console.log('Selected roster category_id:', selectedRosterTemplate?.category_id);
+      
       let query = supabase
         .from('shifts')
         .select(`
@@ -193,13 +205,36 @@ const Roster = () => {
       
       const { data, error } = await query;
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching shifts:', error);
+        throw error;
+      }
+      
+      console.log('Raw shifts data:', data);
       
       // Transform the data to include time records
-      return (data || []).map(shift => ({
+      const result = (data || []).map(shift => ({
         ...shift,
         time_record: shift.time_clock_records?.[0] || null
       })) as ShiftWithTimeRecord[];
+      
+      console.log('Processed shifts:', result);
+      return result;
+    }
+  });
+
+  // Debug query to check all shifts with category_id
+  const { data: debugShifts } = useQuery({
+    queryKey: ['debug-shifts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('id, employee_id, date, category_id')
+        .limit(10);
+      
+      if (error) throw error;
+      console.log('Debug - All shifts sample:', data);
+      return data;
     }
   });
 
@@ -535,6 +570,7 @@ const Roster = () => {
 
   const handleRosterSelect = (template: RosterTemplate) => {
     console.log('handleRosterSelect called with:', template);
+    console.log('Template category_id:', template.category_id);
     setSelectedRosterTemplate(template);
   };
 
@@ -662,6 +698,21 @@ const Roster = () => {
 
       {/* Active Rosters */}
       <ActiveRosterTemplates onSelectRoster={handleRosterSelect} />
+
+      {/* Debug Information */}
+      {selectedRosterTemplate && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="pt-4">
+            <h3 className="font-medium text-blue-900 mb-2">Debug Information</h3>
+            <div className="text-sm text-blue-800 space-y-1">
+              <p>Selected Template: {selectedRosterTemplate.name}</p>
+              <p>Category ID: {selectedRosterTemplate.category_id || 'None'}</p>
+              <p>Employees Found: {employees.length}</p>
+              <p>Shifts Found: {shifts?.length || 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Week Navigation */}
       <div className="flex items-center justify-center space-x-4 mt-4">
