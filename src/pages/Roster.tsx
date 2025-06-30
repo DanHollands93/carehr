@@ -20,6 +20,8 @@ import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import { useRosterCategories } from "@/hooks/useRosterCategories";
 import { useIsMobile } from "@/hooks/use-mobile";
+import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
+import TemplateDeployment from "@/components/TemplateDeployment";
 
 interface Employee {
   id: string;
@@ -84,7 +86,10 @@ const Roster = () => {
     employeeName: '',
     date: ''
   });
-  
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [deployingTemplate, setDeployingTemplate] = useState<any>(null);
+
   const { categories, getAssignedEmployees } = useRosterCategories();
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
@@ -524,6 +529,10 @@ const Roster = () => {
     setShowSortDialog(false);
   };
 
+  const handleDeployTemplate = (template: any) => {
+    setDeployingTemplate(template);
+  };
+
   useEffect(() => {
     const preventHorizontalNavigation = (e: WheelEvent) => {
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
@@ -616,59 +625,69 @@ const Roster = () => {
         />
       )}
 
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Weekly Roster {!canEditRoster && <span className="text-sm font-normal text-gray-500">(View Only)</span>}
-        </h1>
-        <p className="text-gray-600">
-          {canEditRoster 
-            ? (isMobile 
-                ? "Tap on shifts to edit or remove them, or tap empty cells to add shifts. Multiple shifts per day are allowed but cannot overlap."
-                : "Drag and drop shifts to assign staff or move shifts between staff and days, or click on empty cells to add shifts. Multiple shifts per day are allowed but cannot overlap."
-              )
-            : "View-only access - shifts cannot be modified"
-          }
-        </p>
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Weekly Roster</h1>
+          <p className="text-gray-600">Manage staff schedules and shift assignments</p>
+        </div>
         
-        {/* Date Navigation */}
-        <div className="flex items-center justify-center space-x-4 mt-4">
+        <div className="flex space-x-2">
           <Button
             variant="outline"
-            onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
+            onClick={() => setShowTemplates(!showTemplates)}
           >
-            <ChevronLeft className="w-4 h-4" />
+            <Calendar className="w-4 h-4 mr-2" />
+            Shift Templates
           </Button>
-          
-          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-[240px] justify-start text-left font-normal",
-                  !currentWeek && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                Week of {format(weekStart, 'MMM dd, yyyy')}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="center">
-              <Calendar
-                mode="single"
-                selected={currentWeek}
-                onSelect={handleDateSelect}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-          
-          <Button
-            variant="outline"
-            onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
-          >
-            <ChevronRight className="w-4 h-4" />
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Shift
           </Button>
         </div>
+      </div>
+
+      {/* Active Roster Templates */}
+      <ActiveRosterTemplates onDeployTemplate={handleDeployTemplate} />
+
+      {/* Week Navigation */}
+      <div className="flex items-center justify-center space-x-4 mt-4">
+        <Button
+          variant="outline"
+          onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        
+        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-[240px] justify-start text-left font-normal",
+                !currentWeek && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              Week of {format(weekStart, 'MMM dd, yyyy')}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="center">
+            <Calendar
+              mode="single"
+              selected={currentWeek}
+              onSelect={handleDateSelect}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        
+        <Button
+          variant="outline"
+          onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
       </div>
 
       {/* Category Selection - only allow editing if user has edit permissions */}
@@ -919,6 +938,18 @@ const Roster = () => {
             <p className="text-gray-500">Select a roster category above to begin {canEditRoster ? 'managing' : 'viewing'} shifts and staff assignments.</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Template Deployment Dialog */}
+      {deployingTemplate && (
+        <TemplateDeployment
+          templateId={deployingTemplate.id}
+          templateName={deployingTemplate.name}
+          repeatType={deployingTemplate.repeat_type}
+          repeatInterval={deployingTemplate.repeat_interval}
+          isOpen={!!deployingTemplate}
+          onClose={() => setDeployingTemplate(null)}
+        />
       )}
     </div>
   );

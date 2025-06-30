@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +26,7 @@ interface RosterTemplate {
   repeat_interval: number;
   is_active: boolean;
   created_at: string;
+  end_date: string | null;
 }
 
 const RosterTemplates = () => {
@@ -42,7 +42,8 @@ const RosterTemplates = () => {
     name: "",
     description: "",
     repeat_type: "weekly" as RepeatType,
-    repeat_interval: 1
+    repeat_interval: 1,
+    end_date: ""
   });
 
   const { data: rosterTemplates, isLoading } = useQuery({
@@ -60,9 +61,14 @@ const RosterTemplates = () => {
 
   const createMutation = useMutation({
     mutationFn: async (data: Omit<RosterTemplate, 'id' | 'created_at'>) => {
+      const templateData = {
+        ...data,
+        end_date: data.end_date || null
+      };
+      
       const { data: newTemplate, error } = await supabase
         .from('roster_templates')
-        .insert([data])
+        .insert([templateData])
         .select()
         .single();
       
@@ -89,9 +95,14 @@ const RosterTemplates = () => {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: Partial<RosterTemplate> & { id: string }) => {
+      const updateData = {
+        ...data,
+        end_date: data.end_date || null
+      };
+      
       const { error } = await supabase
         .from('roster_templates')
-        .update(data)
+        .update(updateData)
         .eq('id', id);
       
       if (error) throw error;
@@ -138,7 +149,8 @@ const RosterTemplates = () => {
       name: "",
       description: "",
       repeat_type: "weekly",
-      repeat_interval: 1
+      repeat_interval: 1,
+      end_date: ""
     });
     setEditingTemplate(null);
   };
@@ -164,7 +176,8 @@ const RosterTemplates = () => {
       name: template.name,
       description: template.description || "",
       repeat_type: template.repeat_type,
-      repeat_interval: template.repeat_interval
+      repeat_interval: template.repeat_interval,
+      end_date: template.end_date || ""
     });
     setIsDialogOpen(true);
   };
@@ -293,6 +306,16 @@ const RosterTemplates = () => {
                   </div>
                 )}
               </div>
+
+              <div>
+                <Label htmlFor="end_date">End Date (Optional)</Label>
+                <Input
+                  id="end_date"
+                  type="date"
+                  value={formData.end_date}
+                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                />
+              </div>
               
               <div className="flex justify-end space-x-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -324,6 +347,7 @@ const RosterTemplates = () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Period</TableHead>
+                  <TableHead>End Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -337,8 +361,11 @@ const RosterTemplates = () => {
                       {getRepeatTypeLabel(template.repeat_type, template.repeat_interval)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={template.is_active ? "default" : "secondary"}>
-                        {template.is_active ? "Active" : "Inactive"}
+                      {template.end_date ? new Date(template.end_date).toLocaleDateString() : 'No end date'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={template.is_active && (!template.end_date || new Date(template.end_date) >= new Date()) ? "default" : "secondary"}>
+                        {template.is_active && (!template.end_date || new Date(template.end_date) >= new Date()) ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell>

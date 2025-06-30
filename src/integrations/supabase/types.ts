@@ -1065,6 +1065,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
+          end_date: string | null
           id: string
           is_active: boolean | null
           name: string
@@ -1076,6 +1077,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          end_date?: string | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -1087,6 +1089,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          end_date?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
@@ -1687,6 +1690,10 @@ export type Database = {
           _user_id: string
           _role: Database["public"]["Enums"]["user_role"]
         }
+        Returns: boolean
+      }
+      is_template_active: {
+        Args: { template_start_date: string; template_end_date: string }
         Returns: boolean
       }
       user_can_create_employees: {
