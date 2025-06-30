@@ -97,7 +97,7 @@ const Roster = () => {
   // Get assigned employees for selected category
   const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
 
-  // Get all employees with their primary job roles
+  // Get all employees with their job roles
   const { data: allEmployees } = useQuery({
     queryKey: ['employees-with-roles'],
     queryFn: async () => {
@@ -109,7 +109,7 @@ const Roster = () => {
           last_name, 
           department,
           employee_job_roles!inner(
-            job_roles(title),
+            job_roles(id, title),
             is_primary
           )
         `)
@@ -123,7 +123,7 @@ const Roster = () => {
         primary_job_role: emp.employee_job_roles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
                          emp.employee_job_roles?.[0]?.job_roles?.title || 
                          'No Role Assigned'
-      })) as EmployeeWithJobRole[];
+      }));
     }
   });
 

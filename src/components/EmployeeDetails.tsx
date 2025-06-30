@@ -52,7 +52,7 @@ interface CareerHistoryEntry {
   end_date?: string;
   currency: string;
   probation_end_date?: string;
-  notice_period_weeks?: number;
+  notice_period_weeks: number; // Made required to match CareerHistoryRecord
 }
 
 interface AddressHistoryEntry {
@@ -148,7 +148,12 @@ const EmployeeDetails = ({ employee, onUpdate, onBack }: EmployeeDetailsProps) =
         .order('start_date', { ascending: false });
       
       if (error) throw error;
-      return data as CareerHistoryEntry[];
+      
+      // Ensure notice_period_weeks has a default value if null
+      return (data as CareerHistoryEntry[]).map(entry => ({
+        ...entry,
+        notice_period_weeks: entry.notice_period_weeks ?? 4
+      }));
     },
     enabled: !!employeeId
   });

@@ -142,7 +142,7 @@ const TemplateRosterBuilder = ({
           last_name, 
           department,
           employee_job_roles!inner(
-            job_roles(title),
+            job_roles(id, title),
             is_primary
           )
         `)
@@ -173,6 +173,20 @@ const TemplateRosterBuilder = ({
       
       if (error) throw error;
       return data as LookupItem[];
+    }
+  });
+
+  // Add query for job roles to resolve the undefined jobRoles issue
+  const { data: jobRoles } = useQuery({
+    queryKey: ['job-roles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_roles')
+        .select('*')
+        .order('title');
+      
+      if (error) throw error;
+      return data;
     }
   });
 
@@ -530,7 +544,7 @@ const TemplateRosterBuilder = ({
       start_time: template.start_time,
       end_time: template.end_time,
       position: template.position,
-      job_role_id: ''
+      job_role_id: templateShift.job_role_id || ''
     };
   };
 
