@@ -125,34 +125,41 @@ const Roster = () => {
       
       console.log('Fetching roster employees for category:', selectedRosterTemplate.category_id);
       
-      const { data, error } = await supabase
+      // First get the employee IDs from shifts
+      const { data: shiftsData, error: shiftsError } = await supabase
         .from('shifts')
-        .select(`
-          employee_id,
-          employees!inner(id, first_name, last_name, department)
-        `)
+        .select('employee_id')
         .eq('category_id', selectedRosterTemplate.category_id);
       
-      if (error) {
-        console.error('Error fetching roster employees:', error);
-        throw error;
+      if (shiftsError) {
+        console.error('Error fetching shifts for employees:', shiftsError);
+        throw shiftsError;
       }
       
-      console.log('Raw roster employees data:', data);
+      console.log('Shifts data for employees:', shiftsData);
       
-      // Get unique employees from the shifts data
-      const uniqueEmployees = new Map<string, Employee>();
-      data?.forEach(shift => {
-        // Handle the case where employees is an array (from join)
-        const employeeData = Array.isArray(shift.employees) ? shift.employees[0] : shift.employees;
-        if (employeeData && !uniqueEmployees.has(employeeData.id)) {
-          uniqueEmployees.set(employeeData.id, employeeData as Employee);
-        }
-      });
+      if (!shiftsData || shiftsData.length === 0) {
+        console.log('No shifts found for category');
+        return [];
+      }
       
-      const result = Array.from(uniqueEmployees.values());
-      console.log('Processed roster employees:', result);
-      return result;
+      // Get unique employee IDs
+      const employeeIds = [...new Set(shiftsData.map(shift => shift.employee_id))];
+      console.log('Unique employee IDs:', employeeIds);
+      
+      // Now fetch the employee details
+      const { data: employeesData, error: employeesError } = await supabase
+        .from('employees')
+        .select('id, first_name, last_name, department')
+        .in('id', employeeIds);
+      
+      if (employeesError) {
+        console.error('Error fetching employee details:', employeesError);
+        throw employeesError;
+      }
+      
+      console.log('Fetched employee details:', employeesData);
+      return employeesData as Employee[];
     },
     enabled: !!selectedRosterTemplate?.category_id
   });
