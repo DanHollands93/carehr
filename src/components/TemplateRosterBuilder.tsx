@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -772,29 +770,35 @@ const TemplateRosterBuilder = ({
               <CardTitle>
                 {totalWeeks > 1 ? `Week ${currentWeek + 1} - ${templateName} Template` : `${templateName} Template`}
               </CardTitle>
-              {!isMobile && (
-                <div className="flex items-center space-x-2">
-                  <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Sort by..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="first_name">First Name</SelectItem>
-                      <SelectItem value="last_name">Last Name</SelectItem>
-                      <SelectItem value="department">Job Title</SelectItem>
-                      <SelectItem value="custom">Custom Order</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowSortDialog(true)}
-                  >
-                    <ArrowUpDown className="w-4 h-4 mr-2" />
-                    Custom Sort
-                  </Button>
-                </div>
-              )}
+              <div className="flex items-center space-x-2">
+                <Button onClick={() => setShowAddStaffDialog(true)}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Add Staff
+                </Button>
+                {!isMobile && (
+                  <>
+                    <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Sort by..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="first_name">First Name</SelectItem>
+                        <SelectItem value="last_name">Last Name</SelectItem>
+                        <SelectItem value="department">Job Title</SelectItem>
+                        <SelectItem value="custom">Custom Order</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSortDialog(true)}
+                    >
+                      <ArrowUpDown className="w-4 h-4 mr-2" />
+                      Custom Sort
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -803,7 +807,7 @@ const TemplateRosterBuilder = ({
                 <table className="w-full border-collapse">
                   <thead>
                     <tr>
-                      <th className="p-3 text-left font-medium border-b">Staff</th>
+                      <th className="p-3 text-left font-medium border-b min-w-[160px]">Staff</th>
                       {weekDays.map((dayIndex) => (
                         <th key={dayIndex} className="p-3 text-center font-medium border-b min-w-24">
                           <div className="text-sm">{getDayLabel(dayIndex)}</div>
@@ -819,8 +823,8 @@ const TemplateRosterBuilder = ({
                   <tbody>
                     {employees.map((employee) => (
                       <tr key={employee.id} className="border-b">
-                        <td className="p-3 font-medium">
-                          <div className="relative">
+                        <td className="p-3 font-medium min-w-[160px]">
+                          <div>
                             <div>{employee.first_name} {employee.last_name}</div>
                             <div className="flex justify-end">
                               <Button
@@ -842,7 +846,7 @@ const TemplateRosterBuilder = ({
                           return (
                             <td
                               key={dayIndex}
-                              className="p-2 border-r border-l"
+                              className="p-2 border-r border-l min-w-32"
                               onDrop={!isMobile ? () => handleDrop(employee.id, dayIndex) : undefined}
                               onDragOver={!isMobile ? handleDragOver : undefined}
                             >
@@ -889,7 +893,7 @@ const TemplateRosterBuilder = ({
             ) : (
               <div className="text-center py-8">
                 <p className="text-gray-500">No staff assigned to this roster template.</p>
-                <p className="text-sm text-gray-400 mt-2">Click "Add Staff" below to get started.</p>
+                <p className="text-sm text-gray-400 mt-2">Click "Add Staff" above to get started.</p>
               </div>
             )}
           </CardContent>
@@ -923,4 +927,3 @@ const TemplateRosterBuilder = ({
 };
 
 export default TemplateRosterBuilder;
-
