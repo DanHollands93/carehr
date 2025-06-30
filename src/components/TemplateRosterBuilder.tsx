@@ -130,33 +130,16 @@ const TemplateRosterBuilder = ({
   // Get assigned employees for selected category
   const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
 
-  // Get all employees with their primary job roles
   const { data: allEmployees } = useQuery({
-    queryKey: ['employees-with-roles-template'],
+    queryKey: ['employees'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('employees')
-        .select(`
-          id, 
-          first_name, 
-          last_name, 
-          department,
-          employee_job_roles!inner(
-            job_roles(title),
-            is_primary
-          )
-        `)
+        .select('id, first_name, last_name, department')
         .order('first_name');
       
       if (error) throw error;
-      
-      // Transform the data to include primary job role
-      return (data || []).map(emp => ({
-        ...emp,
-        primary_job_role: emp.employee_job_roles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
-                         emp.employee_job_roles?.[0]?.job_roles?.title || 
-                         'No Role Assigned'
-      }));
+      return data as Employee[];
     }
   });
 
@@ -191,7 +174,7 @@ const TemplateRosterBuilder = ({
       case 'last_name':
         return [...filteredEmployees].sort((a, b) => a.last_name.localeCompare(b.last_name));
       case 'department':
-        return [...filteredEmployees].sort((a, b) => (a.primary_job_role || '').localeCompare(b.primary_job_role || ''));
+        return [...filteredEmployees].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
       case 'custom':
         if (customOrder.length === 0) return filteredEmployees;
         return [...filteredEmployees].sort((a, b) => {
@@ -300,10 +283,6 @@ const TemplateRosterBuilder = ({
   // Get employee job roles for role selection
   const getEmployeeJobRoles = (employeeId: string) => {
     return allEmployeeJobRoles?.filter(ejr => ejr.employee_id === employeeId) || [];
-  };
-
-  const getJobRoleTitle = (jobRoleId: string) => {
-    return jobRoles?.find(role => role.id === jobRoleId)?.title || 'Unknown Role';
   };
 
   const handleDragStart = (template: ShiftTemplate) => {
@@ -718,7 +697,7 @@ const TemplateRosterBuilder = ({
                       <SelectContent>
                         <SelectItem value="first_name">First Name</SelectItem>
                         <SelectItem value="last_name">Last Name</SelectItem>
-                        <SelectItem value="department">Job Role</SelectItem>
+                        <SelectItem value="department">Job Title</SelectItem>
                         <SelectItem value="custom">Custom Order</SelectItem>
                       </SelectContent>
                     </Select>
@@ -758,7 +737,7 @@ const TemplateRosterBuilder = ({
                         <tr key={employee.id} className="border-b">
                           <td className="p-3 font-medium">
                             <div>{employee.first_name} {employee.last_name}</div>
-                            <div className="text-sm text-gray-500">{employee.primary_job_role}</div>
+                            <div className="text-sm text-gray-500">{employee.department}</div>
                           </td>
                           {weekDays.map((dayIndex) => {
                             const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
@@ -791,7 +770,7 @@ const TemplateRosterBuilder = ({
                                       onDoubleClick={!isMobile ? () => removeShift(shift) : undefined}
                                       title={isMobile ? "Tap to edit or remove" : "Drag to move or delete, double-click to remove"}
                                     >
-                                      <div className="font-medium">{shift.job_role_id ? getJobRoleTitle(shift.job_role_id) : template.position}</div>
+                                      <div className="font-medium">{template.position}</div>
                                       <div>{template.start_time} - {template.end_time}</div>
                                       {shift.pay_rate && (
                                         <div className="text-xs text-gray-500">£{shift.pay_rate}/hr</div>
