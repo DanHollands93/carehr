@@ -30,16 +30,6 @@ interface Employee {
 
 interface EmployeeWithJobRole extends Employee {
   primary_job_role?: string;
-  employee_job_roles?: Array<{
-    job_roles: {
-      id: string;
-      title: string;
-    } | {
-      id: string;
-      title: string;
-    }[];
-    is_primary: boolean;
-  }>;
 }
 
 interface ShiftTemplate {
@@ -107,7 +97,7 @@ const Roster = () => {
   // Get assigned employees for selected category
   const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
 
-  // Get all employees with their job roles
+  // Get all employees with their primary job roles
   const { data: allEmployees } = useQuery({
     queryKey: ['employees-with-roles'],
     queryFn: async () => {
@@ -119,7 +109,7 @@ const Roster = () => {
           last_name, 
           department,
           employee_job_roles!inner(
-            job_roles(id, title),
+            job_roles(title),
             is_primary
           )
         `)
@@ -127,21 +117,13 @@ const Roster = () => {
       
       if (error) throw error;
       
-      // Transform the data to include primary job role with proper typing
-      return (data || []).map(emp => {
-        const jobRoles = emp.employee_job_roles?.map((ejr: any) => ({
-          ...ejr,
-          job_roles: Array.isArray(ejr.job_roles) ? ejr.job_roles[0] : ejr.job_roles
-        }));
-        
-        return {
-          ...emp,
-          employee_job_roles: jobRoles,
-          primary_job_role: jobRoles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
-                           jobRoles?.[0]?.job_roles?.title || 
-                           'No Role Assigned'
-        };
-      }) as EmployeeWithJobRole[];
+      // Transform the data to include primary job role
+      return (data || []).map(emp => ({
+        ...emp,
+        primary_job_role: emp.employee_job_roles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
+                         emp.employee_job_roles?.[0]?.job_roles?.title || 
+                         'No Role Assigned'
+      })) as EmployeeWithJobRole[];
     }
   });
 

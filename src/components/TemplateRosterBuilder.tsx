@@ -24,20 +24,6 @@ interface Employee {
   department: string;
 }
 
-interface EmployeeWithJobRole extends Employee {
-  primary_job_role?: string;
-  employee_job_roles?: Array<{
-    job_roles: {
-      id: string;
-      title: string;
-    } | {
-      id: string;
-      title: string;
-    }[];
-    is_primary: boolean;
-  }>;
-}
-
 interface ShiftTemplate {
   id: string;
   name: string;
@@ -144,7 +130,7 @@ const TemplateRosterBuilder = ({
   // Get assigned employees for selected category
   const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
 
-  // Get all employees with their job roles
+  // Get all employees with their primary job roles
   const { data: allEmployees } = useQuery({
     queryKey: ['employees-with-roles-template'],
     queryFn: async () => {
@@ -156,7 +142,7 @@ const TemplateRosterBuilder = ({
           last_name, 
           department,
           employee_job_roles!inner(
-            job_roles(id, title),
+            job_roles(title),
             is_primary
           )
         `)
@@ -164,21 +150,13 @@ const TemplateRosterBuilder = ({
       
       if (error) throw error;
       
-      // Transform the data to include primary job role with proper typing
-      return (data || []).map(emp => {
-        const jobRoles = emp.employee_job_roles?.map((ejr: any) => ({
-          ...ejr,
-          job_roles: Array.isArray(ejr.job_roles) ? ejr.job_roles[0] : ejr.job_roles
-        }));
-        
-        return {
-          ...emp,
-          employee_job_roles: jobRoles,
-          primary_job_role: jobRoles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
-                           jobRoles?.[0]?.job_roles?.title || 
-                           'No Role Assigned'
-        };
-      }) as EmployeeWithJobRole[];
+      // Transform the data to include primary job role
+      return (data || []).map(emp => ({
+        ...emp,
+        primary_job_role: emp.employee_job_roles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
+                         emp.employee_job_roles?.[0]?.job_roles?.title || 
+                         'No Role Assigned'
+      }));
     }
   });
 
@@ -195,34 +173,6 @@ const TemplateRosterBuilder = ({
       
       if (error) throw error;
       return data as LookupItem[];
-    }
-  });
-
-  // Add query for job roles to resolve the undefined jobRoles issue
-  const { data: jobRoles } = useQuery({
-    queryKey: ['job-roles'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_roles')
-        .select('*')
-        .order('title');
-      
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  // Add missing shift templates query
-  const { data: shiftTemplates } = useQuery({
-    queryKey: ['shift-templates'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('shift_templates')
-        .select('*')
-        .order('position, name');
-      
-      if (error) throw error;
-      return data as ShiftTemplate[];
     }
   });
 
@@ -256,6 +206,19 @@ const TemplateRosterBuilder = ({
         return filteredEmployees;
     }
   })();
+
+  const { data: shiftTemplates } = useQuery({
+    queryKey: ['shift-templates'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('shift_templates')
+        .select('*')
+        .order('position, name');
+      
+      if (error) throw error;
+      return data as ShiftTemplate[];
+    }
+  });
 
   // Load existing template assignments
   const { data: existingAssignments } = useQuery({
@@ -567,7 +530,7 @@ const TemplateRosterBuilder = ({
       start_time: template.start_time,
       end_time: template.end_time,
       position: template.position,
-      job_role_id: templateShift.job_role_id || ''
+      job_role_id: ''
     };
   };
 
