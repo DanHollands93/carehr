@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,22 +127,23 @@ const Roster = () => {
         .from('shifts')
         .select(`
           employee_id,
-          employees(id, first_name, last_name, department)
+          employees!inner(id, first_name, last_name, department)
         `)
         .eq('category_id', selectedRosterTemplate.category_id);
       
       if (error) throw error;
       
       // Get unique employees from the shifts data
-      const uniqueEmployees = new Map();
+      const uniqueEmployees = new Map<string, Employee>();
       data?.forEach(shift => {
-        const emp = shift.employees as Employee;
-        if (emp && !uniqueEmployees.has(emp.id)) {
-          uniqueEmployees.set(emp.id, emp);
+        // Handle the case where employees is an array (from join)
+        const employeeData = Array.isArray(shift.employees) ? shift.employees[0] : shift.employees;
+        if (employeeData && !uniqueEmployees.has(employeeData.id)) {
+          uniqueEmployees.set(employeeData.id, employeeData as Employee);
         }
       });
       
-      return Array.from(uniqueEmployees.values()) as Employee[];
+      return Array.from(uniqueEmployees.values());
     },
     enabled: !!selectedRosterTemplate?.category_id
   });
