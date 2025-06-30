@@ -14,7 +14,6 @@ interface RosterTemplate {
   repeat_interval: number;
   end_date: string | null;
   is_active: boolean;
-  category_id?: string;
 }
 
 interface ActiveRosterTemplatesProps {
@@ -27,20 +26,14 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
     queryFn: async () => {
       const { data, error } = await supabase
         .from('roster_templates')
-        .select(`
-          *,
-          roster_categories (
-            id,
-            name
-          )
-        `)
+        .select('*')
         .eq('is_active', true)
         .or('end_date.is.null,end_date.gte.' + new Date().toISOString().split('T')[0])
         .order('name');
       
       if (error) throw error;
       console.log('Active roster templates:', data);
-      return data as (RosterTemplate & { roster_categories?: { id: string; name: string } })[];
+      return data as RosterTemplate[];
     }
   });
 
@@ -54,30 +47,9 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
     }
   };
 
-  const handleTemplateClick = (template: RosterTemplate & { roster_categories?: { id: string; name: string } }) => {
+  const handleTemplateClick = (template: RosterTemplate) => {
     console.log('Template clicked:', template);
-    
-    // Try to get category_id from multiple sources
-    let categoryId = template.category_id;
-    if (!categoryId && template.roster_categories) {
-      categoryId = template.roster_categories.id;
-    }
-    
-    console.log('Extracted category_id:', categoryId);
-    
-    if (!categoryId) {
-      console.warn('No category_id found for template:', template.name);
-      // You might want to show a toast here to inform the user
-      return;
-    }
-    
-    // Pass the template with the correct category_id structure
-    const templateWithCategory = {
-      ...template,
-      category_id: categoryId
-    };
-    console.log('Passing template to deploy:', templateWithCategory);
-    onDeployTemplate(templateWithCategory);
+    onDeployTemplate(template);
   };
 
   return (
@@ -108,16 +80,6 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
                 </div>
                 {template.description && (
                   <p className="text-sm text-gray-600 mt-1 text-left">{template.description}</p>
-                )}
-                {template.roster_categories && (
-                  <p className="text-xs text-blue-600 mt-1">
-                    Category: {template.roster_categories.name}
-                  </p>
-                )}
-                {!template.category_id && !template.roster_categories && (
-                  <p className="text-xs text-red-500 mt-1">
-                    No category assigned
-                  </p>
                 )}
                 {template.end_date && (
                   <p className="text-xs text-gray-500 mt-1">
