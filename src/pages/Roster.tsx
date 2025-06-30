@@ -682,22 +682,6 @@ const Roster = () => {
       {/* Active Rosters */}
       <ActiveRosterTemplates onSelectRoster={handleRosterSelect} />
 
-      {/* Debug Information */}
-      {selectedRosterTemplate && (
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="pt-4">
-            <h3 className="font-medium text-blue-900 mb-2">Debug Information</h3>
-            <div className="text-sm text-blue-800 space-y-1">
-              <p>Selected Template: {selectedRosterTemplate.name}</p>
-              <p>Template ID: {selectedRosterTemplate.id}</p>
-              <p>Category ID: {selectedRosterTemplate.category_id || 'None'}</p>
-              <p>Employees Found: {employees.length}</p>
-              <p>Shifts Found: {shifts?.length || 0}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Week Navigation */}
       <div className="flex items-center justify-center space-x-4 mt-4">
         <Button
