@@ -14,6 +14,7 @@ interface RosterTemplate {
   repeat_interval: number;
   end_date: string | null;
   is_active: boolean;
+  category_id?: string;
 }
 
 interface ActiveRosterTemplatesProps {

@@ -526,8 +526,10 @@ const Roster = () => {
     setShowSortDialog(false);
   };
 
-  const handleRosterSelect = (categoryId: string) => {
-    setSelectedCategoryId(categoryId);
+  const handleRosterSelect = (template: { category_id?: string }) => {
+    if (template.category_id) {
+      setSelectedCategoryId(template.category_id);
+    }
   };
 
   useEffect(() => {
@@ -644,7 +646,7 @@ const Roster = () => {
         </div>
       </div>
 
-      {/* Active Rosters - Changed from Active Roster Templates */}
+      {/* Active Rosters */}
       <ActiveRosterTemplates onDeployTemplate={handleRosterSelect} />
 
       {/* Week Navigation */}
