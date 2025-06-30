@@ -132,12 +132,17 @@ const Roster = () => {
         return [];
       }
       
-      // Extract unique employees
+      // Extract unique employees from assignments
       const uniqueEmployees = new Map<string, Employee>();
       assignmentsData.forEach(assignment => {
         const employeeData = assignment.employees;
         if (employeeData && !uniqueEmployees.has(employeeData.id)) {
-          uniqueEmployees.set(employeeData.id, employeeData as Employee);
+          uniqueEmployees.set(employeeData.id, {
+            id: employeeData.id,
+            first_name: employeeData.first_name,
+            last_name: employeeData.last_name,
+            department: employeeData.department
+          } as Employee);
         }
       });
       
@@ -175,8 +180,7 @@ const Roster = () => {
       console.log('Fetching shifts for date range:', startDate, 'to', endDate);
       console.log('Selected roster template ID:', selectedRosterTemplate?.id);
       
-      // For now, get all shifts in the date range and filter by employees
-      // Later we can add a roster_template_id field to shifts table
+      // Get shifts in the date range that match the roster template
       let query = supabase
         .from('shifts')
         .select(`
@@ -190,6 +194,11 @@ const Roster = () => {
         `)
         .gte('date', startDate)
         .lte('date', endDate);
+      
+      // Filter by roster template if selected
+      if (selectedRosterTemplate?.id) {
+        query = query.eq('roster_template_id', selectedRosterTemplate.id);
+      }
       
       const { data, error } = await query;
       
@@ -676,6 +685,7 @@ const Roster = () => {
             <div className="text-sm text-blue-800 space-y-1">
               <p>Selected Template: {selectedRosterTemplate.name}</p>
               <p>Template ID: {selectedRosterTemplate.id}</p>
+              <p>Category ID: {selectedRosterTemplate.category_id || 'None'}</p>
               <p>Employees Found: {employees.length}</p>
               <p>Shifts Found: {shifts?.length || 0}</p>
             </div>
