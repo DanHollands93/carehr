@@ -47,7 +47,7 @@ interface Shift {
   end_time: string;
   position: string;
   job_role_id: string;
-  category_id?: string;
+  roster_template_id?: string;
 }
 
 interface ShiftWithTimeRecord extends Shift {
@@ -103,69 +103,53 @@ const Roster = () => {
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun (7 days)
 
-  // Get all employees
-  const { data: allEmployees } = useQuery({
-    queryKey: ['employees'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('id, first_name, last_name, department')
-        .order('first_name');
-      
-      if (error) throw error;
-      return data as Employee[];
-    }
-  });
-
-  // Get employees that have shifts in the selected roster category
+  // Get employees assigned to the selected roster template
   const { data: rosterEmployees } = useQuery({
-    queryKey: ['roster-employees', selectedRosterTemplate?.category_id],
+    queryKey: ['roster-employees', selectedRosterTemplate?.id],
     queryFn: async () => {
-      if (!selectedRosterTemplate?.category_id) return [];
+      if (!selectedRosterTemplate?.id) return [];
       
-      console.log('Fetching roster employees for category:', selectedRosterTemplate.category_id);
+      console.log('Fetching roster employees for template:', selectedRosterTemplate.id);
       
-      // First get the employee IDs from shifts
-      const { data: shiftsData, error: shiftsError } = await supabase
-        .from('shifts')
-        .select('employee_id')
-        .eq('category_id', selectedRosterTemplate.category_id);
+      // Get employees from roster template assignments
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('roster_template_assignments')
+        .select(`
+          employee_id,
+          employees!inner(id, first_name, last_name, department)
+        `)
+        .eq('roster_template_id', selectedRosterTemplate.id);
       
-      if (shiftsError) {
-        console.error('Error fetching shifts for employees:', shiftsError);
-        throw shiftsError;
+      if (assignmentsError) {
+        console.error('Error fetching roster template assignments:', assignmentsError);
+        throw assignmentsError;
       }
       
-      console.log('Shifts data for employees:', shiftsData);
+      console.log('Roster template assignments:', assignmentsData);
       
-      if (!shiftsData || shiftsData.length === 0) {
-        console.log('No shifts found for category');
+      if (!assignmentsData || assignmentsData.length === 0) {
+        console.log('No employees found for this roster template');
         return [];
       }
       
-      // Get unique employee IDs
-      const employeeIds = [...new Set(shiftsData.map(shift => shift.employee_id))];
-      console.log('Unique employee IDs:', employeeIds);
+      // Extract unique employees
+      const uniqueEmployees = new Map<string, Employee>();
+      assignmentsData.forEach(assignment => {
+        const employeeData = assignment.employees;
+        if (employeeData && !uniqueEmployees.has(employeeData.id)) {
+          uniqueEmployees.set(employeeData.id, employeeData as Employee);
+        }
+      });
       
-      // Now fetch the employee details
-      const { data: employeesData, error: employeesError } = await supabase
-        .from('employees')
-        .select('id, first_name, last_name, department')
-        .in('id', employeeIds);
-      
-      if (employeesError) {
-        console.error('Error fetching employee details:', employeesError);
-        throw employeesError;
-      }
-      
-      console.log('Fetched employee details:', employeesData);
-      return employeesData as Employee[];
+      const result = Array.from(uniqueEmployees.values());
+      console.log('Processed roster employees:', result);
+      return result;
     },
-    enabled: !!selectedRosterTemplate?.category_id
+    enabled: !!selectedRosterTemplate?.id
   });
 
-  // Use roster employees if a roster is selected, otherwise use all employees
-  const employees = selectedRosterTemplate ? (rosterEmployees || []) : (allEmployees || []);
+  // Use roster employees
+  const employees = rosterEmployees || [];
 
   // Get all shift templates
   const { data: shiftTemplates } = useQuery({
@@ -181,16 +165,18 @@ const Roster = () => {
     }
   });
 
-  // Update the shifts query to filter by category_id instead of roster_name
+  // Get shifts for the selected roster template
   const { data: shifts } = useQuery({
-    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedRosterTemplate?.category_id],
+    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedRosterTemplate?.id],
     queryFn: async () => {
       const startDate = format(weekStart, 'yyyy-MM-dd');
       const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
       
       console.log('Fetching shifts for date range:', startDate, 'to', endDate);
-      console.log('Selected roster category_id:', selectedRosterTemplate?.category_id);
+      console.log('Selected roster template ID:', selectedRosterTemplate?.id);
       
+      // For now, get all shifts in the date range and filter by employees
+      // Later we can add a roster_template_id field to shifts table
       let query = supabase
         .from('shifts')
         .select(`
@@ -205,11 +191,6 @@ const Roster = () => {
         .gte('date', startDate)
         .lte('date', endDate);
       
-      // Filter by category_id if a roster template is selected
-      if (selectedRosterTemplate?.category_id) {
-        query = query.eq('category_id', selectedRosterTemplate.category_id);
-      }
-      
       const { data, error } = await query;
       
       if (error) {
@@ -219,30 +200,20 @@ const Roster = () => {
       
       console.log('Raw shifts data:', data);
       
+      // Filter shifts to only include employees assigned to this roster template
+      const employeeIds = employees.map(emp => emp.id);
+      const filteredShifts = data?.filter(shift => employeeIds.includes(shift.employee_id)) || [];
+      
       // Transform the data to include time records
-      const result = (data || []).map(shift => ({
+      const result = filteredShifts.map(shift => ({
         ...shift,
         time_record: shift.time_clock_records?.[0] || null
       })) as ShiftWithTimeRecord[];
       
-      console.log('Processed shifts:', result);
+      console.log('Filtered shifts for template employees:', result);
       return result;
-    }
-  });
-
-  // Debug query to check all shifts with category_id
-  const { data: debugShifts } = useQuery({
-    queryKey: ['debug-shifts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('shifts')
-        .select('id, employee_id, date, category_id')
-        .limit(10);
-      
-      if (error) throw error;
-      console.log('Debug - All shifts sample:', data);
-      return data;
-    }
+    },
+    enabled: !!selectedRosterTemplate?.id && employees.length > 0
   });
 
   // Permission checks
@@ -288,7 +259,7 @@ const Roster = () => {
           job_role_id: shiftData.job_role_id,
           actual_job_role_id: shiftData.job_role_id,
           pay_rate: shiftData.pay_rate,
-          category_id: selectedRosterTemplate?.category_id
+          roster_template_id: selectedRosterTemplate?.id
         }]);
       
       if (error) throw error;
@@ -409,13 +380,10 @@ const Roster = () => {
     if (!canEditRoster || isMobile) return;
     
     try {
-      // Format the date properly - date is coming from day.toISOString()
       const formattedDate = format(new Date(date), 'yyyy-MM-dd');
       console.log('Dropping shift:', { employeeId, originalDate: date, formattedDate });
       
       if (draggedTemplate) {
-        // When dropping a template, we need to open the shift creation popup
-        // to select the job role since templates don't have job role info
         const employee = employees?.find(e => e.id === employeeId);
         const employeeName = employee ? `${employee.first_name} ${employee.last_name}` : '';
         
@@ -467,7 +435,6 @@ const Roster = () => {
     setShowDeleteBin(false);
   };
 
-  // Updated function to get ALL shifts for an employee on a specific date
   const getShiftsForEmployeeAndDate = (employeeId: string, date: string) => {
     return shifts?.filter(shift => 
       shift.employee_id === employeeId && 
@@ -475,7 +442,6 @@ const Roster = () => {
     ) || [];
   };
 
-  // Keep the old function for backward compatibility but mark it as deprecated
   const getShiftForEmployeeAndDate = (employeeId: string, date: string) => {
     return shifts?.find(shift => 
       shift.employee_id === employeeId && 
@@ -488,7 +454,6 @@ const Roster = () => {
     return shifts?.filter(shift => shift.date === dateStr).length || 0;
   };
 
-  // Group shift templates by position
   const groupedTemplates = shiftTemplates?.reduce((acc, template) => {
     if (!acc[template.position]) {
       acc[template.position] = [];
@@ -542,7 +507,6 @@ const Roster = () => {
   }) => {
     if (!canEditRoster || !shiftPopup.existingShift) return;
     
-    // Check for overlapping shifts (excluding the current shift being updated)
     const existingShifts = getShiftsForEmployeeAndDate(shiftPopup.employeeId, shiftPopup.date);
     if (hasTimeOverlap(shiftData.start_time, shiftData.end_time, existingShifts, shiftPopup.existingShift.id)) {
       toast({
@@ -553,7 +517,6 @@ const Roster = () => {
       return;
     }
     
-    // Delete the old shift and create a new one with updated data
     deleteShiftMutation.mutate(shiftPopup.existingShift.id);
     createShiftMutation.mutate({
       employeeId: shiftPopup.employeeId,
@@ -577,7 +540,6 @@ const Roster = () => {
 
   const handleRosterSelect = (template: RosterTemplate) => {
     console.log('handleRosterSelect called with:', template);
-    console.log('Template category_id:', template.category_id);
     setSelectedRosterTemplate(template);
   };
 
@@ -713,7 +675,7 @@ const Roster = () => {
             <h3 className="font-medium text-blue-900 mb-2">Debug Information</h3>
             <div className="text-sm text-blue-800 space-y-1">
               <p>Selected Template: {selectedRosterTemplate.name}</p>
-              <p>Category ID: {selectedRosterTemplate.category_id || 'None'}</p>
+              <p>Template ID: {selectedRosterTemplate.id}</p>
               <p>Employees Found: {employees.length}</p>
               <p>Shifts Found: {shifts?.length || 0}</p>
             </div>
@@ -853,7 +815,7 @@ const Roster = () => {
                 </ScrollArea>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">No employees found for this roster.</p>
+                  <p className="text-gray-500">No employees found for this roster template.</p>
                 </div>
               )}
             </CardContent>
