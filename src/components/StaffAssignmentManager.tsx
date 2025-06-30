@@ -24,7 +24,7 @@ interface StaffAssignmentManagerProps {
 }
 
 const StaffAssignmentManager = ({ categoryId, categoryName }: StaffAssignmentManagerProps) => {
-  const { assignStaff, removeStaff, getAssignedEmployees } = useRosterCategories();
+  const { assignStaff, removeStaff, getAssignedEmployees, getExplicitlyAssignedEmployees } = useRosterCategories();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -42,6 +42,7 @@ const StaffAssignmentManager = ({ categoryId, categoryName }: StaffAssignmentMan
   });
 
   const assignedEmployeeIds = getAssignedEmployees(categoryId);
+  const explicitlyAssignedEmployeeIds = getExplicitlyAssignedEmployees(categoryId);
   const assignedEmployees = allEmployees?.filter(emp => assignedEmployeeIds.includes(emp.id)) || [];
   const unassignedEmployees = allEmployees?.filter(emp => !assignedEmployeeIds.includes(emp.id)) || [];
 
@@ -55,8 +56,16 @@ const StaffAssignmentManager = ({ categoryId, categoryName }: StaffAssignmentMan
   };
 
   const handleRemoveEmployee = (employeeId: string) => {
+    // For "All Staff" category, only allow removal if explicitly assigned
+    if (categoryName === 'All Staff' && !explicitlyAssignedEmployeeIds.includes(employeeId)) {
+      // Can't remove from "All Staff" if not explicitly assigned
+      return;
+    }
     removeStaff.mutate({ categoryId, employeeId });
   };
+
+  const isAllStaffCategory = categoryName === 'All Staff';
+  const hasExplicitAssignments = explicitlyAssignedEmployeeIds.length > 0;
 
   return (
     <Card>
@@ -115,32 +124,53 @@ const StaffAssignmentManager = ({ categoryId, categoryName }: StaffAssignmentMan
         </div>
       </CardHeader>
       <CardContent>
+        {isAllStaffCategory && !hasExplicitAssignments && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700">
+              <strong>All Staff</strong> category includes all employees by default. You can add specific staff assignments if needed.
+            </p>
+          </div>
+        )}
+        
         {assignedEmployees.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">
             No staff assigned to this category
           </p>
         ) : (
           <div className="space-y-2">
-            {assignedEmployees.map((employee) => (
-              <div key={employee.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                <div>
-                  <div className="font-medium">{employee.first_name} {employee.last_name}</div>
-                  <div className="text-sm text-gray-500">{employee.department}</div>
+            {assignedEmployees.map((employee) => {
+              const isExplicitlyAssigned = explicitlyAssignedEmployeeIds.includes(employee.id);
+              const canRemove = !isAllStaffCategory || isExplicitlyAssigned;
+              
+              return (
+                <div key={employee.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <div className="flex-1">
+                    <div className="font-medium">{employee.first_name} {employee.last_name}</div>
+                    <div className="text-sm text-gray-500">
+                      {employee.department}
+                      {isAllStaffCategory && !isExplicitlyAssigned && (
+                        <span className="ml-2 text-xs text-blue-600">(Default)</span>
+                      )}
+                    </div>
+                  </div>
+                  {canRemove && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRemoveEmployee(employee.id)}
+                    >
+                      <UserMinus className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleRemoveEmployee(employee.id)}
-                >
-                  <UserMinus className="w-4 h-4" />
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <div className="mt-4 pt-4 border-t">
           <Badge variant="secondary">
             {assignedEmployees.length} staff member{assignedEmployees.length !== 1 ? 's' : ''}
+            {isAllStaffCategory && !hasExplicitAssignments && " (All employees)"}
           </Badge>
         </div>
       </CardContent>

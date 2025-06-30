@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -141,19 +140,29 @@ export const useRosterCategories = () => {
     // Find the category to check if it's the "All Staff" category
     const category = categories?.find(cat => cat.id === categoryId);
     
-    // If it's the "All Staff" category and no specific assignments exist, return all employees
+    // If it's the "All Staff" category, return all employees OR specifically assigned ones
     if (category?.name === 'All Staff') {
       const specificAssignments = staffAssignments?.filter(assignment => 
         assignment.roster_category_id === categoryId
       );
       
-      // If no specific assignments for "All Staff", return all employees
-      if (!specificAssignments || specificAssignments.length === 0) {
-        return allEmployees || [];
+      // If there are specific assignments for "All Staff", return those
+      if (specificAssignments && specificAssignments.length > 0) {
+        return specificAssignments.map(assignment => assignment.employee_id);
       }
+      
+      // Otherwise, return all employees as the default for "All Staff"
+      return allEmployees || [];
     }
     
-    // For other categories or when specific assignments exist, return the assigned employees
+    // For other categories, return the assigned employees
+    return staffAssignments?.filter(assignment => 
+      assignment.roster_category_id === categoryId
+    ).map(assignment => assignment.employee_id) || [];
+  };
+
+  // Helper function to check if employees are explicitly assigned vs default "All Staff"
+  const getExplicitlyAssignedEmployees = (categoryId: string) => {
     return staffAssignments?.filter(assignment => 
       assignment.roster_category_id === categoryId
     ).map(assignment => assignment.employee_id) || [];
@@ -166,6 +175,7 @@ export const useRosterCategories = () => {
     createCategory,
     assignStaff,
     removeStaff,
-    getAssignedEmployees
+    getAssignedEmployees,
+    getExplicitlyAssignedEmployees
   };
 };
