@@ -30,6 +30,13 @@ interface Employee {
 
 interface EmployeeWithJobRole extends Employee {
   primary_job_role?: string;
+  employee_job_roles?: Array<{
+    job_roles: {
+      id: string;
+      title: string;
+    };
+    is_primary: boolean;
+  }>;
 }
 
 interface ShiftTemplate {
@@ -117,13 +124,13 @@ const Roster = () => {
       
       if (error) throw error;
       
-      // Transform the data to include primary job role
+      // Transform the data to include primary job role with proper typing
       return (data || []).map(emp => ({
         ...emp,
         primary_job_role: emp.employee_job_roles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
                          emp.employee_job_roles?.[0]?.job_roles?.title || 
                          'No Role Assigned'
-      }));
+      })) as EmployeeWithJobRole[];
     }
   });
 

@@ -24,6 +24,17 @@ interface Employee {
   department: string;
 }
 
+interface EmployeeWithJobRole extends Employee {
+  primary_job_role?: string;
+  employee_job_roles?: Array<{
+    job_roles: {
+      id: string;
+      title: string;
+    };
+    is_primary: boolean;
+  }>;
+}
+
 interface ShiftTemplate {
   id: string;
   name: string;
@@ -130,7 +141,7 @@ const TemplateRosterBuilder = ({
   // Get assigned employees for selected category
   const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
 
-  // Get all employees with their primary job roles
+  // Get all employees with their job roles
   const { data: allEmployees } = useQuery({
     queryKey: ['employees-with-roles-template'],
     queryFn: async () => {
@@ -150,13 +161,13 @@ const TemplateRosterBuilder = ({
       
       if (error) throw error;
       
-      // Transform the data to include primary job role
+      // Transform the data to include primary job role with proper typing
       return (data || []).map(emp => ({
         ...emp,
         primary_job_role: emp.employee_job_roles?.find((ejr: any) => ejr.is_primary)?.job_roles?.title || 
                          emp.employee_job_roles?.[0]?.job_roles?.title || 
                          'No Role Assigned'
-      }));
+      })) as EmployeeWithJobRole[];
     }
   });
 
@@ -220,19 +231,6 @@ const TemplateRosterBuilder = ({
         return filteredEmployees;
     }
   })();
-
-  const { data: shiftTemplates } = useQuery({
-    queryKey: ['shift-templates'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('shift_templates')
-        .select('*')
-        .order('position, name');
-      
-      if (error) throw error;
-      return data as ShiftTemplate[];
-    }
-  });
 
   // Load existing template assignments
   const { data: existingAssignments } = useQuery({
