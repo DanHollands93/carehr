@@ -18,7 +18,6 @@ import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDo
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
-import StaffAssignmentManager from "@/components/StaffAssignmentManager";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -49,7 +48,7 @@ interface Shift {
   end_time: string;
   position: string;
   job_role_id: string;
-  roster_name?: string;
+  category_id?: string;
 }
 
 interface ShiftWithTimeRecord extends Shift {
@@ -69,6 +68,7 @@ interface RosterTemplate {
   repeat_interval: number;
   end_date: string | null;
   is_active: boolean;
+  category_id?: string;
 }
 
 const Roster = () => {
@@ -81,7 +81,7 @@ const Roster = () => {
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
   const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [selectedRosterName, setSelectedRosterName] = useState<string | null>(null);
+  const [selectedRosterTemplate, setSelectedRosterTemplate] = useState<RosterTemplate | null>(null);
   const [showDeleteBin, setShowDeleteBin] = useState(false);
   const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'department' | 'custom'>('first_name');
   const [customOrder, setCustomOrder] = useState<string[]>([]);
@@ -118,26 +118,26 @@ const Roster = () => {
     }
   });
 
-  // Get employees that have shifts in the selected roster
+  // Get employees that have shifts in the selected roster category
   const { data: rosterEmployees } = useQuery({
-    queryKey: ['roster-employees', selectedRosterName],
+    queryKey: ['roster-employees', selectedRosterTemplate?.category_id],
     queryFn: async () => {
-      if (!selectedRosterName) return [];
+      if (!selectedRosterTemplate?.category_id) return [];
       
       const { data, error } = await supabase
         .from('shifts')
         .select(`
           employee_id,
-          employees!inner(id, first_name, last_name, department)
+          employees(id, first_name, last_name, department)
         `)
-        .eq('roster_name', selectedRosterName);
+        .eq('category_id', selectedRosterTemplate.category_id);
       
       if (error) throw error;
       
       // Get unique employees from the shifts data
       const uniqueEmployees = new Map();
       data?.forEach(shift => {
-        const emp = shift.employees[0] as Employee; // Fix: Access first element of array
+        const emp = shift.employees as Employee;
         if (emp && !uniqueEmployees.has(emp.id)) {
           uniqueEmployees.set(emp.id, emp);
         }
@@ -145,11 +145,11 @@ const Roster = () => {
       
       return Array.from(uniqueEmployees.values()) as Employee[];
     },
-    enabled: !!selectedRosterName
+    enabled: !!selectedRosterTemplate?.category_id
   });
 
   // Use roster employees if a roster is selected, otherwise use all employees
-  const employees = selectedRosterName ? (rosterEmployees || []) : (allEmployees || []);
+  const employees = selectedRosterTemplate ? (rosterEmployees || []) : (allEmployees || []);
 
   // Get all shift templates
   const { data: shiftTemplates } = useQuery({
@@ -165,9 +165,9 @@ const Roster = () => {
     }
   });
 
-  // Update the shifts query to filter by roster name
+  // Update the shifts query to filter by category_id instead of roster_name
   const { data: shifts } = useQuery({
-    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedRosterName],
+    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedRosterTemplate?.category_id],
     queryFn: async () => {
       const startDate = format(weekStart, 'yyyy-MM-dd');
       const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
@@ -186,9 +186,9 @@ const Roster = () => {
         .gte('date', startDate)
         .lte('date', endDate);
       
-      // Filter by roster name if selected
-      if (selectedRosterName) {
-        query = query.eq('roster_name', selectedRosterName);
+      // Filter by category_id if a roster template is selected
+      if (selectedRosterTemplate?.category_id) {
+        query = query.eq('category_id', selectedRosterTemplate.category_id);
       }
       
       const { data, error } = await query;
@@ -246,7 +246,7 @@ const Roster = () => {
           job_role_id: shiftData.job_role_id,
           actual_job_role_id: shiftData.job_role_id,
           pay_rate: shiftData.pay_rate,
-          roster_name: selectedRosterName
+          category_id: selectedRosterTemplate?.category_id
         }]);
       
       if (error) throw error;
@@ -535,7 +535,7 @@ const Roster = () => {
 
   const handleRosterSelect = (template: RosterTemplate) => {
     console.log('handleRosterSelect called with:', template);
-    setSelectedRosterName(template.name);
+    setSelectedRosterTemplate(template);
   };
 
   useEffect(() => {
@@ -703,14 +703,14 @@ const Roster = () => {
         </Button>
       </div>
 
-      {selectedRosterName && (
+      {selectedRosterTemplate && (
         <div className="space-y-6">
           {/* Roster Grid */}
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>
-                  {selectedRosterName} Roster
+                  {selectedRosterTemplate.name} Roster
                 </CardTitle>
               </div>
             </CardHeader>
@@ -803,7 +803,7 @@ const Roster = () => {
         </div>
       )}
 
-      {!selectedRosterName && (
+      {!selectedRosterTemplate && (
         <Card>
           <CardContent className="text-center py-8">
             <p className="text-gray-500">Select an active roster above to begin {canEditRoster ? 'managing' : 'viewing'} shifts and staff assignments.</p>
