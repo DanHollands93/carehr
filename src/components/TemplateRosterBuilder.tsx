@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -821,15 +822,17 @@ const TemplateRosterBuilder = ({
                         <td className="p-3 font-medium">
                           <div className="relative">
                             <div>{employee.first_name} {employee.last_name}</div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="absolute bottom-0 right-0 h-6 w-6 p-0 hover:bg-red-100"
-                              onClick={() => openRemoveStaffDialog(employee.id, `${employee.first_name} ${employee.last_name}`)}
-                              title="Remove staff member from roster"
-                            >
-                              <UserMinus className="w-3 h-3 text-red-500" />
-                            </Button>
+                            <div className="flex justify-end">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 hover:bg-red-100"
+                                onClick={() => openRemoveStaffDialog(employee.id, `${employee.first_name} ${employee.last_name}`)}
+                                title="Remove staff member from roster"
+                              >
+                                <UserMinus className="w-3 h-3 text-red-500" />
+                              </Button>
+                            </div>
                           </div>
                         </td>
                         {weekDays.map((dayIndex) => {
@@ -920,3 +923,4 @@ const TemplateRosterBuilder = ({
 };
 
 export default TemplateRosterBuilder;
+
