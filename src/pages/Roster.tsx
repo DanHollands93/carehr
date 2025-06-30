@@ -136,14 +136,19 @@ const Roster = () => {
       const uniqueEmployees = new Map<string, Employee>();
       assignmentsData.forEach(assignment => {
         const employeeData = assignment.employees;
-        if (employeeData && !uniqueEmployees.has(employeeData.id)) {
-          uniqueEmployees.set(employeeData.id, {
-            id: employeeData.id,
-            first_name: employeeData.first_name,
-            last_name: employeeData.last_name,
-            department: employeeData.department
-          } as Employee);
-        }
+        // Check if employeeData is an array or single object
+        const employees = Array.isArray(employeeData) ? employeeData : [employeeData];
+        
+        employees.forEach(emp => {
+          if (emp && !uniqueEmployees.has(emp.id)) {
+            uniqueEmployees.set(emp.id, {
+              id: emp.id,
+              first_name: emp.first_name,
+              last_name: emp.last_name,
+              department: emp.department
+            } as Employee);
+          }
+        });
       });
       
       const result = Array.from(uniqueEmployees.values());
