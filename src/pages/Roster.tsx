@@ -48,6 +48,7 @@ interface Shift {
   end_time: string;
   position: string;
   job_role_id: string;
+  roster_name?: string;
 }
 
 interface ShiftWithTimeRecord extends Shift {
@@ -57,6 +58,16 @@ interface ShiftWithTimeRecord extends Shift {
     clock_in_time: string | null;
     clock_out_time: string | null;
   };
+}
+
+interface RosterTemplate {
+  id: string;
+  name: string;
+  description: string;
+  repeat_type: 'weekly' | 'bi_weekly' | 'monthly' | 'custom';
+  repeat_interval: number;
+  end_date: string | null;
+  is_active: boolean;
 }
 
 const Roster = () => {
@@ -118,45 +129,38 @@ const Roster = () => {
     }
   });
 
-  // Filter and sort employees
-  const employees = (() => {
-    let filteredEmployees = allEmployees;
-    if (!filteredEmployees) return [];
+  // Get employees that have shifts in the selected roster
+  const { data: rosterEmployees } = useQuery({
+    queryKey: ['roster-employees', selectedRosterName],
+    queryFn: async () => {
+      if (!selectedRosterName) return [];
+      
+      const { data, error } = await supabase
+        .from('shifts')
+        .select(`
+          employee_id,
+          employees!inner(id, first_name, last_name, department)
+        `)
+        .eq('roster_name', selectedRosterName);
+      
+      if (error) throw error;
+      
+      // Get unique employees
+      const uniqueEmployees = new Map();
+      data?.forEach(shift => {
+        const emp = shift.employees;
+        if (emp && !uniqueEmployees.has(emp.id)) {
+          uniqueEmployees.set(emp.id, emp);
+        }
+      });
+      
+      return Array.from(uniqueEmployees.values()) as Employee[];
+    },
+    enabled: !!selectedRosterName
+  });
 
-    // Apply sorting
-    switch (sortBy) {
-      case 'first_name':
-        return [...filteredEmployees].sort((a, b) => a.first_name.localeCompare(b.first_name));
-      case 'last_name':
-        return [...filteredEmployees].sort((a, b) => a.last_name.localeCompare(b.last_name));
-      case 'department':
-        return [...filteredEmployees].sort((a, b) => (a.department || '').localeCompare(b.department || ''));
-      case 'custom':
-        if (customOrder.length === 0) return filteredEmployees;
-        return [...filteredEmployees].sort((a, b) => {
-          const indexA = customOrder.indexOf(a.id);
-          const indexB = customOrder.indexOf(b.id);
-          if (indexA === -1 && indexB === -1) return 0;
-          if (indexA === -1) return 1;
-          if (indexB === -1) return -1;
-          return indexA - indexB;
-        });
-      default:
-        return filteredEmployees;
-    }
-  })();
-
-  // Get employees not in roster for the add staff dialog
-  const filteredEmployeesNotInRoster = allEmployees?.filter(emp =>
-    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.department?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
-
-  // Get employees in roster
-  const employeesInRoster = Array.from(staffInRoster);
-
-  // Get employees not in roster
-  const employeesNotInRoster = allEmployees?.filter(emp => !staffInRoster.has(emp.id)) || [];
+  // Use roster employees if a roster is selected, otherwise use all employees
+  const employees = selectedRosterName ? (rosterEmployees || []) : (allEmployees || []);
 
   // Get all shift templates
   const { data: shiftTemplates } = useQuery({
@@ -172,14 +176,14 @@ const Roster = () => {
     }
   });
 
-  // Update the shifts query to work without categories
+  // Update the shifts query to filter by roster name
   const { data: shifts } = useQuery({
     queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedRosterName],
     queryFn: async () => {
       const startDate = format(weekStart, 'yyyy-MM-dd');
       const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('shifts')
         .select(`
           *,
@@ -192,6 +196,13 @@ const Roster = () => {
         `)
         .gte('date', startDate)
         .lte('date', endDate);
+      
+      // Filter by roster name if selected
+      if (selectedRosterName) {
+        query = query.eq('roster_name', selectedRosterName);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       
@@ -206,6 +217,72 @@ const Roster = () => {
   // Permission checks
   const canViewRoster = hasPermission('view_roster') || hasPermission('edit_roster');
   const canEditRoster = hasPermission('edit_roster');
+
+  // Deploy template mutation - copies template shifts to live roster
+  const deployTemplateMutation = useMutation({
+    mutationFn: async (template: RosterTemplate) => {
+      console.log('Deploying template:', template);
+      
+      // Get template shifts
+      const { data: templateShifts, error: templateError } = await supabase
+        .from('template_shifts')
+        .select('*')
+        .eq('template_id', template.id);
+      
+      if (templateError) throw templateError;
+      
+      console.log('Template shifts found:', templateShifts);
+      
+      if (!templateShifts || templateShifts.length === 0) {
+        throw new Error('No shifts found in this template');
+      }
+      
+      // Calculate the start date for the current week
+      const startDate = format(weekStart, 'yyyy-MM-dd');
+      
+      // Create shifts for the current week based on template
+      const shiftsToCreate = templateShifts.map(templateShift => {
+        // Calculate the actual date based on day_of_week
+        const shiftDate = format(addDays(weekStart, templateShift.day_of_week), 'yyyy-MM-dd');
+        
+        return {
+          employee_id: templateShift.employee_id,
+          date: shiftDate,
+          start_time: templateShift.start_time,
+          end_time: templateShift.end_time,
+          position: templateShift.position,
+          job_role_id: templateShift.job_role_id,
+          actual_job_role_id: templateShift.job_role_id,
+          pay_rate: 0,
+          roster_name: template.name
+        };
+      });
+      
+      console.log('Creating shifts:', shiftsToCreate);
+      
+      // Insert the shifts
+      const { error: insertError } = await supabase
+        .from('shifts')
+        .insert(shiftsToCreate);
+      
+      if (insertError) throw insertError;
+      
+      return template.name;
+    },
+    onSuccess: (rosterName) => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['roster-employees'] });
+      toast({ title: `Template deployed successfully as "${rosterName}"` });
+    },
+    onError: (error) => {
+      console.error('Template deployment error:', error);
+      toast({ 
+        title: "Error deploying template", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
 
   // Helper function to check for time overlaps
   const hasTimeOverlap = (newStart: string, newEnd: string, existingShifts: Shift[], excludeShiftId?: string) => {
@@ -245,7 +322,8 @@ const Roster = () => {
           position: shiftData.position,
           job_role_id: shiftData.job_role_id,
           actual_job_role_id: shiftData.job_role_id,
-          pay_rate: shiftData.pay_rate
+          pay_rate: shiftData.pay_rate,
+          roster_name: selectedRosterName
         }]);
       
       if (error) throw error;
@@ -532,8 +610,17 @@ const Roster = () => {
     setShowSortDialog(false);
   };
 
-  const handleRosterSelect = (template: { name: string }) => {
+  const handleRosterSelect = (template: RosterTemplate) => {
     console.log('handleRosterSelect called with:', template);
+    
+    // Check if this template has already been deployed for this week
+    const hasShiftsThisWeek = shifts && shifts.length > 0;
+    
+    if (!hasShiftsThisWeek) {
+      // Deploy the template first
+      deployTemplateMutation.mutate(template);
+    }
+    
     setSelectedRosterName(template.name);
   };
 
@@ -695,12 +782,22 @@ const Roster = () => {
       )}
 
       {/* Shift Creation/Edit Popup - only show if user can edit */}
-      {canEditRoster && (
+      {canEditRoster && shiftPopup.isOpen && (
         <ShiftCreationPopup
           isOpen={shiftPopup.isOpen}
           onClose={() => setShiftPopup(prev => ({ ...prev, isOpen: false }))}
-          onCreateShift={shiftPopup.existingShift ? handleUpdateShiftFromPopup : handleCreateShiftFromPopup}
-          onDeleteShift={shiftPopup.existingShift ? handleDeleteShiftFromPopup : undefined}
+          onCreateShift={(shiftData) => {
+            createShiftMutation.mutate({
+              employeeId: shiftPopup.employeeId,
+              date: shiftPopup.date,
+              shiftData
+            });
+            setShiftPopup(prev => ({ ...prev, isOpen: false }));
+          }}
+          onDeleteShift={shiftPopup.existingShift ? () => {
+            deleteShiftMutation.mutate(shiftPopup.existingShift!.id);
+            setShiftPopup(prev => ({ ...prev, isOpen: false }));
+          } : undefined}
           shiftTemplates={shiftTemplates || []}
           employeeName={shiftPopup.employeeName}
           employeeId={shiftPopup.employeeId}
@@ -770,7 +867,7 @@ const Roster = () => {
             <Calendar
               mode="single"
               selected={currentWeek}
-              onSelect={handleDateSelect}
+              onSelect={(date) => date && setCurrentWeek(date)}
               initialFocus
             />
           </PopoverContent>
@@ -817,18 +914,40 @@ const Roster = () => {
                             <td className="p-3 font-medium min-w-[160px]">
                               <div>{employee.first_name} {employee.last_name}</div>
                             </td>
-                            {weekDays.map((day) => (
-                              <td
-                                key={day.toISOString()}
-                                className="p-2 border-r border-l min-w-32"
-                              >
-                                <div className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 transition-colors cursor-pointer hover:border-gray-300">
-                                  <div className="opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center h-full">
-                                    <Plus className="w-4 h-4 text-gray-400" />
+                            {weekDays.map((day) => {
+                              const dayShifts = getShiftsForEmployeeAndDate(employee.id, day.toISOString());
+                              return (
+                                <td
+                                  key={day.toISOString()}
+                                  className="p-2 border-r border-l min-w-32"
+                                  onClick={() => handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, format(day, 'yyyy-MM-dd'))}
+                                >
+                                  <div className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 transition-colors cursor-pointer hover:border-gray-300">
+                                    {dayShifts.length > 0 ? (
+                                      <div className="space-y-1">
+                                        {dayShifts.map((shift) => (
+                                          <div
+                                            key={shift.id}
+                                            className="text-xs bg-blue-100 text-blue-800 p-1 rounded"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, format(day, 'yyyy-MM-dd'), shift);
+                                            }}
+                                          >
+                                            <div className="font-medium">{shift.position}</div>
+                                            <div>{shift.start_time} - {shift.end_time}</div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center h-full">
+                                        <Plus className="w-4 h-4 text-gray-400" />
+                                      </div>
+                                    )}
                                   </div>
-                                </div>
-                              </td>
-                            ))}
+                                </td>
+                              );
+                            })}
                           </tr>
                         ))}
                       </tbody>
