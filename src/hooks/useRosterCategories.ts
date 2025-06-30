@@ -51,6 +51,20 @@ export const useRosterCategories = () => {
     }
   });
 
+  // Query to get all employees for the "All Staff" category fallback
+  const { data: allEmployees } = useQuery({
+    queryKey: ['all-employees-roster'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id')
+        .order('first_name');
+      
+      if (error) throw error;
+      return data?.map(emp => emp.id) || [];
+    }
+  });
+
   const createCategory = useMutation({
     mutationFn: async (categoryData: Omit<RosterCategory, 'id' | 'created_at'>) => {
       const { data, error } = await supabase
@@ -124,6 +138,22 @@ export const useRosterCategories = () => {
   });
 
   const getAssignedEmployees = (categoryId: string) => {
+    // Find the category to check if it's the "All Staff" category
+    const category = categories?.find(cat => cat.id === categoryId);
+    
+    // If it's the "All Staff" category and no specific assignments exist, return all employees
+    if (category?.name === 'All Staff') {
+      const specificAssignments = staffAssignments?.filter(assignment => 
+        assignment.roster_category_id === categoryId
+      );
+      
+      // If no specific assignments for "All Staff", return all employees
+      if (!specificAssignments || specificAssignments.length === 0) {
+        return allEmployees || [];
+      }
+    }
+    
+    // For other categories or when specific assignments exist, return the assigned employees
     return staffAssignments?.filter(assignment => 
       assignment.roster_category_id === categoryId
     ).map(assignment => assignment.employee_id) || [];
@@ -132,6 +162,7 @@ export const useRosterCategories = () => {
   return {
     categories,
     staffAssignments,
+    allEmployees,
     createCategory,
     assignStaff,
     removeStaff,
