@@ -229,6 +229,17 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
       {/* Header with Save and Load buttons */}
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
+          {/* Test button to verify click events work */}
+          <Button 
+            onClick={() => {
+              console.log('TEST BUTTON CLICKED!');
+              alert('Test button works!');
+            }}
+            variant="outline"
+          >
+            Test Click
+          </Button>
+          
           <Button 
             onClick={(e) => {
               console.log('Save button clicked!', e);
@@ -245,7 +256,7 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
             type="button"
           >
             <Save className="w-4 h-4 mr-2" />
-            Save Form
+            Save Form (Enabled: {formName.trim().length > 0 && formFields.length > 0 ? 'YES' : 'NO'})
           </Button>
           <Button 
             variant="outline" 
