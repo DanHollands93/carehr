@@ -18,6 +18,7 @@ interface FormField {
   placeholder?: string;
   required: boolean;
   options?: string[];
+  lookupCategory?: string;
 }
 
 interface FormBuilderProps {
@@ -44,6 +45,8 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
   const [selectedField, setSelectedField] = useState<FormField | null>(null);
   const [savedForms, setSavedForms] = useState<any[]>([]);
   const [showSavedForms, setShowSavedForms] = useState(false);
+  const [editingFormId, setEditingFormId] = useState<string | null>(null);
+  const [lookupCategories, setLookupCategories] = useState<string[]>([]);
 
   // Debug component loading
   console.log('FormBuilder component rendered');
@@ -115,6 +118,22 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
     }
   };
 
+  const loadLookupCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('lookup_lists')
+        .select('category')
+        .eq('is_active', true);
+      
+      if (error) throw error;
+      
+      const uniqueCategories = [...new Set(data?.map(item => item.category) || [])];
+      setLookupCategories(uniqueCategories);
+    } catch (error) {
+      console.error('Error loading lookup categories:', error);
+    }
+  };
+
   const saveForm = async () => {
     console.log('Save form called');
     console.log('Form name:', formName);
@@ -162,20 +181,36 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
         created_by: user.id
       };
       
-      console.log('Inserting form data:', formData);
-
-      const { data, error } = await supabase
-        .from('custom_forms')
-        .insert(formData)
-        .select();
-
-      console.log('Insert result:', { data, error });
+      let data, error;
+      
+      if (editingFormId) {
+        // Update existing form
+        console.log('Updating form data:', formData);
+        const result = await supabase
+          .from('custom_forms')
+          .update(formData)
+          .eq('id', editingFormId)
+          .select();
+        data = result.data;
+        error = result.error;
+        console.log('Update result:', { data, error });
+      } else {
+        // Create new form
+        console.log('Inserting form data:', formData);
+        const result = await supabase
+          .from('custom_forms')
+          .insert(formData)
+          .select();
+        data = result.data;
+        error = result.error;
+        console.log('Insert result:', { data, error });
+      }
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Form saved successfully!"
+        description: editingFormId ? "Form updated successfully!" : "Form saved successfully!"
       });
 
       // Update parent component with current form data
@@ -192,6 +227,7 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
       setFormDescription("");
       setFormFields([]);
       setSelectedField(null);
+      setEditingFormId(null);
       
       // Reload saved forms
       loadSavedForms();
@@ -211,6 +247,7 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
     setFormFields(form.form_fields || []);
     setSelectedField(null);
     setShowSavedForms(false);
+    setEditingFormId(form.id);
     
     toast({
       title: "Form Loaded",
@@ -231,6 +268,7 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
     });
     
     loadSavedForms();
+    loadLookupCategories();
   }, []);
 
   return (
@@ -254,7 +292,7 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
             type="button"
           >
             <Save className="w-4 h-4 mr-2" />
-            Save Form
+            {editingFormId ? 'Update Form' : 'Save Form'}
           </Button>
           <Button 
             variant="outline" 
@@ -444,41 +482,84 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
 
               {(selectedField.type === 'select' || selectedField.type === 'radio') && (
                 <div>
-                  <Label>Options</Label>
-                  <div className="space-y-2">
-                    {selectedField.options?.map((option, index) => (
-                      <div key={index} className="flex gap-2">
-                        <Input
-                          value={option}
-                          onChange={(e) => {
-                            const newOptions = [...(selectedField.options || [])];
-                            newOptions[index] = e.target.value;
-                            updateOptions(selectedField.id, newOptions);
-                          }}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const newOptions = selectedField.options?.filter((_, i) => i !== index) || [];
-                            updateOptions(selectedField.id, newOptions);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newOptions = [...(selectedField.options || []), `Option ${(selectedField.options?.length || 0) + 1}`];
-                        updateOptions(selectedField.id, newOptions);
+                  <Label>Options Source</Label>
+                  <div className="space-y-4">
+                    <Select
+                      value={selectedField.lookupCategory || 'manual'}
+                      onValueChange={(value) => {
+                        const isLookup = value !== 'manual';
+                        updateField(selectedField.id, { 
+                          lookupCategory: isLookup ? value : undefined,
+                          options: isLookup ? [] : selectedField.options || []
+                        });
+                        setSelectedField({ 
+                          ...selectedField, 
+                          lookupCategory: isLookup ? value : undefined,
+                          options: isLookup ? [] : selectedField.options || []
+                        });
                       }}
                     >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Option
-                    </Button>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose options source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manual">Manual Options</SelectItem>
+                        {lookupCategories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            Lookup: {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {!selectedField.lookupCategory && (
+                      <div>
+                        <Label>Manual Options</Label>
+                        <div className="space-y-2">
+                          {selectedField.options?.map((option, index) => (
+                            <div key={index} className="flex gap-2">
+                              <Input
+                                value={option}
+                                onChange={(e) => {
+                                  const newOptions = [...(selectedField.options || [])];
+                                  newOptions[index] = e.target.value;
+                                  updateOptions(selectedField.id, newOptions);
+                                }}
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const newOptions = selectedField.options?.filter((_, i) => i !== index) || [];
+                                  updateOptions(selectedField.id, newOptions);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newOptions = [...(selectedField.options || []), `Option ${(selectedField.options?.length || 0) + 1}`];
+                              updateOptions(selectedField.id, newOptions);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Option
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedField.lookupCategory && (
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm text-muted-foreground">
+                          Options will be loaded from the <strong>{selectedField.lookupCategory}</strong> lookup list.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
