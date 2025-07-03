@@ -14,13 +14,14 @@ interface RosterTemplate {
   repeat_interval: number;
   end_date: string | null;
   is_active: boolean;
+  category_id?: string;
 }
 
 interface ActiveRosterTemplatesProps {
-  onSelectRoster: (template: RosterTemplate) => void;
+  onDeployTemplate: (template: RosterTemplate) => void;
 }
 
-const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) => {
+const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps) => {
   const { data: activeTemplates, isLoading } = useQuery({
     queryKey: ['active-roster-templates'],
     queryFn: async () => {
@@ -32,7 +33,6 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
         .order('name');
       
       if (error) throw error;
-      console.log('Active roster templates:', data);
       return data as RosterTemplate[];
     }
   });
@@ -45,11 +45,6 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
       case 'custom': return `${interval} weeks`;
       default: return type;
     }
-  };
-
-  const handleTemplateClick = (template: RosterTemplate) => {
-    console.log('Template clicked:', template);
-    onSelectRoster(template);
   };
 
   return (
@@ -70,7 +65,7 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
                 key={template.id}
                 variant="outline"
                 className="h-auto p-3 flex flex-col items-start text-left"
-                onClick={() => handleTemplateClick(template)}
+                onClick={() => onDeployTemplate(template)}
               >
                 <div className="flex items-center justify-between w-full">
                   <div className="font-medium">{template.name}</div>
