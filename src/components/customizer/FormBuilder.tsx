@@ -45,7 +45,13 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
   const [savedForms, setSavedForms] = useState<any[]>([]);
   const [showSavedForms, setShowSavedForms] = useState(false);
 
+  // Debug component loading
+  console.log('FormBuilder component rendered');
+  console.log('Current form name:', formName);
+  console.log('Current form fields count:', formFields.length);
+
   const addField = (type: FormField['type']) => {
+    console.log('Adding field of type:', type);
     const newField: FormField = {
       id: `field_${Date.now()}`,
       type,
@@ -53,7 +59,9 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
       required: false,
       options: type === 'select' || type === 'radio' ? ['Option 1', 'Option 2'] : undefined
     };
-    setFormFields([...formFields, newField]);
+    const updatedFields = [...formFields, newField];
+    console.log('Updated fields:', updatedFields);
+    setFormFields(updatedFields);
   };
 
   const updateField = (id: string, updates: Partial<FormField>) => {
