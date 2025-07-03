@@ -17,10 +17,10 @@ interface RosterTemplate {
 }
 
 interface ActiveRosterTemplatesProps {
-  onDeployTemplate: (template: RosterTemplate) => void;
+  onSelectRoster: (template: RosterTemplate) => void;
 }
 
-const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps) => {
+const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) => {
   const { data: activeTemplates, isLoading } = useQuery({
     queryKey: ['active-roster-templates'],
     queryFn: async () => {
@@ -49,7 +49,7 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
 
   const handleTemplateClick = (template: RosterTemplate) => {
     console.log('Template clicked:', template);
-    onDeployTemplate(template);
+    onSelectRoster(template);
   };
 
   return (
