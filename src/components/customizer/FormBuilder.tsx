@@ -213,13 +213,14 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
         description: editingFormId ? "Form updated successfully!" : "Form saved successfully!"
       });
 
-      // Update parent component with current form data
+      // Update parent component with current form template data
       onProcessChange({
         name: formName,
         description: formDescription,
         fields: formFields,
         type: 'form',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        isTemplate: true
       });
 
       // Reset form
