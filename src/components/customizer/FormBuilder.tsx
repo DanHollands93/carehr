@@ -230,14 +230,19 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
           <Button 
-            onClick={() => {
-              console.log('Save button clicked!');
+            onClick={(e) => {
+              console.log('Save button clicked!', e);
               console.log('Form name length:', formName.trim().length);
               console.log('Form fields length:', formFields.length);
               console.log('Button disabled:', !formName.trim() || formFields.length === 0);
-              saveForm();
+              try {
+                saveForm();
+              } catch (error) {
+                console.error('Error calling saveForm:', error);
+              }
             }} 
             disabled={!formName.trim() || formFields.length === 0}
+            type="button"
           >
             <Save className="w-4 h-4 mr-2" />
             Save Form
