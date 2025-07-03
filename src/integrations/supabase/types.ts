@@ -214,6 +214,36 @@ export type Database = {
           },
         ]
       }
+      custom_forms: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          form_fields: Json
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          form_fields?: Json
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          form_fields?: Json
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       email_logs: {
         Row: {
           created_at: string | null
