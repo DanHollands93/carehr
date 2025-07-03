@@ -7,17 +7,19 @@ import { Calendar } from "@/components/ui/calendar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
-import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDown, UserPlus, UserMinus, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
 import StaffAssignmentManager from "@/components/StaffAssignmentManager";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
-import { useRosterCategories } from "@/hooks/useRosterCategories";
 import { useIsMobile } from "@/hooks/use-mobile";
 import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
 
@@ -67,11 +69,23 @@ const Roster = () => {
   const [draggedTemplate, setDraggedTemplate] = useState<ShiftTemplate | null>(null);
   const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedRosterName, setSelectedRosterName] = useState<string | null>(null);
   const [showDeleteBin, setShowDeleteBin] = useState(false);
   const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'department' | 'custom'>('first_name');
   const [customOrder, setCustomOrder] = useState<string[]>([]);
   const [showSortDialog, setShowSortDialog] = useState(false);
+  const [showAddStaffDialog, setShowAddStaffDialog] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [staffInRoster, setStaffInRoster] = useState<Set<string>>(new Set());
+  const [removeStaffDialog, setRemoveStaffDialog] = useState<{
+    isOpen: boolean;
+    employeeId: string;
+    employeeName: string;
+  }>({
+    isOpen: false,
+    employeeId: '',
+    employeeName: ''
+  });
   const [shiftPopup, setShiftPopup] = useState<{
     isOpen: boolean;
     employeeId: string;
@@ -87,13 +101,8 @@ const Roster = () => {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const { categories, getAssignedEmployees } = useRosterCategories();
-
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun (7 days)
-
-  // Get assigned employees for selected category
-  const assignedEmployeeIds = selectedCategoryId ? getAssignedEmployees(selectedCategoryId) : [];
 
   // Get all employees
   const { data: allEmployees } = useQuery({
@@ -109,12 +118,9 @@ const Roster = () => {
     }
   });
 
-  // Filter and sort employees based on category selection and sorting preference
+  // Filter and sort employees
   const employees = (() => {
-    let filteredEmployees = selectedCategoryId 
-      ? allEmployees?.filter(emp => assignedEmployeeIds.includes(emp.id))
-      : allEmployees;
-
+    let filteredEmployees = allEmployees;
     if (!filteredEmployees) return [];
 
     // Apply sorting
@@ -140,6 +146,19 @@ const Roster = () => {
     }
   })();
 
+  // Get employees not in roster for the add staff dialog
+  const filteredEmployeesNotInRoster = allEmployees?.filter(emp =>
+    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.department?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  // Get employees in roster
+  const employeesInRoster = Array.from(staffInRoster);
+
+  // Get employees not in roster
+  const employeesNotInRoster = allEmployees?.filter(emp => !staffInRoster.has(emp.id)) || [];
+
+  // Get all shift templates
   const { data: shiftTemplates } = useQuery({
     queryKey: ['shift-templates'],
     queryFn: async () => {
@@ -153,14 +172,14 @@ const Roster = () => {
     }
   });
 
-  // Update the shifts query to include time clock records
+  // Update the shifts query to work without categories
   const { data: shifts } = useQuery({
-    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedCategoryId],
+    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedRosterName],
     queryFn: async () => {
       const startDate = format(weekStart, 'yyyy-MM-dd');
       const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
       
-      let query = supabase
+      const { data, error } = await supabase
         .from('shifts')
         .select(`
           *,
@@ -173,12 +192,7 @@ const Roster = () => {
         `)
         .gte('date', startDate)
         .lte('date', endDate);
-
-      if (selectedCategoryId) {
-        query = query.eq('category_id', selectedCategoryId);
-      }
       
-      const { data, error } = await query;
       if (error) throw error;
       
       // Transform the data to include time records
@@ -221,12 +235,6 @@ const Roster = () => {
         pay_rate: number;
       };
     }) => {
-      // Check for overlapping shifts
-      const existingShifts = getShiftsForEmployeeAndDate(employeeId, date);
-      if (hasTimeOverlap(shiftData.start_time, shiftData.end_time, existingShifts)) {
-        throw new Error('This shift overlaps with an existing shift. Please choose different times.');
-      }
-
       const { error } = await supabase
         .from('shifts')
         .insert([{
@@ -236,9 +244,8 @@ const Roster = () => {
           end_time: shiftData.end_time,
           position: shiftData.position,
           job_role_id: shiftData.job_role_id,
-          actual_job_role_id: shiftData.job_role_id, // Set actual_job_role_id to the same value
-          pay_rate: shiftData.pay_rate,
-          category_id: selectedCategoryId
+          actual_job_role_id: shiftData.job_role_id,
+          pay_rate: shiftData.pay_rate
         }]);
       
       if (error) throw error;
@@ -248,7 +255,6 @@ const Roster = () => {
       toast({ title: "Shift added successfully" });
     },
     onError: (error) => {
-      console.error('Create shift error:', error);
       toast({ 
         title: "Error adding shift", 
         description: error.message,
@@ -526,10 +532,41 @@ const Roster = () => {
     setShowSortDialog(false);
   };
 
-  const handleRosterSelect = (template: { category_id?: string }) => {
-    if (template.category_id) {
-      setSelectedCategoryId(template.category_id);
-    }
+  const handleRosterSelect = (template: { name: string }) => {
+    console.log('handleRosterSelect called with:', template);
+    setSelectedRosterName(template.name);
+  };
+
+  const handleAddStaff = (employeeId: string) => {
+    if (!selectedRosterName) return;
+    setStaffInRoster(new Set(staffInRoster).add(employeeId));
+    setShowAddStaffDialog(false);
+    setSearchTerm("");
+    toast({ title: "Staff member added to roster" });
+  };
+
+  const handleRemoveStaff = (employeeId: string) => {
+    if (!selectedRosterName) return;
+    
+    // Remove all shifts for this employee in the current week
+    const employeeShifts = shifts?.filter(shift => shift.employee_id === employeeId) || [];
+    
+    employeeShifts.forEach(shift => {
+      deleteShiftMutation.mutate(shift.id);
+    });
+    
+    // Remove from category assignment
+    setStaffInRoster(new Set(staffInRoster).delete(employeeId));
+    setRemoveStaffDialog({ isOpen: false, employeeId: '', employeeName: '' });
+    toast({ title: "Staff member removed from roster" });
+  };
+
+  const openRemoveStaffDialog = (employeeId: string, employeeName: string) => {
+    setRemoveStaffDialog({
+      isOpen: true,
+      employeeId,
+      employeeName
+    });
   };
 
   useEffect(() => {
@@ -581,10 +618,68 @@ const Roster = () => {
     );
   }
 
-  const selectedCategory = categories?.find(cat => cat.id === selectedCategoryId);
-
   return (
     <div className="space-y-6" style={{ overscrollBehavior: 'none' }}>
+      {/* Remove Staff Confirmation Dialog */}
+      <AlertDialog open={removeStaffDialog.isOpen} onOpenChange={(open) => !open && setRemoveStaffDialog({ isOpen: false, employeeId: '', employeeName: '' })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Staff Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <strong>{removeStaffDialog.employeeName}</strong> from this roster? 
+              This will also remove all their assigned shifts for the current week.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleRemoveStaff(removeStaffDialog.employeeId)}>
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add Staff Dialog */}
+      <Dialog open={showAddStaffDialog} onOpenChange={setShowAddStaffDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Staff to {selectedRosterName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search employees..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {filteredEmployeesNotInRoster.map((employee) => (
+                <div key={employee.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                  <div className="flex-1">
+                    <div className="font-medium">{employee.first_name} {employee.last_name}</div>
+                    <div className="text-sm text-gray-500">{employee.department}</div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAddStaff(employee.id)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              ))}
+              {filteredEmployeesNotInRoster.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  {searchTerm ? 'No employees found matching search' : 'All employees are already in this roster'}
+                </p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Bin - only show if user can edit and is dragging a shift on desktop */}
       {showDeleteBin && canEditRoster && !isMobile && (
         <div className="fixed top-20 right-8 z-50">
@@ -689,93 +784,15 @@ const Roster = () => {
         </Button>
       </div>
 
-      {/* Staff Assignment for Selected Category - only show if user can edit */}
-      {selectedCategory && canEditRoster && (
-        <StaffAssignmentManager
-          categoryId={selectedCategory.id}
-          categoryName={selectedCategory.name}
-        />
-      )}
-
-      {selectedCategoryId && (
+      {selectedRosterName && (
         <div className="space-y-6">
-          {/* Shift Templates Panel - only show if user can edit and not on mobile */}
-          {canEditRoster && !isMobile && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Shift Templates</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Accordion type="multiple" className="w-full">
-                  {Object.entries(groupedTemplates).map(([position, templates]) => (
-                    <AccordionItem value={position} key={position}>
-                      <AccordionTrigger className="text-sm font-medium">
-                        {position}
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="grid grid-cols-2 gap-2">
-                          {templates.map((template) => (
-                            <div
-                              key={template.id}
-                              draggable={canEditRoster}
-                              onDragStart={() => handleDragStart(template)}
-                              className={cn(
-                                "p-2 rounded border text-xs transition-shadow",
-                                canEditRoster ? "cursor-move hover:shadow-md" : "cursor-default"
-                              )}
-                              style={{ 
-                                backgroundColor: template.color + '20',
-                                borderColor: template.color 
-                              }}
-                            >
-                              <div className="font-medium truncate">{template.name}</div>
-                              <div className="text-xs text-gray-600 truncate">
-                                {template.start_time} - {template.end_time}
-                              </div>
-                              <div className="text-xs text-gray-600 truncate">
-                                {template.pay_value} hrs
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Roster Grid */}
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>
-                  {selectedCategory?.name} Roster
+                  {selectedRosterName} Roster
                 </CardTitle>
-                {canEditRoster && !isMobile && (
-                  <div className="flex items-center space-x-2">
-                    <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Sort by..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="first_name">First Name</SelectItem>
-                        <SelectItem value="last_name">Last Name</SelectItem>
-                        <SelectItem value="department">Job Title</SelectItem>
-                        <SelectItem value="custom">Custom Order</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowSortDialog(true)}
-                    >
-                      <ArrowUpDown className="w-4 h-4 mr-2" />
-                      Custom Sort
-                    </Button>
-                  </div>
-                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -790,10 +807,6 @@ const Roster = () => {
                             <th key={day.toISOString()} className="p-3 text-center font-medium border-b min-w-32">
                               <div>{format(day, 'EEE')}</div>
                               <div className="text-sm text-gray-500">{format(day, 'MMM dd')}</div>
-                              <div className="flex items-center justify-center mt-1 text-xs text-blue-600">
-                                <Users className="w-3 h-3 mr-1" />
-                                {getStaffCountForDate(day.toISOString())}
-                              </div>
                             </th>
                           ))}
                         </tr>
@@ -803,103 +816,19 @@ const Roster = () => {
                           <tr key={employee.id} className="border-b">
                             <td className="p-3 font-medium min-w-[160px]">
                               <div>{employee.first_name} {employee.last_name}</div>
-                              <div className="text-sm text-gray-500">{employee.department}</div>
                             </td>
-                            {weekDays.map((day) => {
-                              const employeeShifts = getShiftsForEmployeeAndDate(employee.id, day.toISOString()) as ShiftWithTimeRecord[];
-                              
-                              return (
-                                <td
-                                  key={day.toISOString()}
-                                  className="p-2 border-r border-l min-w-32"
-                                  onDrop={canEditRoster && !isMobile ? (e) => {
-                                    e.preventDefault();
-                                    handleDrop(employee.id, day.toISOString());
-                                  } : undefined}
-                                  onDragOver={canEditRoster && !isMobile ? (e) => {
-                                    e.preventDefault();
-                                  } : undefined}
-                                >
-                                  <div 
-                                    className={cn(
-                                      "min-h-16 border-2 border-dashed border-gray-200 rounded p-2 transition-colors relative group",
-                                      canEditRoster ? "cursor-pointer hover:border-gray-300" : "cursor-default"
-                                    )}
-                                    style={{
-                                      backgroundColor: (canEditRoster && !isMobile && (draggedTemplate || draggedShift)) ? '#f0f9ff' : 'transparent'
-                                    }}
-                                    onClick={canEditRoster ? () => handleCellClick(
-                                      employee.id, 
-                                      `${employee.first_name} ${employee.last_name}`, 
-                                      day.toISOString()
-                                    ) : undefined}
-                                  >
-                                    {employeeShifts.length > 0 ? (
-                                      <div className="space-y-1">
-                                        {employeeShifts.map((shift, index) => {
-                                          const template = shiftTemplates?.find(t => 
-                                            t.position === shift.position && 
-                                            t.start_time === shift.start_time && 
-                                            t.end_time === shift.end_time
-                                          );
-                                          const statusColor = getShiftStatusColor(shift);
-                                          const statusText = getShiftStatusText(shift);
-                                          
-                                          return (
-                                            <div
-                                              key={shift.id}
-                                              draggable={canEditRoster && !isMobile}
-                                              onDragStart={canEditRoster && !isMobile ? () => handleShiftDragStart(shift) : undefined}
-                                              onDragEnd={canEditRoster && !isMobile ? handleDragEnd : undefined}
-                                              className={cn(
-                                                "p-1 rounded text-xs transition-shadow relative",
-                                                canEditRoster ? "cursor-pointer hover:shadow-md" : "cursor-default",
-                                                !isMobile && canEditRoster && "hover:cursor-move"
-                                              )}
-                                              style={{ 
-                                                backgroundColor: template?.color + '20' || '#3B82F6' + '20',
-                                                borderColor: template?.color || '#3B82F6',
-                                                borderLeft: statusColor ? `4px solid ${statusColor}` : undefined
-                                              }}
-                                              onDoubleClick={canEditRoster && !isMobile ? () => deleteShiftMutation.mutate(shift.id) : undefined}
-                                              onClick={(e) => {
-                                                if (canEditRoster) {
-                                                  e.stopPropagation();
-                                                  handleCellClick(
-                                                    employee.id, 
-                                                    `${employee.first_name} ${employee.last_name}`, 
-                                                    day.toISOString(),
-                                                    shift
-                                                  );
-                                                }
-                                              }}
-                                              title={canEditRoster ? (isMobile ? "Tap to edit or remove" : "Click to edit, drag to move, or double-click to delete") : "View only"}
-                                            >
-                                              <div className="font-medium text-xs">{shift.position}</div>
-                                              <div className="text-xs">{shift.start_time} - {shift.end_time}</div>
-                                              {statusText && (
-                                                <div className="text-xs mt-1 font-medium" style={{ color: statusColor }}>
-                                                  {statusText}
-                                                </div>
-                                              )}
-                                              {shift.time_record?.status === 'discrepancy' && (
-                                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : (
-                                      canEditRoster && (
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center h-full">
-                                          <Plus className="w-4 h-4 text-gray-400" />
-                                        </div>
-                                      )
-                                    )}
+                            {weekDays.map((day) => (
+                              <td
+                                key={day.toISOString()}
+                                className="p-2 border-r border-l min-w-32"
+                              >
+                                <div className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 transition-colors cursor-pointer hover:border-gray-300">
+                                  <div className="opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center h-full">
+                                    <Plus className="w-4 h-4 text-gray-400" />
                                   </div>
-                                </td>
-                              );
-                            })}
+                                </div>
+                              </td>
+                            ))}
                           </tr>
                         ))}
                       </tbody>
@@ -909,15 +838,7 @@ const Roster = () => {
                 </ScrollArea>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">
-                    {selectedCategory ? 
-                      (canEditRoster 
-                        ? `No staff assigned to ${selectedCategory.name}. Add staff using the button above.`
-                        : `No staff assigned to ${selectedCategory.name}.`
-                      ) :
-                      'Select a category to view and manage rosters.'
-                    }
-                  </p>
+                  <p className="text-gray-500">No employees found for this roster.</p>
                 </div>
               )}
             </CardContent>
@@ -925,7 +846,7 @@ const Roster = () => {
         </div>
       )}
 
-      {!selectedCategoryId && (
+      {!selectedRosterName && (
         <Card>
           <CardContent className="text-center py-8">
             <p className="text-gray-500">Select an active roster above to begin {canEditRoster ? 'managing' : 'viewing'} shifts and staff assignments.</p>

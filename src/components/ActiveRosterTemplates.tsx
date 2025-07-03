@@ -14,7 +14,6 @@ interface RosterTemplate {
   repeat_interval: number;
   end_date: string | null;
   is_active: boolean;
-  category_id?: string;
 }
 
 interface ActiveRosterTemplatesProps {
@@ -33,6 +32,7 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
         .order('name');
       
       if (error) throw error;
+      console.log('Active roster templates:', data);
       return data as RosterTemplate[];
     }
   });
@@ -45,6 +45,11 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
       case 'custom': return `${interval} weeks`;
       default: return type;
     }
+  };
+
+  const handleTemplateClick = (template: RosterTemplate) => {
+    console.log('Template clicked:', template);
+    onDeployTemplate(template);
   };
 
   return (
@@ -65,7 +70,7 @@ const ActiveRosterTemplates = ({ onDeployTemplate }: ActiveRosterTemplatesProps)
                 key={template.id}
                 variant="outline"
                 className="h-auto p-3 flex flex-col items-start text-left"
-                onClick={() => onDeployTemplate(template)}
+                onClick={() => handleTemplateClick(template)}
               >
                 <div className="flex items-center justify-between w-full">
                   <div className="font-medium">{template.name}</div>
