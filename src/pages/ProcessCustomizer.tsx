@@ -15,9 +15,21 @@ const ProcessCustomizer = () => {
   const [previewMode, setPreviewMode] = useState(false);
 
   const handleSaveProcess = () => {
+    console.log('Save Process clicked');
+    console.log('Active process data:', activeProcess);
+    
+    if (!activeProcess || !activeProcess.formData) {
+      toast({
+        title: "Nothing to Save",
+        description: "Please create a form first using the 'Save Form' button in the Form Builder tab.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     toast({
       title: "Process Saved",
-      description: "Your custom process has been saved successfully."
+      description: `Process "${activeProcess.formData.name || 'Untitled'}" has been saved successfully.`
     });
   };
 
@@ -64,7 +76,10 @@ const ProcessCustomizer = () => {
 
           <TabsContent value="forms" className="space-y-6">
             <FormBuilder 
-              onProcessChange={setActiveProcess}
+              onProcessChange={(processData) => {
+                console.log('Process data updated:', processData);
+                setActiveProcess({ formData: processData });
+              }}
               process={activeProcess}
             />
           </TabsContent>
