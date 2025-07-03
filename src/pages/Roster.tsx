@@ -7,10 +7,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
-import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDown, UserPlus, UserMinus, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -72,6 +75,17 @@ const Roster = () => {
   const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'department' | 'custom'>('first_name');
   const [customOrder, setCustomOrder] = useState<string[]>([]);
   const [showSortDialog, setShowSortDialog] = useState(false);
+  const [showAddStaffDialog, setShowAddStaffDialog] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [removeStaffDialog, setRemoveStaffDialog] = useState<{
+    isOpen: boolean;
+    employeeId: string;
+    employeeName: string;
+  }>({
+    isOpen: false,
+    employeeId: '',
+    employeeName: ''
+  });
   const [shiftPopup, setShiftPopup] = useState<{
     isOpen: boolean;
     employeeId: string;
@@ -87,7 +101,7 @@ const Roster = () => {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const { categories, getAssignedEmployees } = useRosterCategories();
+  const { categories, getAssignedEmployees, assignStaff, removeStaff } = useRosterCategories();
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun (7 days)
@@ -139,6 +153,13 @@ const Roster = () => {
         return filteredEmployees;
     }
   })();
+
+  // Get employees not in roster for the add staff dialog
+  const employeesNotInRoster = allEmployees?.filter(emp => !assignedEmployeeIds.includes(emp.id)) || [];
+  const filteredEmployeesNotInRoster = employeesNotInRoster.filter(emp =>
+    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.department?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const { data: shiftTemplates } = useQuery({
     queryKey: ['shift-templates'],
@@ -527,9 +548,45 @@ const Roster = () => {
   };
 
   const handleRosterSelect = (template: { category_id?: string }) => {
+    console.log('handleRosterSelect called with:', template);
     if (template.category_id) {
+      console.log('Setting selectedCategoryId to:', template.category_id);
       setSelectedCategoryId(template.category_id);
+    } else {
+      console.log('No category_id found in template:', template);
     }
+  };
+
+  const handleAddStaff = (employeeId: string) => {
+    if (!selectedCategoryId) return;
+    assignStaff.mutate({ categoryId: selectedCategoryId, employeeId });
+    setShowAddStaffDialog(false);
+    setSearchTerm("");
+    toast({ title: "Staff member added to roster" });
+  };
+
+  const handleRemoveStaff = (employeeId: string) => {
+    if (!selectedCategoryId) return;
+    
+    // Remove all shifts for this employee in the current week
+    const employeeShifts = shifts?.filter(shift => shift.employee_id === employeeId) || [];
+    
+    employeeShifts.forEach(shift => {
+      deleteShiftMutation.mutate(shift.id);
+    });
+    
+    // Remove from category assignment
+    removeStaff.mutate({ categoryId: selectedCategoryId, employeeId });
+    setRemoveStaffDialog({ isOpen: false, employeeId: '', employeeName: '' });
+    toast({ title: "Staff member removed from roster" });
+  };
+
+  const openRemoveStaffDialog = (employeeId: string, employeeName: string) => {
+    setRemoveStaffDialog({
+      isOpen: true,
+      employeeId,
+      employeeName
+    });
   };
 
   useEffect(() => {
@@ -585,6 +642,66 @@ const Roster = () => {
 
   return (
     <div className="space-y-6" style={{ overscrollBehavior: 'none' }}>
+      {/* Remove Staff Confirmation Dialog */}
+      <AlertDialog open={removeStaffDialog.isOpen} onOpenChange={(open) => !open && setRemoveStaffDialog({ isOpen: false, employeeId: '', employeeName: '' })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Staff Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <strong>{removeStaffDialog.employeeName}</strong> from this roster? 
+              This will also remove all their assigned shifts for the current week.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleRemoveStaff(removeStaffDialog.employeeId)}>
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add Staff Dialog */}
+      <Dialog open={showAddStaffDialog} onOpenChange={setShowAddStaffDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Staff to {selectedCategory?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search employees..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {filteredEmployeesNotInRoster.map((employee) => (
+                <div key={employee.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                  <div className="flex-1">
+                    <div className="font-medium">{employee.first_name} {employee.last_name}</div>
+                    <div className="text-sm text-gray-500">{employee.department}</div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAddStaff(employee.id)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              ))}
+              {filteredEmployeesNotInRoster.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  {searchTerm ? 'No employees found matching search' : 'All employees are already in this roster'}
+                </p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Bin - only show if user can edit and is dragging a shift on desktop */}
       {showDeleteBin && canEditRoster && !isMobile && (
         <div className="fixed top-20 right-8 z-50">
@@ -689,14 +806,6 @@ const Roster = () => {
         </Button>
       </div>
 
-      {/* Staff Assignment for Selected Category - only show if user can edit */}
-      {selectedCategory && canEditRoster && (
-        <StaffAssignmentManager
-          categoryId={selectedCategory.id}
-          categoryName={selectedCategory.name}
-        />
-      )}
-
       {selectedCategoryId && (
         <div className="space-y-6">
           {/* Shift Templates Panel - only show if user can edit and not on mobile */}
@@ -753,29 +862,37 @@ const Roster = () => {
                 <CardTitle>
                   {selectedCategory?.name} Roster
                 </CardTitle>
-                {canEditRoster && !isMobile && (
-                  <div className="flex items-center space-x-2">
-                    <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Sort by..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="first_name">First Name</SelectItem>
-                        <SelectItem value="last_name">Last Name</SelectItem>
-                        <SelectItem value="department">Job Title</SelectItem>
-                        <SelectItem value="custom">Custom Order</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowSortDialog(true)}
-                    >
-                      <ArrowUpDown className="w-4 h-4 mr-2" />
-                      Custom Sort
+                <div className="flex items-center space-x-2">
+                  {canEditRoster && (
+                    <Button onClick={() => setShowAddStaffDialog(true)}>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add Staff
                     </Button>
-                  </div>
-                )}
+                  )}
+                  {canEditRoster && !isMobile && (
+                    <>
+                      <Select value={sortBy} onValueChange={(value: 'first_name' | 'last_name' | 'department' | 'custom') => setSortBy(value)}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Sort by..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="first_name">First Name</SelectItem>
+                          <SelectItem value="last_name">Last Name</SelectItem>
+                          <SelectItem value="department">Job Title</SelectItem>
+                          <SelectItem value="custom">Custom Order</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowSortDialog(true)}
+                      >
+                        <ArrowUpDown className="w-4 h-4 mr-2" />
+                        Custom Sort
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -802,8 +919,22 @@ const Roster = () => {
                         {employees.map((employee) => (
                           <tr key={employee.id} className="border-b">
                             <td className="p-3 font-medium min-w-[160px]">
-                              <div>{employee.first_name} {employee.last_name}</div>
-                              <div className="text-sm text-gray-500">{employee.department}</div>
+                              <div>
+                                <div>{employee.first_name} {employee.last_name}</div>
+                                {canEditRoster && (
+                                  <div className="flex justify-end">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 w-6 p-0 hover:bg-red-100"
+                                      onClick={() => openRemoveStaffDialog(employee.id, `${employee.first_name} ${employee.last_name}`)}
+                                      title="Remove staff member from roster"
+                                    >
+                                      <UserMinus className="w-3 h-3 text-red-500" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             </td>
                             {weekDays.map((day) => {
                               const employeeShifts = getShiftsForEmployeeAndDate(employee.id, day.toISOString()) as ShiftWithTimeRecord[];
