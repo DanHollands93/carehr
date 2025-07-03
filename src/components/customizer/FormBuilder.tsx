@@ -85,24 +85,33 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
 
   const loadSavedForms = async () => {
     try {
+      console.log('Loading saved forms...');
+      
       const { data, error } = await supabase
         .from('custom_forms')
         .select('*')
         .order('created_at', { ascending: false });
       
+      console.log('Load forms result:', { data, error });
+      
       if (error) throw error;
       setSavedForms(data || []);
+      console.log('Saved forms loaded:', data?.length || 0);
     } catch (error) {
       console.error('Error loading saved forms:', error);
       toast({
         title: "Error",
-        description: "Failed to load saved forms.",
+        description: `Failed to load saved forms: ${error.message}`,
         variant: "destructive"
       });
     }
   };
 
   const saveForm = async () => {
+    console.log('Save form called');
+    console.log('Form name:', formName);
+    console.log('Form fields:', formFields);
+    
     if (!formName.trim()) {
       toast({
         title: "Error",
@@ -122,14 +131,37 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
     }
 
     try {
-      const { error } = await supabase
+      console.log('Starting save operation...');
+      
+      // Check if user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log('Current user:', user);
+      
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw new Error('Authentication error: ' + authError.message);
+      }
+      
+      if (!user) {
+        console.error('No authenticated user');
+        throw new Error('You must be logged in to save forms');
+      }
+
+      const formData = {
+        name: formName,
+        description: formDescription,
+        form_fields: formFields,
+        created_by: user.id
+      };
+      
+      console.log('Inserting form data:', formData);
+
+      const { data, error } = await supabase
         .from('custom_forms')
-        .insert({
-          name: formName,
-          description: formDescription,
-          form_fields: formFields,
-          created_by: (await supabase.auth.getUser()).data.user?.id
-        });
+        .insert(formData)
+        .select();
+
+      console.log('Insert result:', { data, error });
 
       if (error) throw error;
 
@@ -150,7 +182,7 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
       console.error('Error saving form:', error);
       toast({
         title: "Error",
-        description: "Failed to save form.",
+        description: `Failed to save form: ${error.message}`,
         variant: "destructive"
       });
     }
