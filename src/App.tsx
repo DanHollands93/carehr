@@ -30,6 +30,7 @@ import HolidayApprovals from "./pages/HolidayApprovals";
 import EmailLogs from "./pages/EmailLogs";
 import StaffShifts from "./pages/StaffShifts";
 import TimeDiscrepancyManager from "./components/TimeDiscrepancyManager";
+import ProcessCustomizer from "./pages/ProcessCustomizer";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,11 @@ const App = () => (
               } />
               <Route path="menu-sets" element={<MenuSets />} />
               <Route path="processes" element={<Processes />} />
+              <Route path="process-customizer" element={
+                <ProtectedRoute requiredPermission="manage_processes">
+                  <ProcessCustomizer />
+                </ProtectedRoute>
+              } />
               <Route path="settings" element={<Settings />} />
               <Route path="reports" element={<Reports />} />
               <Route path="employees" element={

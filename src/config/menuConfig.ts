@@ -276,6 +276,12 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
         requiredPermission: "view_settings"
       },
       {
+        title: "Process Customizer",
+        path: "/process-customizer",
+        icon: "Settings",
+        requiredPermission: "manage_processes"
+      },
+      {
         title: "Menu Sets",
         path: "/menu-sets",
         icon: "Menu",
