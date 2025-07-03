@@ -210,6 +210,17 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
   };
 
   useEffect(() => {
+    console.log('FormBuilder useEffect - checking auth and loading forms...');
+    
+    // Check authentication status
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      console.log('Current user:', user);
+      console.log('Auth error:', error);
+      if (!user) {
+        console.warn('User not authenticated - forms cannot be saved');
+      }
+    });
+    
     loadSavedForms();
   }, []);
 
