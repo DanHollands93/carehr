@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,8 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, Move, Type, Hash, Calendar, Check, List, FileText } from "lucide-react";
+import { Plus, Trash2, Move, Type, Hash, Calendar, Check, List, FileText, Save, FolderOpen } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface FormField {
   id: string;
@@ -35,9 +37,13 @@ const fieldTypes = [
 ];
 
 export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
+  const { toast } = useToast();
   const [formFields, setFormFields] = useState<FormField[]>([]);
   const [formName, setFormName] = useState("");
+  const [formDescription, setFormDescription] = useState("");
   const [selectedField, setSelectedField] = useState<FormField | null>(null);
+  const [savedForms, setSavedForms] = useState<any[]>([]);
+  const [showSavedForms, setShowSavedForms] = useState(false);
 
   const addField = (type: FormField['type']) => {
     const newField: FormField = {
@@ -77,8 +83,147 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
     updateField(fieldId, { options });
   };
 
+  const loadSavedForms = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('custom_forms')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setSavedForms(data || []);
+    } catch (error) {
+      console.error('Error loading saved forms:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load saved forms.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const saveForm = async () => {
+    if (!formName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a form name before saving.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formFields.length === 0) {
+      toast({
+        title: "Error", 
+        description: "Please add at least one field before saving.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('custom_forms')
+        .insert({
+          name: formName,
+          description: formDescription,
+          form_fields: formFields,
+          created_by: (await supabase.auth.getUser()).data.user?.id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Form saved successfully!"
+      });
+
+      // Reset form
+      setFormName("");
+      setFormDescription("");
+      setFormFields([]);
+      setSelectedField(null);
+      
+      // Reload saved forms
+      loadSavedForms();
+    } catch (error) {
+      console.error('Error saving form:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save form.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const loadForm = (form: any) => {
+    setFormName(form.name);
+    setFormDescription(form.description || "");
+    setFormFields(form.form_fields || []);
+    setSelectedField(null);
+    setShowSavedForms(false);
+    
+    toast({
+      title: "Form Loaded",
+      description: `Loaded form: ${form.name}`
+    });
+  };
+
+  useEffect(() => {
+    loadSavedForms();
+  }, []);
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="space-y-6">
+      {/* Header with Save and Load buttons */}
+      <div className="flex justify-between items-center">
+        <div className="flex gap-2">
+          <Button onClick={saveForm} disabled={!formName.trim() || formFields.length === 0}>
+            <Save className="w-4 h-4 mr-2" />
+            Save Form
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowSavedForms(!showSavedForms)}
+          >
+            <FolderOpen className="w-4 h-4 mr-2" />
+            {showSavedForms ? 'Hide' : 'Show'} Saved Forms ({savedForms.length})
+          </Button>
+        </div>
+      </div>
+
+      {/* Saved Forms Section */}
+      {showSavedForms && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Saved Forms</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {savedForms.length === 0 ? (
+              <p className="text-muted-foreground">No saved forms yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {savedForms.map((form) => (
+                  <Card key={form.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => loadForm(form)}>
+                    <CardContent className="p-4">
+                      <h4 className="font-medium">{form.name}</h4>
+                      {form.description && (
+                        <p className="text-sm text-muted-foreground mt-1">{form.description}</p>
+                      )}
+                      <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
+                        <span>{form.form_fields?.length || 0} fields</span>
+                        <span>{new Date(form.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Field Types Panel */}
       <Card>
         <CardHeader>
@@ -109,14 +254,26 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
       <Card>
         <CardHeader>
           <CardTitle>Form Preview</CardTitle>
-          <div className="space-y-2">
-            <Label htmlFor="form-name">Form Name</Label>
-            <Input
-              id="form-name"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              placeholder="Enter form name"
-            />
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="form-name">Form Name</Label>
+              <Input
+                id="form-name"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder="Enter form name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="form-description">Form Description</Label>
+              <Textarea
+                id="form-description"
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                placeholder="Enter form description (optional)"
+                rows={3}
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -180,7 +337,10 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
                 <Input
                   id="field-label"
                   value={selectedField.label}
-                  onChange={(e) => updateField(selectedField.id, { label: e.target.value })}
+                  onChange={(e) => {
+                    updateField(selectedField.id, { label: e.target.value });
+                    setSelectedField({ ...selectedField, label: e.target.value });
+                  }}
                 />
               </div>
 
@@ -189,7 +349,10 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
                 <Input
                   id="field-placeholder"
                   value={selectedField.placeholder || ''}
-                  onChange={(e) => updateField(selectedField.id, { placeholder: e.target.value })}
+                  onChange={(e) => {
+                    updateField(selectedField.id, { placeholder: e.target.value });
+                    setSelectedField({ ...selectedField, placeholder: e.target.value });
+                  }}
                 />
               </div>
 
@@ -197,7 +360,10 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
                 <Switch
                   id="field-required"
                   checked={selectedField.required}
-                  onCheckedChange={(checked) => updateField(selectedField.id, { required: checked })}
+                  onCheckedChange={(checked) => {
+                    updateField(selectedField.id, { required: checked });
+                    setSelectedField({ ...selectedField, required: checked });
+                  }}
                 />
                 <Label htmlFor="field-required">Required</Label>
               </div>
@@ -248,6 +414,7 @@ export const FormBuilder = ({ onProcessChange, process }: FormBuilderProps) => {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };
