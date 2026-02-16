@@ -202,9 +202,9 @@ const HoursAnalysisReport = () => {
           
           // Process time segments if they exist
           if (timeRecord.time_segments && timeRecord.time_segments.length > 0) {
-            for (const segment of timeRecord.time_segments as TimeSegment[]) {
-              const segmentHours = Math.round((segment.minutes_worked / 60) * 100) / 100;
-              const paidHours = Math.round((segment.minutes_paid / 60) * 100) / 100;
+            for (const segment of timeRecord.time_segments as any[]) {
+              const segmentHours = Math.round(((segment.minutes_worked || 0) / 60) * 100) / 100;
+              const paidHours = Math.round(((segment.minutes_paid || 0) / 60) * 100) / 100;
               const totalPay = paidHours * payRate;
               
               let segmentDescription = '';
@@ -253,10 +253,10 @@ const HoursAnalysisReport = () => {
               const actualMinutes = differenceInMinutes(clockOut, clockIn);
               
               // If processed and approved, use processed paid time
-              if (timeRecord.processed_at && exceptionStatus === 'approved') {
-                paidHours = Math.round(((timeRecord.scheduled_minutes_paid || 0) + 
-                                      (timeRecord.early_minutes_paid || 0) + 
-                                      (timeRecord.late_minutes_paid || 0)) / 60 * 100) / 100;
+              if ((timeRecord as any).processed_at && exceptionStatus === 'approved') {
+                paidHours = Math.round((((timeRecord as any).scheduled_minutes_paid || 0) + 
+                                      ((timeRecord as any).early_minutes_paid || 0) + 
+                                      ((timeRecord as any).late_minutes_paid || 0)) / 60 * 100) / 100;
               } else {
                 // Default to actual worked hours if not processed
                 paidHours = Math.round((actualMinutes / 60) * 100) / 100;

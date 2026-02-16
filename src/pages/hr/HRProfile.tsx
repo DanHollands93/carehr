@@ -27,7 +27,7 @@ interface EmployeeData {
   passport_number?: string;
   visa_expiry?: string;
   right_to_work_status?: string;
-  emergency_contact?: any;
+  emergency_contact?: Record<string, any>;
 }
 
 const HRProfile = () => {
@@ -381,25 +381,25 @@ const HRProfile = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {employee.emergency_contact.name && (
+                {(employee.emergency_contact as any)?.name && (
                   <div>
                     <span className="text-sm text-gray-600">Contact Name:</span>
-                    <div>{employee.emergency_contact.name}</div>
+                    <div>{(employee.emergency_contact as any).name}</div>
                   </div>
                 )}
-                {employee.emergency_contact.phone && (
+                {(employee.emergency_contact as any)?.phone && (
                   <div>
                     <span className="text-sm text-gray-600">Contact Phone:</span>
                     <div className="flex items-center space-x-3">
                       <Phone className="w-4 h-4 text-gray-500" />
-                      <span>{employee.emergency_contact.phone}</span>
+                      <span>{(employee.emergency_contact as any).phone}</span>
                     </div>
                   </div>
                 )}
-                {employee.emergency_contact.relationship && (
+                {(employee.emergency_contact as any)?.relationship && (
                   <div>
                     <span className="text-sm text-gray-600">Relationship:</span>
-                    <div>{employee.emergency_contact.relationship}</div>
+                    <div>{(employee.emergency_contact as any).relationship}</div>
                   </div>
                 )}
               </div>

@@ -55,7 +55,7 @@ export const useNotifications = () => {
     if (error) {
       console.error('Error loading notifications:', error);
     } else {
-      setNotifications(data || []);
+      setNotifications((data as any[]) || []);
     }
     setLoading(false);
   };
@@ -70,7 +70,7 @@ export const useNotifications = () => {
     if (error) {
       console.error('Error loading notification templates:', error);
     } else {
-      setTemplates(data || []);
+      setTemplates((data as any[]) || []);
     }
   };
 

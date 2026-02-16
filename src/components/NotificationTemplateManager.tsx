@@ -85,7 +85,7 @@ const NotificationTemplateManager = () => {
         variant: "destructive"
       });
     } else {
-      setTemplates(data || []);
+      setTemplates((data as any[]) || []);
     }
     setLoading(false);
   };
@@ -120,7 +120,7 @@ const NotificationTemplateManager = () => {
       // Create new template
       const { error } = await supabase
         .from('notification_templates')
-        .insert(template);
+        .insert(template as any);
 
       if (error) {
         console.error('Error creating template:', error);

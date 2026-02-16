@@ -122,7 +122,7 @@ export const useEnhancedPermissions = () => {
         ...item,
         permission: Array.isArray(item.permissions) ? item.permissions[0] : item.permissions
       })) || [];
-      setUserPermissionOverrides(transformedData);
+      setUserPermissionOverrides(transformedData as any[]);
     }
   };
 
@@ -135,7 +135,7 @@ export const useEnhancedPermissions = () => {
     if (error) {
       console.error('Error loading effective permissions:', error);
     } else {
-      setEffectivePermissions(data || []);
+      setEffectivePermissions((data as any[]) || []);
     }
   };
 

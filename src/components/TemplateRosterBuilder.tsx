@@ -240,11 +240,11 @@ const TemplateRosterBuilder = ({
 
   useEffect(() => {
     if (existingAssignments) {
-      const shifts: TemplateShift[] = existingAssignments.map(assignment => ({
+      const shifts: TemplateShift[] = existingAssignments.map((assignment: any) => ({
         id: assignment.id,
         employee_id: assignment.employee_id,
-        day_index: assignment.day_of_period,
-        shift_template_id: assignment.shift_template_id
+        day_index: assignment.day_of_period || 0,
+        shift_template_id: assignment.shift_template_id || ''
       }));
       setTemplateShifts(shifts);
     }
