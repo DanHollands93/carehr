@@ -134,48 +134,50 @@ const EmployeeForm = ({ onClose, onSuccess, employee }: EmployeeFormProps) => {
   // Populate form when editing
   useEffect(() => {
     if (isEditMode && fullEmployee && currentCareer) {
+      const emp = fullEmployee as any;
+      const career = currentCareer as any;
       // Personal details
-      setValue('first_name', fullEmployee.first_name || '');
-      setValue('last_name', fullEmployee.last_name || '');
-      setValue('email', fullEmployee.email || '');
-      setValue('phone_number', fullEmployee.phone_number || '');
-      setValue('date_of_birth', fullEmployee.date_of_birth || '');
-      setValue('national_insurance_number', fullEmployee.national_insurance_number || '');
-      setValue('tax_code', fullEmployee.tax_code || '');
-      setValue('passport_number', fullEmployee.passport_number || '');
-      setValue('visa_expiry', fullEmployee.visa_expiry || '');
-      setValue('right_to_work_status', fullEmployee.right_to_work_status || '');
+      setValue('first_name', emp.first_name || '');
+      setValue('last_name', emp.last_name || '');
+      setValue('email', emp.email || '');
+      setValue('phone_number', emp.phone_number || '');
+      setValue('date_of_birth', emp.date_of_birth || '');
+      setValue('national_insurance_number', emp.national_insurance_number || '');
+      setValue('tax_code', emp.tax_code || '');
+      setValue('passport_number', emp.passport_number || '');
+      setValue('visa_expiry', emp.visa_expiry || '');
+      setValue('right_to_work_status', emp.right_to_work_status || '');
 
       // Address
-      setValue('address_line_1', fullEmployee.address?.line_1 || '');
-      setValue('address_line_2', fullEmployee.address?.line_2 || '');
-      setValue('city', fullEmployee.address?.city || '');
-      setValue('postcode', fullEmployee.address?.postcode || '');
-      setValue('country', fullEmployee.address?.country || 'United Kingdom');
+      setValue('address_line_1', emp.address?.line_1 || '');
+      setValue('address_line_2', emp.address?.line_2 || '');
+      setValue('city', emp.address?.city || '');
+      setValue('postcode', emp.address?.postcode || '');
+      setValue('country', emp.address?.country || 'United Kingdom');
 
       // Emergency contact
-      setValue('emergency_name', fullEmployee.emergency_contact?.name || '');
-      setValue('emergency_phone', fullEmployee.emergency_contact?.phone || '');
-      setValue('emergency_relationship', fullEmployee.emergency_contact?.relationship || '');
+      setValue('emergency_name', emp.emergency_contact?.name || '');
+      setValue('emergency_phone', emp.emergency_contact?.phone || '');
+      setValue('emergency_relationship', emp.emergency_contact?.relationship || '');
 
       // Employment details
-      setValue('job_title', currentCareer.job_title || '');
-      setValue('department', fullEmployee.department || '');
-      setValue('location', currentCareer.location || '');
-      setValue('pay_rate', currentCareer.pay_rate || 0);
-      setValue('pay_type', currentCareer.pay_type || 'salary');
-      setValue('hours_per_week', currentCareer.hours_per_week || 40);
-      setValue('employment_type', currentCareer.employment_type || 'permanent');
-      setValue('contract_type', currentCareer.contract_type || 'full_time');
-      setValue('start_date', currentCareer.start_date?.split('T')[0] || '');
-      setValue('probation_end_date', currentCareer.probation_end_date || '');
-      setValue('notice_period_weeks', currentCareer.notice_period_weeks || 4);
+      setValue('job_title', career.job_title || '');
+      setValue('department', emp.department || '');
+      setValue('location', career.location || '');
+      setValue('pay_rate', career.pay_rate || 0);
+      setValue('pay_type', career.pay_type || 'salary');
+      setValue('hours_per_week', career.hours_per_week || 40);
+      setValue('employment_type', career.employment_type || 'permanent');
+      setValue('contract_type', career.contract_type || 'full_time');
+      setValue('start_date', career.start_date?.split('T')[0] || '');
+      setValue('probation_end_date', career.probation_end_date || '');
+      setValue('notice_period_weeks', career.notice_period_weeks || 4);
 
       // Bank details
-      setValue('bank_name', fullEmployee.bank_details?.bank_name || '');
-      setValue('account_holder_name', fullEmployee.bank_details?.account_holder_name || '');
-      setValue('account_number', fullEmployee.bank_details?.account_number || '');
-      setValue('sort_code', fullEmployee.bank_details?.sort_code || '');
+      setValue('bank_name', emp.bank_details?.bank_name || '');
+      setValue('account_holder_name', emp.bank_details?.account_holder_name || '');
+      setValue('account_number', emp.bank_details?.account_number || '');
+      setValue('sort_code', emp.bank_details?.sort_code || '');
     }
   }, [isEditMode, fullEmployee, currentCareer, setValue]);
 

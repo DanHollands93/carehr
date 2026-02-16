@@ -23,16 +23,7 @@ interface BulkRoleRule {
   position: string;
   permission_group_id: string;
   created_at: string;
-  permission_groups: PermissionGroup[];
-}
-
-// Raw interface from Supabase (before transformation)
-interface RawBulkRoleRule {
-  id: string;
-  position: string;
-  permission_group_id: string;
-  created_at: string;
-  permission_groups: PermissionGroup[];
+  permission_groups: PermissionGroup | PermissionGroup[];
 }
 
 const BulkRoleManager = () => {
@@ -119,16 +110,7 @@ const BulkRoleManager = () => {
         });
       } else {
         console.log('Loaded bulk rules:', data);
-        
-        // Transform the raw data to handle permission_groups as array
-        const transformedData: BulkRoleRule[] = (data as RawBulkRoleRule[])?.map(rule => ({
-          ...rule,
-          permission_groups: Array.isArray(rule.permission_groups) 
-            ? rule.permission_groups 
-            : [rule.permission_groups]
-        })) || [];
-        
-        setBulkRules(transformedData);
+        setBulkRules((data as any[]) || []);
       }
     } catch (error) {
       console.error('Exception loading bulk rules:', error);
@@ -322,8 +304,8 @@ const BulkRoleManager = () => {
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm text-muted-foreground">automatically gets assigned</span>
-                        {rule.permission_groups.map((group, index) => (
-                          <Badge key={index} variant="secondary">{group.name}</Badge>
+                        {(Array.isArray(rule.permission_groups) ? rule.permission_groups : [rule.permission_groups]).map((group: any, index: number) => (
+                          <Badge key={index} variant="secondary">{group?.name || 'Unknown'}</Badge>
                         ))}
                       </div>
                     </div>

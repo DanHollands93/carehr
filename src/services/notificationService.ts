@@ -120,9 +120,8 @@ export const notificationService = {
       return [];
     }
 
-    return data || [];
+    return (data as any[]) || [];
   },
-
   // Helper function to send holiday approval notification
   sendHolidayApprovalNotification: async (
     userId: string,

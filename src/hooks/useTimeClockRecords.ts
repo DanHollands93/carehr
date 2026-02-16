@@ -160,10 +160,10 @@ export const useTimeClockRecords = () => {
       
       if (error) throw error;
       
-      return (shifts || []).map(shift => ({
+      return (shifts || []).map((shift: any) => ({
         ...shift,
         time_record: shift.time_clock_records?.[0] || null
-      })) as ShiftWithRecord[];
+      })) as any[];
     },
     enabled: !!employeeProfile?.employee_id
   });

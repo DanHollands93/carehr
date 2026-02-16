@@ -34,7 +34,7 @@ export const processService = {
       throw error;
     }
 
-    return (data || []).map(set => ({
+    return (data || []).map((set: any) => ({
       id: set.id,
       name: set.name,
       description: set.description,
@@ -91,8 +91,8 @@ export const processService = {
       .insert({
         name: menuSet.name,
         description: menuSet.description,
-        items: menuSet.items
-      })
+        items: menuSet.items as any
+      } as any)
       .select()
       .single();
 
@@ -102,10 +102,10 @@ export const processService = {
     }
 
     return {
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      items: Array.isArray(data.items) ? data.items : []
+      id: (data as any).id,
+      name: (data as any).name,
+      description: (data as any).description,
+      items: Array.isArray((data as any).items) ? (data as any).items : []
     };
   },
 

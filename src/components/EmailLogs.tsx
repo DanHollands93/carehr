@@ -13,14 +13,11 @@ import { usePermissions } from "@/hooks/usePermissions";
 
 interface EmailLog {
   id: string;
-  recipient_email: string;
+  recipient: string;
   subject: string;
-  email_type: string;
+  body: string | null;
   status: string;
   sent_at: string;
-  sender_user_id: string | null;
-  email_service: string;
-  external_id: string | null;
   error_message: string | null;
   created_at: string;
 }
@@ -132,17 +129,13 @@ const EmailLogs = () => {
 
   const filteredLogs = emailLogs.filter(log => {
     const matchesSearch = !searchTerm || 
-      log.recipient_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.recipient.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.subject.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter;
-    const matchesType = typeFilter === 'all' || log.email_type === typeFilter;
     
-    return matchesSearch && matchesStatus && matchesType;
+    return matchesSearch && matchesStatus;
   });
-
-  // Get unique email types for filter
-  const emailTypes = [...new Set(emailLogs.map(log => log.email_type))];
 
   return (
     <div className="space-y-6">
@@ -182,19 +175,6 @@ const EmailLogs = () => {
                 </SelectContent>
               </Select>
               
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {emailTypes.map(type => (
-                    <SelectItem key={type} value={type}>
-                      {type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               
               <Button
                 variant="outline"
@@ -247,7 +227,7 @@ const EmailLogs = () => {
                         </div>
                       </TableCell>
                       <TableCell className="font-medium">
-                        {log.recipient_email}
+                        {log.recipient}
                       </TableCell>
                       <TableCell>
                         <div className="max-w-xs truncate" title={log.subject}>
@@ -255,13 +235,11 @@ const EmailLogs = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
-                          {log.email_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </Badge>
+                        <Badge variant="outline">Email</Badge>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
-                          {log.email_service}
+                          System
                         </span>
                       </TableCell>
                       <TableCell>

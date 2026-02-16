@@ -67,12 +67,24 @@ const Employees = () => {
     queryKey: ['employee-positions'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('current_employee_positions')
+        .from('employees')
         .select('*')
         .order('first_name');
       
       if (error) throw error;
-      return data as EmployeePosition[];
+      // Map employees to EmployeePosition format
+      return (data || []).map((emp: any) => ({
+        employee_id: emp.id,
+        first_name: emp.first_name,
+        last_name: emp.last_name,
+        email: emp.email,
+        department: emp.department || '',
+        phone_number: emp.phone_number,
+        hire_date: emp.hire_date,
+        job_title: emp.job_title || '',
+        location: emp.location || '',
+        employment_type: emp.employment_type
+      })) as EmployeePosition[];
     }
   });
 

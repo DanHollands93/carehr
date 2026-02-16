@@ -95,8 +95,8 @@ const TemplateDeployment = ({
       const endDate = format(addDays(startDate, periodDays - 1), 'yyyy-MM-dd');
 
       // Create shifts for the period
-      const shiftsToCreate = templateAssignments.map(assignment => {
-        const shiftDate = format(addDays(startDate, assignment.day_of_period), 'yyyy-MM-dd');
+      const shiftsToCreate = templateAssignments.map((assignment: any) => {
+        const shiftDate = format(addDays(startDate, assignment.day_of_period || 0), 'yyyy-MM-dd');
         const shiftTemplate = shiftTemplates?.find(st => st.id === assignment.shift_template_id);
         
         return {
@@ -145,6 +145,7 @@ const TemplateDeployment = ({
         .from('applied_roster_templates')
         .insert([{
           roster_template_id: templateId,
+          applied_date: format(startDate, 'yyyy-MM-dd'),
           start_date: format(startDate, 'yyyy-MM-dd'),
           end_date: endDate
         }]);

@@ -126,7 +126,7 @@ export const secureNotificationService = {
       user_id: userId,
       title,
       message,
-      type: template.type,
+      type: template.type as 'success' | 'warning' | 'info',
       category: template.category
     });
   },
@@ -169,7 +169,7 @@ export const secureNotificationService = {
       secureNotificationService.validateTemplateVariables(template.message_template)
     );
 
-    return validTemplates;
+    return validTemplates as any[];
   },
 
   // Helper function to send secure holiday approval notification
