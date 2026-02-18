@@ -2,6 +2,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 import { Navigate } from 'react-router-dom';
 
 interface ProtectedRouteProps {
@@ -17,6 +18,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   const { user, loading, userRole } = useAuth();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const { isImpersonating } = useImpersonation();
 
   if (loading || permissionsLoading) {
     return (
@@ -31,6 +33,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Admins impersonating should still be able to navigate everywhere
+  if (isImpersonating && userRole === 'admin') {
+    return <>{children}</>;
   }
 
   // Check role-based access (legacy support)

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 
 interface Permission {
   id: string;
@@ -26,21 +27,23 @@ interface UserLocationPermission {
 
 export const usePermissions = () => {
   const { user } = useAuth();
+  const impersonation = useImpersonation();
+  const effectiveUserId = impersonation.effectiveUserId ?? user?.id ?? null;
   const [permissions, setPermissions] = useState<UserPermission[]>([]);
   const [locationPermissions, setLocationPermissions] = useState<UserLocationPermission[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
+    if (effectiveUserId) {
       loadUserPermissions();
       loadUserLocationPermissions();
     }
-  }, [user]);
+  }, [effectiveUserId]);
 
   const loadUserPermissions = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
-    console.log('Loading permissions for user:', user.id);
+    console.log('Loading permissions for user:', effectiveUserId);
 
     // Load permissions from role assignments (permission groups)
     const { data: roleData, error: roleError } = await supabase
@@ -65,7 +68,7 @@ export const usePermissions = () => {
           )
         )
       `)
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveUserId)
       .eq('is_active', true);
 
     if (roleError) {
@@ -88,7 +91,7 @@ export const usePermissions = () => {
           category
         )
       `)
-      .eq('user_id', user.id);
+      .eq('user_id', effectiveUserId);
 
     if (directError) {
       console.error('Error loading direct permissions:', directError);
@@ -104,7 +107,7 @@ export const usePermissions = () => {
             if (pgp.permissions) {
               rolePermissions.push({
                 id: `role-${roleAssignment.id}-${pgp.permission_id}`,
-                user_id: user.id,
+                user_id: effectiveUserId,
                 permission_id: pgp.permission_id,
                 location: pgp.location || roleAssignment.location,
                 permission: pgp.permissions
@@ -139,12 +142,12 @@ export const usePermissions = () => {
   };
 
   const loadUserLocationPermissions = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     const { data, error } = await supabase
       .from('user_location_permissions')
       .select('*')
-      .eq('user_id', user.id);
+      .eq('user_id', effectiveUserId);
 
     if (error) {
       console.error('Error loading user location permissions:', error);

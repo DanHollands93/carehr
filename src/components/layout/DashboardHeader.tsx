@@ -6,6 +6,7 @@ import { Menu, User, Bell, LogOut, UserCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
+import ImpersonateUserDialog from "@/components/ImpersonateUserDialog";
 
 interface DashboardHeaderProps {
   isMobileOpen: boolean;
@@ -44,7 +45,8 @@ const DashboardHeader = ({
           <span className="text-secondary">HR</span>
         </h1>
       </div>
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-3">
+        <ImpersonateUserDialog />
         <div className="relative">
           <Button variant="ghost" size="icon" onClick={handleNotificationClick} className="hover:bg-gray-100">
             <Bell className={`h-5 w-5 ${unseenCount > 0 ? 'text-red-600' : 'text-black'}`} />

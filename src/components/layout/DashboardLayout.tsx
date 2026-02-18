@@ -4,6 +4,7 @@ import { Outlet } from "react-router-dom";
 import { useState } from "react";
 import DashboardHeader from "./DashboardHeader";
 import UnifiedSidebar from "./UnifiedSidebar";
+import ImpersonationBanner from "@/components/ImpersonationBanner";
 
 const DashboardLayout = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -16,6 +17,7 @@ const DashboardLayout = () => {
           setIsMobileOpen={setIsMobileOpen} 
         />
         <SidebarInset className="flex-1">
+          <ImpersonationBanner />
           <DashboardHeader 
             isMobileOpen={isMobileOpen} 
             setIsMobileOpen={setIsMobileOpen} 
