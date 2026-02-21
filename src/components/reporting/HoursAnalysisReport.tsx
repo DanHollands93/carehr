@@ -146,7 +146,7 @@ const HoursAnalysisReport = () => {
       // Get employee career history for pay rates
       const { data: careerHistory } = await supabase
         .from('career_history')
-        .select('employee_id, pay_rate, job_title, start_date, end_date')
+        .select('employee_id, pay_rate, job_title, job_role_id, start_date, end_date')
         .in('employee_id', employeeIds)
         .is('end_date', null);
       
@@ -173,10 +173,16 @@ const HoursAnalysisReport = () => {
         // Get time clock record if exists
         const timeRecord = timeRecords?.find(tr => tr.shift_id === shift.id);
         
-        // Get pay rate
-        const employeeCareer = careerHistory?.find(ch => ch.employee_id === employee.id);
-        const payRate = employeeCareer?.pay_rate || shift.pay_rate || 0;
-        const jobTitle = employeeCareer?.job_title || 'Unknown';
+        // Get pay rate - match by job_role_id first, then by job_title matching shift position
+        const employeeCareer = careerHistory?.find(ch => 
+          ch.employee_id === employee.id && shift.job_role_id && ch.job_role_id === shift.job_role_id
+        ) || careerHistory?.find(ch => 
+          ch.employee_id === employee.id && ch.job_title === shift.position
+        ) || careerHistory?.find(ch => 
+          ch.employee_id === employee.id
+        );
+        const payRate = shift.pay_rate || employeeCareer?.pay_rate || 0;
+        const jobTitle = shift.position || employeeCareer?.job_title || 'Unknown';
         
         let hasIssue = false;
         let issueType = '';
