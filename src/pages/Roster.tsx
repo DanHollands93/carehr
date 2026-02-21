@@ -627,7 +627,24 @@ const Roster = () => {
         <ShiftCreationPopup
           isOpen={shiftPopup.isOpen}
           onClose={() => setShiftPopup(prev => ({ ...prev, isOpen: false }))}
-          onCreateShift={(shiftData) => {
+          onCreateShift={shiftPopup.existingShift ? (shiftData) => {
+            const existingShifts = getShiftsForEmployeeAndDate(shiftPopup.employeeId, shiftPopup.date);
+            if (hasTimeOverlap(shiftData.start_time, shiftData.end_time, existingShifts, shiftPopup.existingShift!.id)) {
+              toast({
+                title: "Time Overlap Error",
+                description: "This shift overlaps with another existing shift. Please choose different times.",
+                variant: "destructive"
+              });
+              return;
+            }
+            deleteShiftMutation.mutate(shiftPopup.existingShift!.id);
+            createShiftMutation.mutate({
+              employeeId: shiftPopup.employeeId,
+              date: shiftPopup.date,
+              shiftData
+            });
+            setShiftPopup(prev => ({ ...prev, isOpen: false }));
+          } : (shiftData) => {
             createShiftMutation.mutate({
               employeeId: shiftPopup.employeeId,
               date: shiftPopup.date,
