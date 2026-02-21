@@ -105,7 +105,7 @@ const TemplateDeployment = ({
           start_time: shiftTemplate?.start_time || '09:00',
           end_time: shiftTemplate?.end_time || '17:00',
           position: shiftTemplate?.position || 'General',
-          job_role_id: '00000000-0000-0000-0000-000000000000',
+          job_role_id: null,
         };
       });
 
