@@ -99,6 +99,10 @@ const Roster = () => {
   });
   const [showTemplates, setShowTemplates] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showAddStaffDialog, setShowAddStaffDialog] = useState(false);
+  const [staffSearchTerm, setStaffSearchTerm] = useState('');
+  const [adHocEmployees, setAdHocEmployees] = useState<Employee[]>([]);
+  const [employeeToRemove, setEmployeeToRemove] = useState<Employee | null>(null);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun (7 days)
@@ -158,8 +162,31 @@ const Roster = () => {
     enabled: !!selectedRosterTemplate?.id
   });
 
-  // Use roster employees
-  const employees = rosterEmployees || [];
+  // Fetch all employees for the "Add Staff" search
+  const { data: allEmployees } = useQuery({
+    queryKey: ['all-employees'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id, first_name, last_name, department')
+        .order('first_name');
+      if (error) throw error;
+      return data as Employee[];
+    },
+    enabled: showAddStaffDialog
+  });
+
+  // Merge roster employees with ad-hoc employees
+  const employees = (() => {
+    const base = rosterEmployees || [];
+    const merged = [...base];
+    adHocEmployees.forEach(emp => {
+      if (!merged.find(e => e.id === emp.id)) {
+        merged.push(emp);
+      }
+    });
+    return merged;
+  })();
 
   // Get all shift templates
   const { data: shiftTemplates } = useQuery({
@@ -175,17 +202,14 @@ const Roster = () => {
     }
   });
 
-  // Get shifts for the selected roster template
+  // Get shifts for the selected roster template + ad-hoc employees
   const { data: shifts } = useQuery({
-    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedRosterTemplate?.id],
+    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedRosterTemplate?.id, adHocEmployees.map(e => e.id).join(',')],
     queryFn: async () => {
       const startDate = format(weekStart, 'yyyy-MM-dd');
       const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
       
-      console.log('Fetching shifts for date range:', startDate, 'to', endDate);
-      console.log('Selected roster template ID:', selectedRosterTemplate?.id);
-      
-      // Get shifts in the date range that match the roster template
+      // Get shifts for the roster template
       let query = supabase
         .from('shifts')
         .select(`
@@ -200,9 +224,14 @@ const Roster = () => {
         .gte('date', startDate)
         .lte('date', endDate);
       
-      // Filter by roster template if selected
       if (selectedRosterTemplate?.id) {
-        query = query.eq('roster_template_id', selectedRosterTemplate.id);
+        // Get shifts for roster template OR for ad-hoc employees
+        const adHocIds = adHocEmployees.map(e => e.id);
+        if (adHocIds.length > 0) {
+          query = query.or(`roster_template_id.eq.${selectedRosterTemplate.id},employee_id.in.(${adHocIds.join(',')})`);
+        } else {
+          query = query.eq('roster_template_id', selectedRosterTemplate.id);
+        }
       }
       
       const { data, error } = await query;
@@ -212,19 +241,15 @@ const Roster = () => {
         throw error;
       }
       
-      console.log('Raw shifts data:', data);
-      
-      // Filter shifts to only include employees assigned to this roster template
+      // Filter shifts to only include employees in our combined list
       const employeeIds = employees.map(emp => emp.id);
       const filteredShifts = data?.filter(shift => employeeIds.includes(shift.employee_id)) || [];
       
-      // Transform the data to include time records
       const result = filteredShifts.map(shift => ({
         ...shift,
         time_record: shift.time_clock_records?.[0] || null
       })) as ShiftWithTimeRecord[];
       
-      console.log('Filtered shifts for template employees:', result);
       return result;
     },
     enabled: !!selectedRosterTemplate?.id && employees.length > 0
@@ -748,6 +773,12 @@ const Roster = () => {
                 <CardTitle>
                   {selectedRosterTemplate.name} Roster
                 </CardTitle>
+                {canEditRoster && (
+                  <Button variant="outline" size="sm" onClick={() => { setStaffSearchTerm(''); setShowAddStaffDialog(true); }}>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Add Staff
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -770,7 +801,19 @@ const Roster = () => {
                         {employees.map((employee) => (
                           <tr key={employee.id} className="border-b">
                             <td className="p-3 font-medium min-w-[160px]">
-                              <div>{employee.first_name} {employee.last_name}</div>
+                              <div className="flex items-center justify-between">
+                                <span>{employee.first_name} {employee.last_name}</span>
+                                {canEditRoster && adHocEmployees.find(e => e.id === employee.id) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                                    onClick={() => setEmployeeToRemove(employee)}
+                                  >
+                                    <UserMinus className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
                             </td>
                             {weekDays.map((day) => {
                               const dayShifts = shifts?.filter(shift => 
@@ -846,6 +889,82 @@ const Roster = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Add Staff Dialog */}
+      <Dialog open={showAddStaffDialog} onOpenChange={setShowAddStaffDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Staff to Roster</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Search employees..."
+                value={staffSearchTerm}
+                onChange={(e) => setStaffSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <ScrollArea className="h-[300px]">
+              <div className="space-y-1">
+                {allEmployees
+                  ?.filter(emp => {
+                    const name = `${emp.first_name} ${emp.last_name}`.toLowerCase();
+                    return name.includes(staffSearchTerm.toLowerCase());
+                  })
+                  .filter(emp => !employees.find(e => e.id === emp.id))
+                  .map(emp => (
+                    <Button
+                      key={emp.id}
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setAdHocEmployees(prev => [...prev, emp]);
+                        setShowAddStaffDialog(false);
+                        toast({ title: `${emp.first_name} ${emp.last_name} added to roster` });
+                      }}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      {emp.first_name} {emp.last_name}
+                      {emp.department && <span className="ml-2 text-muted-foreground text-xs">({emp.department})</span>}
+                    </Button>
+                  ))}
+                {allEmployees?.filter(emp => {
+                  const name = `${emp.first_name} ${emp.last_name}`.toLowerCase();
+                  return name.includes(staffSearchTerm.toLowerCase());
+                }).filter(emp => !employees.find(e => e.id === emp.id)).length === 0 && (
+                  <p className="text-center text-muted-foreground py-4">No employees found</p>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Ad-Hoc Staff Confirmation */}
+      <AlertDialog open={!!employeeToRemove} onOpenChange={(open) => !open && setEmployeeToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove staff from roster?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove {employeeToRemove?.first_name} {employeeToRemove?.last_name} from this week's roster view? This won't delete any existing shifts.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (employeeToRemove) {
+                setAdHocEmployees(prev => prev.filter(e => e.id !== employeeToRemove.id));
+                setEmployeeToRemove(null);
+                toast({ title: 'Staff removed from roster view' });
+              }
+            }}>
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
