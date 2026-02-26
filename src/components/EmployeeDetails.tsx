@@ -1,18 +1,19 @@
 
-import React, { useState } from 'react';
-import { useQuery } from "@tanstack/react-query";
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, User, MapPin, Briefcase } from "lucide-react";
+import { Plus, User, MapPin, Briefcase, Pencil, Save, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import CareerHistoryForm from "@/components/CareerHistoryForm";
 import UserAccountManager from "@/components/UserAccountManager";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 interface EmployeeData {
   id: string;
@@ -51,8 +52,23 @@ interface EmployeeDetailsProps {
 }
 
 const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [showCareerForm, setShowCareerForm] = useState(false);
   const [editingCareerEntry, setEditingCareerEntry] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<Partial<EmployeeData>>({});
+  const [canEdit, setCanEdit] = useState(false);
+
+  // Check edit permission
+  useEffect(() => {
+    const checkPermission = async () => {
+      if (!user) return;
+      const { data } = await supabase.rpc('user_can_edit_employees', { _user_id: user.id });
+      setCanEdit(data || false);
+    };
+    checkPermission();
+  }, [user]);
 
   const { data: employee, isLoading } = useQuery({
     queryKey: ['employee', employeeId],
@@ -86,6 +102,54 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
     enabled: !!employeeId
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (updates: Partial<EmployeeData>) => {
+      const { error } = await supabase
+        .from('employees')
+        .update(updates)
+        .eq('id', employeeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee', employeeId] });
+      queryClient.invalidateQueries({ queryKey: ['employee-positions'] });
+      setIsEditing(false);
+      toast.success('Employee details updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to update employee: ' + error.message);
+    }
+  });
+
+  const startEditing = () => {
+    if (!employee) return;
+    setEditData({
+      first_name: employee.first_name,
+      last_name: employee.last_name,
+      email: employee.email,
+      phone_number: employee.phone_number || '',
+      date_of_birth: employee.date_of_birth || '',
+      department: employee.department || '',
+      hire_date: employee.hire_date || '',
+      national_insurance_number: employee.national_insurance_number || '',
+      tax_code: employee.tax_code || '',
+      right_to_work_status: employee.right_to_work_status || '',
+      passport_number: employee.passport_number || '',
+      visa_expiry: employee.visa_expiry || '',
+      emergency_contact: employee.emergency_contact || {},
+    });
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditData({});
+  };
+
+  const saveChanges = () => {
+    updateMutation.mutate(editData);
+  };
+
   const handleCareerFormSuccess = () => {
     setShowCareerForm(false);
     setEditingCareerEntry(null);
@@ -99,6 +163,17 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
     } catch (error) {
       return 'Invalid date';
     }
+  };
+
+  const updateField = (field: string, value: string) => {
+    setEditData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const updateEmergencyContact = (field: string, value: string) => {
+    setEditData(prev => ({
+      ...prev,
+      emergency_contact: { ...(prev.emergency_contact || {}), [field]: value }
+    }));
   };
 
   if (isLoading) {
@@ -134,8 +209,30 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
         <TabsContent value="personal" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Personal Information</CardTitle>
-              <CardDescription>Employee's personal details and contact information</CardDescription>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Personal Information</CardTitle>
+                  <CardDescription>Employee's personal details and contact information</CardDescription>
+                </div>
+                {canEdit && !isEditing && (
+                  <Button variant="outline" size="sm" onClick={startEditing}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
+                {isEditing && (
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={saveChanges} disabled={updateMutation.isPending}>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={cancelEditing}>
+                      <X className="w-4 h-4 mr-2" />
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="flex items-center space-x-4 mb-6">
@@ -152,61 +249,141 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>First Name</Label>
-                  <Input value={employee.first_name} readOnly />
+                  <Input
+                    value={isEditing ? editData.first_name || '' : employee.first_name}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('first_name', e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Last Name</Label>
-                  <Input value={employee.last_name} readOnly />
+                  <Input
+                    value={isEditing ? editData.last_name || '' : employee.last_name}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('last_name', e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Email</Label>
-                  <Input value={employee.email} readOnly />
+                  <Input
+                    value={isEditing ? editData.email || '' : employee.email}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('email', e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Phone Number</Label>
-                  <Input value={employee.phone_number || 'Not provided'} readOnly />
+                  <Input
+                    value={isEditing ? editData.phone_number || '' : employee.phone_number || 'Not provided'}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('phone_number', e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Date of Birth</Label>
-                  <Input value={formatDate(employee.date_of_birth)} readOnly />
+                  {isEditing ? (
+                    <Input
+                      type="date"
+                      value={editData.date_of_birth || ''}
+                      onChange={(e) => updateField('date_of_birth', e.target.value)}
+                    />
+                  ) : (
+                    <Input value={formatDate(employee.date_of_birth)} readOnly />
+                  )}
                 </div>
                 <div>
                   <Label>Hire Date</Label>
-                  <Input value={formatDate(employee.hire_date)} readOnly />
+                  {isEditing ? (
+                    <Input
+                      type="date"
+                      value={editData.hire_date || ''}
+                      onChange={(e) => updateField('hire_date', e.target.value)}
+                    />
+                  ) : (
+                    <Input value={formatDate(employee.hire_date)} readOnly />
+                  )}
+                </div>
+                <div>
+                  <Label>Department</Label>
+                  <Input
+                    value={isEditing ? editData.department || '' : employee.department || 'Not provided'}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('department', e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>National Insurance Number</Label>
-                  <Input value={employee.national_insurance_number || 'Not provided'} readOnly />
+                  <Input
+                    value={isEditing ? editData.national_insurance_number || '' : employee.national_insurance_number || 'Not provided'}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('national_insurance_number', e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Tax Code</Label>
-                  <Input value={employee.tax_code || 'Not provided'} readOnly />
+                  <Input
+                    value={isEditing ? editData.tax_code || '' : employee.tax_code || 'Not provided'}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('tax_code', e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Right to Work Status</Label>
-                  <Input value={employee.right_to_work_status || 'Not provided'} readOnly />
+                  <Input
+                    value={isEditing ? editData.right_to_work_status || '' : employee.right_to_work_status || 'Not provided'}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('right_to_work_status', e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Passport Number</Label>
-                  <Input value={employee.passport_number || 'Not provided'} readOnly />
+                  <Input
+                    value={isEditing ? editData.passport_number || '' : employee.passport_number || 'Not provided'}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('passport_number', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Visa Expiry</Label>
+                  {isEditing ? (
+                    <Input
+                      type="date"
+                      value={editData.visa_expiry || ''}
+                      onChange={(e) => updateField('visa_expiry', e.target.value)}
+                    />
+                  ) : (
+                    <Input value={employee.visa_expiry || 'Not provided'} readOnly />
+                  )}
                 </div>
               </div>
 
-              {employee.emergency_contact && (
+              {(employee.emergency_contact || isEditing) && (
                 <div className="mt-6">
                   <h3 className="text-lg font-medium mb-4">Emergency Contact</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Contact Name</Label>
-                      <Input value={employee.emergency_contact?.name || 'Not provided'} readOnly />
+                      <Input
+                        value={isEditing ? editData.emergency_contact?.name || '' : employee.emergency_contact?.name || 'Not provided'}
+                        readOnly={!isEditing}
+                        onChange={(e) => updateEmergencyContact('name', e.target.value)}
+                      />
                     </div>
                     <div>
                       <Label>Relationship</Label>
-                      <Input value={employee.emergency_contact?.relationship || 'Not provided'} readOnly />
+                      <Input
+                        value={isEditing ? editData.emergency_contact?.relationship || '' : employee.emergency_contact?.relationship || 'Not provided'}
+                        readOnly={!isEditing}
+                        onChange={(e) => updateEmergencyContact('relationship', e.target.value)}
+                      />
                     </div>
                     <div>
                       <Label>Phone Number</Label>
-                      <Input value={employee.emergency_contact?.phone || 'Not provided'} readOnly />
+                      <Input
+                        value={isEditing ? editData.emergency_contact?.phone || '' : employee.emergency_contact?.phone || 'Not provided'}
+                        readOnly={!isEditing}
+                        onChange={(e) => updateEmergencyContact('phone', e.target.value)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -223,10 +400,12 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                   <CardTitle>Address History</CardTitle>
                   <CardDescription>Employee's address history and current address</CardDescription>
                 </div>
-                <Button size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Address
-                </Button>
+                {canEdit && (
+                  <Button size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Address
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -289,13 +468,15 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                   <CardTitle>Employment History</CardTitle>
                   <CardDescription>Employee's career progression and employment records</CardDescription>
                 </div>
-                <Button size="sm" onClick={() => {
-                  setEditingCareerEntry(null);
-                  setShowCareerForm(true);
-                }}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Position
-                </Button>
+                {canEdit && (
+                  <Button size="sm" onClick={() => {
+                    setEditingCareerEntry(null);
+                    setShowCareerForm(true);
+                  }}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Position
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -337,18 +518,20 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                             <Input value={`${formatDate(entry.start_date)} - ${entry.end_date ? formatDate(entry.end_date) : 'Present'}`} readOnly />
                           </div>
                         </div>
-                        <div className="flex justify-end mt-4 space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingCareerEntry(entry);
-                              setShowCareerForm(true);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                        </div>
+                        {canEdit && (
+                          <div className="flex justify-end mt-4 space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingCareerEntry(entry);
+                                setShowCareerForm(true);
+                              }}
+                            >
+                              Edit
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
