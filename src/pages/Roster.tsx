@@ -101,7 +101,6 @@ const Roster = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showAddStaffDialog, setShowAddStaffDialog] = useState(false);
   const [staffSearchTerm, setStaffSearchTerm] = useState('');
-  const [adHocEmployees, setAdHocEmployees] = useState<Employee[]>([]);
   const [employeeToRemove, setEmployeeToRemove] = useState<Employee | null>(null);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
@@ -176,11 +175,46 @@ const Roster = () => {
     enabled: showAddStaffDialog
   });
 
+  // Get employee IDs from template assignments to identify "core" vs "ad-hoc"
+  const templateEmployeeIds = new Set((rosterEmployees || []).map(e => e.id));
+
+  // Query for ad-hoc employees: those with shifts for this week+template but NOT in template assignments
+  const { data: adHocEmployees } = useQuery({
+    queryKey: ['adhoc-roster-employees', selectedRosterTemplate?.id, format(weekStart, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      if (!selectedRosterTemplate?.id) return [];
+      const startDate = format(weekStart, 'yyyy-MM-dd');
+      const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+      
+      // Find employee IDs that have shifts for this template+week
+      const { data: shiftEmployees, error } = await supabase
+        .from('shifts')
+        .select('employee_id, employees!inner(id, first_name, last_name, department)')
+        .eq('roster_template_id', selectedRosterTemplate.id)
+        .gte('date', startDate)
+        .lte('date', endDate);
+      
+      if (error) throw error;
+      
+      // Filter to only those NOT already in template assignments
+      const uniqueAdHoc = new Map<string, Employee>();
+      shiftEmployees?.forEach(s => {
+        const emp = Array.isArray(s.employees) ? s.employees[0] : s.employees;
+        if (emp && !templateEmployeeIds.has(emp.id) && !uniqueAdHoc.has(emp.id)) {
+          uniqueAdHoc.set(emp.id, emp as Employee);
+        }
+      });
+      
+      return Array.from(uniqueAdHoc.values());
+    },
+    enabled: !!selectedRosterTemplate?.id
+  });
+
   // Merge roster employees with ad-hoc employees
   const employees = (() => {
     const base = rosterEmployees || [];
     const merged = [...base];
-    adHocEmployees.forEach(emp => {
+    (adHocEmployees || []).forEach(emp => {
       if (!merged.find(e => e.id === emp.id)) {
         merged.push(emp);
       }
@@ -202,14 +236,13 @@ const Roster = () => {
     }
   });
 
-  // Get shifts for the selected roster template + ad-hoc employees
+  // Get shifts for the selected roster template
   const { data: shifts } = useQuery({
-    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedRosterTemplate?.id, adHocEmployees.map(e => e.id).join(',')],
+    queryKey: ['shifts', format(weekStart, 'yyyy-MM-dd'), selectedRosterTemplate?.id],
     queryFn: async () => {
       const startDate = format(weekStart, 'yyyy-MM-dd');
       const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
       
-      // Get shifts for the roster template
       let query = supabase
         .from('shifts')
         .select(`
@@ -225,13 +258,7 @@ const Roster = () => {
         .lte('date', endDate);
       
       if (selectedRosterTemplate?.id) {
-        // Get shifts for roster template OR for ad-hoc employees
-        const adHocIds = adHocEmployees.map(e => e.id);
-        if (adHocIds.length > 0) {
-          query = query.or(`roster_template_id.eq.${selectedRosterTemplate.id},employee_id.in.(${adHocIds.join(',')})`);
-        } else {
-          query = query.eq('roster_template_id', selectedRosterTemplate.id);
-        }
+        query = query.eq('roster_template_id', selectedRosterTemplate.id);
       }
       
       const { data, error } = await query;
@@ -241,18 +268,14 @@ const Roster = () => {
         throw error;
       }
       
-      // Filter shifts to only include employees in our combined list
-      const employeeIds = employees.map(emp => emp.id);
-      const filteredShifts = data?.filter(shift => employeeIds.includes(shift.employee_id)) || [];
-      
-      const result = filteredShifts.map(shift => ({
+      const result = (data || []).map(shift => ({
         ...shift,
         time_record: shift.time_clock_records?.[0] || null
       })) as ShiftWithTimeRecord[];
       
       return result;
     },
-    enabled: !!selectedRosterTemplate?.id && employees.length > 0
+    enabled: !!selectedRosterTemplate?.id
   });
 
   // Permission checks
@@ -364,6 +387,65 @@ const Roster = () => {
         description: error.message,
         variant: "destructive" 
       });
+    }
+  });
+
+  // Add ad-hoc staff: create a roster_template_assignment so they persist
+  const addAdHocStaffMutation = useMutation({
+    mutationFn: async (employee: Employee) => {
+      if (!selectedRosterTemplate?.id) throw new Error('No roster template selected');
+      const { error } = await supabase
+        .from('roster_template_assignments')
+        .insert([{
+          roster_template_id: selectedRosterTemplate.id,
+          employee_id: employee.id,
+          day_of_period: -1, // marker for ad-hoc assignment
+        }]);
+      if (error) throw error;
+      return employee;
+    },
+    onSuccess: (employee) => {
+      queryClient.invalidateQueries({ queryKey: ['roster-employees'] });
+      queryClient.invalidateQueries({ queryKey: ['adhoc-roster-employees'] });
+      toast({ title: `${employee.first_name} ${employee.last_name} added to roster` });
+    },
+    onError: (error) => {
+      toast({ title: "Error adding staff", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Remove ad-hoc staff: delete their shifts for this week and their ad-hoc assignment
+  const removeAdHocStaffMutation = useMutation({
+    mutationFn: async (employeeId: string) => {
+      if (!selectedRosterTemplate?.id) throw new Error('No roster template selected');
+      const startDate = format(weekStart, 'yyyy-MM-dd');
+      const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+      
+      // Delete shifts for this employee in this week for this template
+      await supabase
+        .from('shifts')
+        .delete()
+        .eq('employee_id', employeeId)
+        .eq('roster_template_id', selectedRosterTemplate.id)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      // Remove ad-hoc assignment (day_of_period = -1)
+      await supabase
+        .from('roster_template_assignments')
+        .delete()
+        .eq('roster_template_id', selectedRosterTemplate.id)
+        .eq('employee_id', employeeId)
+        .eq('day_of_period', -1);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['roster-employees'] });
+      queryClient.invalidateQueries({ queryKey: ['adhoc-roster-employees'] });
+      toast({ title: 'Staff removed from roster' });
+    },
+    onError: (error) => {
+      toast({ title: "Error removing staff", description: error.message, variant: "destructive" });
     }
   });
 
@@ -803,7 +885,7 @@ const Roster = () => {
                             <td className="p-3 font-medium min-w-[160px]">
                               <div className="flex items-center justify-between">
                                 <span>{employee.first_name} {employee.last_name}</span>
-                                {canEditRoster && adHocEmployees.find(e => e.id === employee.id) && (
+                                {canEditRoster && !templateEmployeeIds.has(employee.id) && (adHocEmployees || []).find(e => e.id === employee.id) && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -920,9 +1002,9 @@ const Roster = () => {
                       variant="ghost"
                       className="w-full justify-start"
                       onClick={() => {
-                        setAdHocEmployees(prev => [...prev, emp]);
+                        // Add a roster_template_assignment so they persist
+                        addAdHocStaffMutation.mutate(emp);
                         setShowAddStaffDialog(false);
-                        toast({ title: `${emp.first_name} ${emp.last_name} added to roster` });
                       }}
                     >
                       <UserPlus className="w-4 h-4 mr-2" />
@@ -948,16 +1030,15 @@ const Roster = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove staff from roster?</AlertDialogTitle>
             <AlertDialogDescription>
-              Remove {employeeToRemove?.first_name} {employeeToRemove?.last_name} from this week's roster view? This won't delete any existing shifts.
+              Remove {employeeToRemove?.first_name} {employeeToRemove?.last_name} from this roster? This will also delete their shifts for this week.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               if (employeeToRemove) {
-                setAdHocEmployees(prev => prev.filter(e => e.id !== employeeToRemove.id));
+                removeAdHocStaffMutation.mutate(employeeToRemove.id);
                 setEmployeeToRemove(null);
-                toast({ title: 'Staff removed from roster view' });
               }
             }}>
               Remove
