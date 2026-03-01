@@ -48,12 +48,25 @@ const UnifiedSidebar = ({
     if (user?.id) {
       supabase
         .from('profiles')
-        .select('first_name, last_name')
+        .select('first_name, last_name, employee_id')
         .eq('id', user.id)
         .single()
-        .then(({ data }) => {
-          if (data?.first_name || data?.last_name) {
-            setProfileName([data.first_name, data.last_name].filter(Boolean).join(' '));
+        .then(async ({ data }) => {
+          // Try profile name first
+          if (data?.first_name) {
+            setProfileName(data.first_name);
+            return;
+          }
+          // Fall back to linked employee name
+          if (data?.employee_id) {
+            const { data: emp } = await supabase
+              .from('employees')
+              .select('first_name, last_name')
+              .eq('id', data.employee_id)
+              .single();
+            if (emp?.first_name) {
+              setProfileName(emp.first_name);
+            }
           }
         });
     }
@@ -117,15 +130,11 @@ const UnifiedSidebar = ({
 
   const visibleGroups = getVisibleGroups();
 
-  // Get employee name from user data
-  const getEmployeeName = () => {
-    if (profileName) return profileName;
-    if (user?.user_metadata?.first_name && user?.user_metadata?.last_name) {
-      return `${user.user_metadata.first_name} ${user.user_metadata.last_name}`;
-    }
-    if (user?.user_metadata?.first_name) {
-      return user.user_metadata.first_name;
-    }
+  const getDisplayGreeting = () => {
+    const firstName = profileName 
+      || user?.user_metadata?.first_name 
+      || null;
+    if (firstName) return `Hey 👋, ${firstName}`;
     return user?.email || 'Employee';
   };
 
@@ -138,7 +147,7 @@ const UnifiedSidebar = ({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">
-              {getEmployeeName()}
+              {getDisplayGreeting()}
             </p>
           </div>
         </div>
