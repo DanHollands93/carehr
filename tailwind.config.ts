@@ -64,16 +64,16 @@ export default {
     				ring: 'hsl(var(--sidebar-ring))'
     			},
     			hr: {
-    				primary: '#0f172a',
-    				accent: '#8b5cf6',
-    				secondary: '#14b8a6',
-    				light: '#f8fafc',
-    				dark: '#1e293b'
+    				primary: 'hsl(var(--primary))',
+    				accent: 'hsl(var(--accent))',
+    				secondary: 'hsl(var(--secondary))',
+    				light: 'hsl(var(--muted))',
+    				dark: 'hsl(var(--foreground))'
     			}
     		},
     		fontFamily: {
     			sans: [
-    				'DM Sans',
+    				'Inter',
     				'ui-sans-serif',
     				'system-ui',
     				'-apple-system',
@@ -82,28 +82,7 @@ export default {
     				'Roboto',
     				'Helvetica Neue',
     				'Arial',
-    				'Noto Sans',
     				'sans-serif'
-    			],
-    			serif: [
-    				'Crimson Pro',
-    				'ui-serif',
-    				'Georgia',
-    				'Cambria',
-    				'Times New Roman',
-    				'Times',
-    				'serif'
-    			],
-    			mono: [
-    				'SF Mono',
-    				'ui-monospace',
-    				'SFMono-Regular',
-    				'Menlo',
-    				'Monaco',
-    				'Consolas',
-    				'Liberation Mono',
-    				'Courier New',
-    				'monospace'
     			]
     		},
     		borderRadius: {
