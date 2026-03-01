@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { unifiedMenuConfig } from "@/config/menuConfig";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 const iconMap = {
   Home,
   Calendar,
@@ -41,6 +42,22 @@ const UnifiedSidebar = ({
   const { signOut, user } = useAuth();
   const { hasPermission, loading: permissionsLoading, permissions } = usePermissions();
   const isMobile = useIsMobile();
+  const [profileName, setProfileName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.id) {
+      supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.first_name || data?.last_name) {
+            setProfileName([data.first_name, data.last_name].filter(Boolean).join(' '));
+          }
+        });
+    }
+  }, [user?.id]);
 
   const closeMobileSidebar = () => {
     if (isMobile) {
@@ -102,6 +119,7 @@ const UnifiedSidebar = ({
 
   // Get employee name from user data
   const getEmployeeName = () => {
+    if (profileName) return profileName;
     if (user?.user_metadata?.first_name && user?.user_metadata?.last_name) {
       return `${user.user_metadata.first_name} ${user.user_metadata.last_name}`;
     }
