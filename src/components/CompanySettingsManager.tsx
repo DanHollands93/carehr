@@ -25,7 +25,7 @@ const SETTING_META: Record<string, { label: string; icon: React.ElementType; cat
   allow_shift_swap: { label: "Allow Shift Swapping", icon: ArrowLeftRight, category: "Roster" },
 };
 
-const CompanySettingsManager = () => {
+const CompanySettingsManager = ({ companyId: propCompanyId }: { companyId?: string } = {}) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -41,10 +41,10 @@ const CompanySettingsManager = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !propCompanyId,
   });
 
-  const companyId = profile?.company_id;
+  const companyId = propCompanyId || profile?.company_id;
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["company-settings", companyId],

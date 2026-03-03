@@ -12,10 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Building2, Eye, Globe, Puzzle, Settings, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Building2, Eye, Globe, Puzzle, Settings, UserPlus, Users, Sliders } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
-
+import CompanySettingsManager from "@/components/CompanySettingsManager";
+import LookupListsManager from "@/components/LookupListsManager";
+import EnhancedPermissionsManager from "@/components/EnhancedPermissionsManager";
 const SETTING_DEFINITIONS = [
   { key: "clock_in_geolocation", label: "Require Geolocation on Clock-In", description: "Capture staff GPS location when clocking in", module: "time_attendance" },
   { key: "clock_in_photo", label: "Require Photo on Clock-In", description: "Take a photo of staff when clocking in", module: "time_attendance" },
@@ -190,6 +192,7 @@ const PlatformCompanyDetail = () => {
           <TabsTrigger value="details"><Building2 className="w-4 h-4 mr-1" />Details</TabsTrigger>
           <TabsTrigger value="modules"><Puzzle className="w-4 h-4 mr-1" />Modules</TabsTrigger>
           <TabsTrigger value="settings"><Settings className="w-4 h-4 mr-1" />Feature Settings</TabsTrigger>
+          <TabsTrigger value="system-settings"><Sliders className="w-4 h-4 mr-1" />System Settings</TabsTrigger>
           <TabsTrigger value="users"><Users className="w-4 h-4 mr-1" />Users</TabsTrigger>
         </TabsList>
 
@@ -267,6 +270,28 @@ const PlatformCompanyDetail = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="system-settings">
+          <Tabs defaultValue="company" className="space-y-4">
+            <TabsList className="flex-wrap">
+              <TabsTrigger value="company">Company</TabsTrigger>
+              <TabsTrigger value="permissions">Permissions</TabsTrigger>
+              <TabsTrigger value="lookups">Lookup Lists</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="company">
+              <CompanySettingsManager companyId={id} />
+            </TabsContent>
+
+            <TabsContent value="permissions">
+              <EnhancedPermissionsManager companyId={id} />
+            </TabsContent>
+
+            <TabsContent value="lookups">
+              <LookupListsManager companyId={id} />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="users">

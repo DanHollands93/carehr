@@ -30,7 +30,7 @@ interface Profile {
   last_name: string | null;
 }
 
-const EnhancedPermissionsManager = () => {
+const EnhancedPermissionsManager = ({ companyId }: { companyId?: string } = {}) => {
   const { toast } = useToast();
   const {
     permissionGroups,
@@ -64,13 +64,18 @@ const EnhancedPermissionsManager = () => {
     loadProfiles();
     loadPermissions();
     loadLocations();
-  }, []);
+  }, [companyId]);
 
   const loadProfiles = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('profiles')
-      .select('id, email, first_name, last_name')
-      .order('email');
+      .select('id, email, first_name, last_name');
+    
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+    
+    const { data, error } = await query.order('email');
     
     if (error) {
       console.error('Error loading profiles:', error);
@@ -80,10 +85,15 @@ const EnhancedPermissionsManager = () => {
   };
 
   const loadPermissions = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('permissions')
-      .select('*')
-      .order('category, name');
+      .select('*');
+    
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+    
+    const { data, error } = await query.order('category, name');
     
     if (error) {
       console.error('Error loading permissions:', error);
@@ -93,12 +103,17 @@ const EnhancedPermissionsManager = () => {
   };
 
   const loadLocations = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('lookup_lists')
       .select('value')
       .eq('category', 'locations')
-      .eq('is_active', true)
-      .order('value');
+      .eq('is_active', true);
+    
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+    
+    const { data, error } = await query.order('value');
     
     if (error) {
       console.error('Error loading locations:', error);
