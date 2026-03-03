@@ -6,6 +6,8 @@ interface ImpersonatedUser {
   email: string;
   firstName: string;
   lastName: string;
+  companyId?: string;
+  companyName?: string;
 }
 
 interface ImpersonationContextType {
@@ -30,18 +32,18 @@ export const ImpersonationProvider: React.FC<{ children: React.ReactNode }> = ({
   const { user, userRole } = useAuth();
   const [impersonatedUser, setImpersonatedUser] = useState<ImpersonatedUser | null>(null);
 
-  const isAdmin = userRole === 'admin';
+  const canImpersonate = userRole === 'admin' || userRole === 'super_admin';
 
   const startImpersonating = useCallback((targetUser: ImpersonatedUser) => {
-    if (!isAdmin) return;
+    if (!canImpersonate) return;
     setImpersonatedUser(targetUser);
-  }, [isAdmin]);
+  }, [canImpersonate]);
 
   const stopImpersonating = useCallback(() => {
     setImpersonatedUser(null);
   }, []);
 
-  const isImpersonating = !!impersonatedUser && isAdmin;
+  const isImpersonating = !!impersonatedUser && canImpersonate;
   const effectiveUserId = isImpersonating ? impersonatedUser.id : (user?.id ?? null);
 
   return (

@@ -286,6 +286,7 @@ export type Database = {
           name: string
           settings: Json
           slug: string
+          subdomain: string | null
           updated_at: string
         }
         Insert: {
@@ -295,6 +296,7 @@ export type Database = {
           name: string
           settings?: Json
           slug: string
+          subdomain?: string | null
           updated_at?: string
         }
         Update: {
@@ -304,6 +306,7 @@ export type Database = {
           name?: string
           settings?: Json
           slug?: string
+          subdomain?: string | null
           updated_at?: string
         }
         Relationships: []

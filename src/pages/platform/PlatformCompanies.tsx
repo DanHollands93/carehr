@@ -3,23 +3,20 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Building2, Settings, Puzzle, ChevronRight } from "lucide-react";
+import { Plus, Building2, Settings, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import CompanyOnboardingWizard from "@/components/platform/CompanyOnboardingWizard";
+import SuperAdminImpersonation from "@/components/platform/SuperAdminImpersonation";
 
 const PlatformCompanies = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newSlug, setNewSlug] = useState("");
+  const [showWizard, setShowWizard] = useState(false);
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ["platform-companies"],
@@ -50,27 +47,6 @@ const PlatformCompanies = () => {
     },
   });
 
-  const createCompany = useMutation({
-    mutationFn: async () => {
-      const slug = newSlug || newName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-      const { error } = await supabase.from("companies").insert({
-        name: newName,
-        slug,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-companies"] });
-      setCreateOpen(false);
-      setNewName("");
-      setNewSlug("");
-      toast({ title: "Company created", description: "New company has been created successfully." });
-    },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
-  });
-
   const toggleActive = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
       const { error } = await supabase.from("companies").update({ is_active }).eq("id", id);
@@ -81,10 +57,19 @@ const PlatformCompanies = () => {
     },
   });
 
-  const autoSlug = (name: string) => {
-    setNewName(name);
-    setNewSlug(name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""));
-  };
+  if (showWizard) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <CompanyOnboardingWizard
+          onComplete={(companyId) => {
+            setShowWizard(false);
+            navigate(`/platform/companies/${companyId}`);
+          }}
+          onCancel={() => setShowWizard(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -93,35 +78,12 @@ const PlatformCompanies = () => {
           <h2 className="text-3xl font-bold tracking-tight">Companies</h2>
           <p className="text-muted-foreground mt-1">Manage your customer companies and their access</p>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-2" />New Company</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Company</DialogTitle>
-              <DialogDescription>Add a new customer company to the platform.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="company-name">Company Name</Label>
-                <Input id="company-name" value={newName} onChange={(e) => autoSlug(e.target.value)} placeholder="e.g. Sunrise Care Home" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="company-slug">Slug</Label>
-                <Input id="company-slug" value={newSlug} onChange={(e) => setNewSlug(e.target.value)} placeholder="sunrise-care-home" />
-                <p className="text-xs text-muted-foreground">Used in URLs. Auto-generated from name.</p>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-              <Button onClick={() => createCompany.mutate()} disabled={!newName.trim() || createCompany.isPending}>
-                {createCompany.isPending ? "Creating..." : "Create Company"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setShowWizard(true)}>
+          <Plus className="w-4 h-4 mr-2" />New Company
+        </Button>
       </div>
+
+      <SuperAdminImpersonation />
 
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading companies...</div>
@@ -131,7 +93,7 @@ const PlatformCompanies = () => {
             <Building2 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No companies yet</h3>
             <p className="text-muted-foreground mb-4">Create your first company to get started.</p>
-            <Button onClick={() => setCreateOpen(true)}><Plus className="w-4 h-4 mr-2" />Create Company</Button>
+            <Button onClick={() => setShowWizard(true)}><Plus className="w-4 h-4 mr-2" />Create Company</Button>
           </CardContent>
         </Card>
       ) : (
