@@ -4,7 +4,7 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { cn } from "@/lib/utils";
 import { 
   Home, Calendar, User, FileText, Bell, LogOut, Settings, Users, 
-  Clock, CheckCircle, BarChart3, Menu, UserPlus, Mail
+  Clock, CheckCircle, BarChart3, Menu, UserPlus, Mail, Building2
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -27,7 +27,8 @@ const iconMap = {
   BarChart3,
   Menu,
   UserPlus,
-  Mail
+  Mail,
+  Building2
 };
 
 interface UnifiedSidebarProps {
@@ -39,7 +40,7 @@ const UnifiedSidebar = ({
   isMobileOpen,
   setIsMobileOpen
 }: UnifiedSidebarProps) => {
-  const { signOut, user } = useAuth();
+  const { signOut, user, userRole } = useAuth();
   const { hasPermission, loading: permissionsLoading, permissions } = usePermissions();
   const isMobile = useIsMobile();
   const [profileName, setProfileName] = useState<string | null>(null);
@@ -100,6 +101,11 @@ const UnifiedSidebar = ({
     // If no permission required, show to everyone
     if (!item.requiredPermission) {
       return true;
+    }
+
+    // Super admin menu items only for super_admin role
+    if (item.requiredPermission === '__super_admin__') {
+      return userRole === 'super_admin';
     }
     
     // Check if user has the required permission
