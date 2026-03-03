@@ -9,7 +9,9 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompanyModules } from "@/hooks/useCompanyModules";
+import { useActiveCompany } from "@/contexts/ActiveCompanyContext";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { unifiedMenuConfig } from "@/config/menuConfig";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -44,6 +46,7 @@ const UnifiedSidebar = ({
   const { signOut, user, userRole } = useAuth();
   const { hasPermission, loading: permissionsLoading, permissions } = usePermissions();
   const { hasModule } = useCompanyModules();
+  const { activeCompanyId, activeCompanyName, setActiveCompany, companies, isSuperAdmin } = useActiveCompany();
   const isMobile = useIsMobile();
   const [profileName, setProfileName] = useState<string | null>(null);
 
@@ -157,7 +160,33 @@ const UnifiedSidebar = ({
             <p className="text-sm font-medium text-sidebar-foreground truncate">
               {getDisplayGreeting()}
             </p>
-          </div>
+      </div>
+
+      {isSuperAdmin && companies && companies.length > 0 && (
+        <div className="px-4 pb-3 border-b border-sidebar-border">
+          <label className="text-xs font-medium text-sidebar-foreground/60 mb-1 block flex items-center gap-1">
+            <Building2 className="w-3 h-3" /> Viewing Company
+          </label>
+          <Select 
+            value={activeCompanyId || ""} 
+            onValueChange={(val) => {
+              const comp = companies.find(c => c.id === val);
+              setActiveCompany(val, comp?.name || null);
+            }}
+          >
+            <SelectTrigger className="h-8 text-xs bg-sidebar-accent/30 border-sidebar-border">
+              <SelectValue placeholder="Select company..." />
+            </SelectTrigger>
+            <SelectContent>
+              {companies.map((c) => (
+                <SelectItem key={c.id} value={c.id} className="text-xs">
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
         </div>
       </div>
 

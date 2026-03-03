@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ActiveCompanyProvider, useActiveCompany } from "./contexts/ActiveCompanyContext";
 import { ImpersonationProvider } from "./contexts/ImpersonationContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
@@ -36,10 +37,11 @@ import PlatformCompanyDetail from "./pages/platform/PlatformCompanyDetail";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <ImpersonationProvider>
+const AppInner = () => {
+  const { setActiveCompany } = useActiveCompany();
+
+  return (
+    <ImpersonationProvider onCompanyChange={setActiveCompany}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -150,7 +152,16 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
-      </ImpersonationProvider>
+    </ImpersonationProvider>
+  );
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <ActiveCompanyProvider>
+        <AppInner />
+      </ActiveCompanyProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
