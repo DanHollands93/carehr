@@ -173,6 +173,7 @@ interface UnifiedMenuItem {
 
 interface UnifiedMenuGroup {
   label: string;
+  moduleKey?: string; // maps to company_modules.module_key
   items: UnifiedMenuItem[];
 }
 
@@ -190,6 +191,7 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
   },
   {
     label: "Staff Management",
+    moduleKey: "hr",
     items: [
       {
         title: "Employees",
@@ -201,6 +203,7 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
   },
   {
     label: "Roster & Time",
+    moduleKey: "rostering",
     items: [
       {
         title: "Weekly Roster",
@@ -236,6 +239,7 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
   },
   {
     label: "HR & Personal",
+    moduleKey: "hr",
     items: [
       {
         title: "My Holidays",
