@@ -2,33 +2,26 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveCompany } from "@/contexts/ActiveCompanyContext";
 
 export const useCompanyModules = () => {
   const { user, userRole } = useAuth();
+  const { activeCompanyId } = useActiveCompany();
 
   const { data: companyModules, isLoading } = useQuery({
-    queryKey: ["company-modules", user?.id],
+    queryKey: ["company-modules", activeCompanyId],
     queryFn: async () => {
-      // First get the user's company_id from their profile
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", user!.id)
-        .single();
-
-      if (profileError || !profile?.company_id) {
-        return [];
-      }
+      if (!activeCompanyId) return [];
 
       const { data, error } = await supabase
         .from("company_modules")
         .select("module_key, is_enabled")
-        .eq("company_id", profile.company_id);
+        .eq("company_id", activeCompanyId);
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user?.id,
+    enabled: !!activeCompanyId,
   });
 
   const hasModule = (moduleKey: string): boolean => {
