@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCompanyModules } from "@/hooks/useCompanyModules";
 import { Button } from "@/components/ui/button";
 import { unifiedMenuConfig } from "@/config/menuConfig";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -42,6 +43,7 @@ const UnifiedSidebar = ({
 }: UnifiedSidebarProps) => {
   const { signOut, user, userRole } = useAuth();
   const { hasPermission, loading: permissionsLoading, permissions } = usePermissions();
+  const { hasModule } = useCompanyModules();
   const isMobile = useIsMobile();
   const [profileName, setProfileName] = useState<string | null>(null);
 
@@ -119,17 +121,17 @@ const UnifiedSidebar = ({
   };
 
   const getVisibleGroups = () => {    
-    const visibleGroups = unifiedMenuConfig.map(group => ({
-      ...group,
-      items: group.items.filter(isMenuItemVisible)
-    })).filter(group => group.items.length > 0);
-
-    // Special debug for Roster & Time group
-    const rosterGroup = unifiedMenuConfig.find(g => g.label === 'Roster & Time');
-    const visibleRosterGroup = visibleGroups.find(g => g.label === 'Roster & Time');
-    
-    console.log('Original Roster & Time items:', rosterGroup?.items);
-    console.log('Visible Roster & Time items:', visibleRosterGroup?.items);
+    const visibleGroups = unifiedMenuConfig
+      .filter(group => {
+        // If group has a moduleKey, check if the company has that module
+        if (group.moduleKey && !hasModule(group.moduleKey)) return false;
+        return true;
+      })
+      .map(group => ({
+        ...group,
+        items: group.items.filter(isMenuItemVisible)
+      }))
+      .filter(group => group.items.length > 0);
     
     return visibleGroups;
   };
