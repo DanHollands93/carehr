@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Calendar } from "lucide-react";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 
 interface RosterTemplate {
   id: string;
@@ -21,20 +22,23 @@ interface ActiveRosterTemplatesProps {
 }
 
 const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) => {
+  const { companyId } = useUserCompanyId();
+
   const { data: activeTemplates, isLoading } = useQuery({
-    queryKey: ['active-roster-templates'],
+    queryKey: ['active-roster-templates', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('roster_templates')
         .select('*')
         .eq('is_active', true)
         .or('end_date.is.null,end_date.gte.' + new Date().toISOString().split('T')[0])
         .order('name');
-      
+      if (companyId) query = query.eq('company_id', companyId);
+      const { data, error } = await query;
       if (error) throw error;
-      console.log('Active roster templates:', data);
       return data as RosterTemplate[];
-    }
+    },
+    enabled: !!companyId
   });
 
   const getRepeatTypeLabel = (type: string, interval: number) => {

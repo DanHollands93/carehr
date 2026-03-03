@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,6 +34,7 @@ interface LookupItem {
 
 const ShiftTemplates = () => {
   const { userRole } = useAuth();
+  const { companyId } = useUserCompanyId();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -68,31 +70,35 @@ const ShiftTemplates = () => {
 
   // Fetch positions from lookup_lists
   const { data: positions } = useQuery({
-    queryKey: ['lookup-positions'],
+    queryKey: ['lookup-positions', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('lookup_lists')
         .select('*')
         .eq('category', 'positions')
         .eq('is_active', true)
         .order('value');
-      
+      if (companyId) query = query.eq('company_id', companyId);
+      const { data, error } = await query;
       if (error) throw error;
       return data as LookupItem[];
-    }
+    },
+    enabled: !!companyId
   });
 
   const { data: shiftTemplates, isLoading } = useQuery({
-    queryKey: ['shift-templates'],
+    queryKey: ['shift-templates', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('shift_templates')
         .select('*')
         .order('name');
-      
+      if (companyId) query = query.eq('company_id', companyId);
+      const { data, error } = await query;
       if (error) throw error;
       return data as ShiftTemplate[];
-    }
+    },
+    enabled: !!companyId
   });
 
   const createMutation = useMutation({

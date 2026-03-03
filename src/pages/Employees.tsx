@@ -10,6 +10,7 @@ import { Plus, Search, User, Briefcase, MapPin, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import EmployeeForm from "@/components/EmployeeForm";
 import EmployeeDetails from "@/components/EmployeeDetails";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 
 interface Employee {
   id: string;
@@ -58,18 +59,25 @@ interface GroupedEmployee {
 }
 
 const Employees = () => {
+  const { companyId } = useUserCompanyId();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeTab, setActiveTab] = useState("list");
 
   const { data: employeePositions = [], isLoading, refetch } = useQuery({
-    queryKey: ['employee-positions'],
+    queryKey: ['employee-positions', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('employees')
         .select('*')
         .order('first_name');
+      
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       // Map employees to EmployeePosition format
@@ -85,7 +93,8 @@ const Employees = () => {
         location: emp.location || '',
         employment_type: emp.employment_type
       })) as EmployeePosition[];
-    }
+    },
+    enabled: !!companyId
   });
 
   // Group positions by employee and location
