@@ -24,17 +24,23 @@ serve(async (req) => {
       }
     )
 
-    const { email, firstName, lastName, employeeId } = await req.json()
+    const { email, firstName, lastName, employeeId, companyId, role, password } = await req.json()
 
-    // Create user account
-    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
+    // Create user account with optional password
+    const createUserParams: any = {
       email,
       email_confirm: true,
       user_metadata: {
         first_name: firstName,
         last_name: lastName
       }
-    })
+    }
+
+    if (password) {
+      createUserParams.password = password
+    }
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser(createUserParams)
 
     if (userError) {
       console.error('Error creating user:', userError)
@@ -47,21 +53,35 @@ serve(async (req) => {
       )
     }
 
-    // Update the profile to link to the employee
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .update({ employee_id: employeeId })
-      .eq('id', userData.user.id)
+    const userId = userData.user.id
 
-    if (profileError) {
-      console.error('Error linking profile to employee:', profileError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to link profile to employee' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+    // Update the profile with company_id and optional employee link
+    const profileUpdate: any = {}
+    if (companyId) profileUpdate.company_id = companyId
+    if (employeeId) profileUpdate.employee_id = employeeId
+    if (firstName) profileUpdate.first_name = firstName
+    if (lastName) profileUpdate.last_name = lastName
+
+    if (Object.keys(profileUpdate).length > 0) {
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update(profileUpdate)
+        .eq('id', userId)
+
+      if (profileError) {
+        console.error('Error updating profile:', profileError)
+      }
+    }
+
+    // Assign role if specified
+    if (role) {
+      const { error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .insert({ user_id: userId, role })
+
+      if (roleError) {
+        console.error('Error assigning role:', roleError)
+      }
     }
 
     return new Response(

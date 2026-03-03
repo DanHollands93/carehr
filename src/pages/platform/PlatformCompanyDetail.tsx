@@ -9,9 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Building2, Puzzle, Settings, Users } from "lucide-react";
+import { ArrowLeft, Building2, Eye, Globe, Puzzle, Settings, UserPlus, Users } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
 
 const SETTING_DEFINITIONS = [
   { key: "clock_in_geolocation", label: "Require Geolocation on Clock-In", description: "Capture staff GPS location when clocking in", module: "time_attendance" },
@@ -23,6 +26,7 @@ const SETTING_DEFINITIONS = [
 ];
 
 const PlatformCompanyDetail = () => {
+  const { startImpersonating } = useImpersonation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -79,6 +83,13 @@ const PlatformCompanyDetail = () => {
 
   const [editName, setEditName] = useState("");
   const [editSlug, setEditSlug] = useState("");
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserFirstName, setNewUserFirstName] = useState("");
+  const [newUserLastName, setNewUserLastName] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState("admin");
+  const [creatingUser, setCreatingUser] = useState(false);
 
   useEffect(() => {
     if (company) {
@@ -260,9 +271,84 @@ const PlatformCompanyDetail = () => {
 
         <TabsContent value="users">
           <Card>
-            <CardHeader>
-              <CardTitle>Company Users</CardTitle>
-              <CardDescription>Users assigned to this company ({companyUsers?.length || 0})</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Company Users</CardTitle>
+                <CardDescription>Users assigned to this company ({companyUsers?.length || 0})</CardDescription>
+              </div>
+              <Dialog open={createUserOpen} onOpenChange={setCreateUserOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm"><UserPlus className="w-4 h-4 mr-2" /> Add User</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create User for {company.name}</DialogTitle>
+                    <DialogDescription>This user will be assigned to this company automatically.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>First Name</Label>
+                        <Input value={newUserFirstName} onChange={(e) => setNewUserFirstName(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Last Name</Label>
+                        <Input value={newUserLastName} onChange={(e) => setNewUserLastName(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email *</Label>
+                      <Input type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Password *</Label>
+                      <Input type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} placeholder="Min 6 characters" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <Select value={newUserRole} onValueChange={setNewUserRole}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="hr_user">HR User</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCreateUserOpen(false)}>Cancel</Button>
+                    <Button
+                      disabled={!newUserEmail.trim() || newUserPassword.length < 6 || creatingUser}
+                      onClick={async () => {
+                        setCreatingUser(true);
+                        try {
+                          const { error } = await supabase.functions.invoke("create-user-account", {
+                            body: {
+                              email: newUserEmail,
+                              firstName: newUserFirstName,
+                              lastName: newUserLastName,
+                              password: newUserPassword,
+                              companyId: id,
+                              role: newUserRole,
+                            },
+                          });
+                          if (error) throw error;
+                          queryClient.invalidateQueries({ queryKey: ["platform-company-users", id] });
+                          setCreateUserOpen(false);
+                          setNewUserEmail(""); setNewUserFirstName(""); setNewUserLastName(""); setNewUserPassword("");
+                          toast({ title: "User created", description: "User has been assigned to this company." });
+                        } catch (err: any) {
+                          toast({ title: "Error", description: err.message, variant: "destructive" });
+                        } finally {
+                          setCreatingUser(false);
+                        }
+                      }}
+                    >
+                      {creatingUser ? "Creating..." : "Create User"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent>
               {!companyUsers?.length ? (
@@ -275,9 +361,28 @@ const PlatformCompanyDetail = () => {
                         <p className="font-medium">{user.first_name} {user.last_name}</p>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
                       </div>
-                      <Badge variant={user.active ? "default" : "secondary"}>
-                        {user.active ? "Active" : "Inactive"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            startImpersonating({
+                              id: user.id,
+                              email: user.email || "",
+                              firstName: user.first_name || "",
+                              lastName: user.last_name || "",
+                              companyId: id,
+                              companyName: company.name,
+                            });
+                            navigate("/dashboard");
+                          }}
+                        >
+                          <Eye className="w-4 h-4 mr-1" /> Impersonate
+                        </Button>
+                        <Badge variant={user.active ? "default" : "secondary"}>
+                          {user.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
                     </div>
                   ))}
                 </div>
