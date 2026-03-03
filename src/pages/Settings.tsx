@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import LookupListsManager from "@/components/LookupListsManager";
 import EnhancedPermissionsManager from "@/components/EnhancedPermissionsManager";
+import CompanySettingsManager from "@/components/CompanySettingsManager";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -29,8 +30,9 @@ const Settings = () => {
       </div>
       
       <Tabs defaultValue="general">
-        <TabsList className="mb-6">
+        <TabsList className="mb-6 flex-wrap">
           <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="company">Company</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="integration">Integration</TabsTrigger>
@@ -82,6 +84,10 @@ const Settings = () => {
               <Button onClick={handleSaveSettings}>Save Changes</Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="company">
+          <CompanySettingsManager />
         </TabsContent>
 
         <TabsContent value="appearance">
