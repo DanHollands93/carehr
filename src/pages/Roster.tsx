@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDown, UserPlus, UserMinus, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
@@ -73,6 +74,7 @@ interface RosterTemplate {
 const Roster = () => {
   const { userRole } = useAuth();
   const { hasPermission } = usePermissions();
+  const { companyId } = useUserCompanyId();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -163,16 +165,18 @@ const Roster = () => {
 
   // Fetch all employees for the "Add Staff" search
   const { data: allEmployees } = useQuery({
-    queryKey: ['all-employees'],
+    queryKey: ['all-employees', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('employees')
         .select('id, first_name, last_name, department')
         .order('first_name');
+      if (companyId) query = query.eq('company_id', companyId);
+      const { data, error } = await query;
       if (error) throw error;
       return data as Employee[];
     },
-    enabled: showAddStaffDialog
+    enabled: showAddStaffDialog && !!companyId
   });
 
   // Get employee IDs from template assignments to identify "core" vs "ad-hoc"
@@ -224,16 +228,18 @@ const Roster = () => {
 
   // Get all shift templates
   const { data: shiftTemplates } = useQuery({
-    queryKey: ['shift-templates'],
+    queryKey: ['shift-templates', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('shift_templates')
         .select('*')
         .order('position, name');
-      
+      if (companyId) query = query.eq('company_id', companyId);
+      const { data, error } = await query;
       if (error) throw error;
       return data as ShiftTemplate[];
-    }
+    },
+    enabled: !!companyId
   });
 
   // Get shifts for the selected roster template

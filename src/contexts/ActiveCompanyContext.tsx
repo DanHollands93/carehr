@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ActiveCompanyContextType {
@@ -70,10 +70,22 @@ export const ActiveCompanyProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [userProfile?.company_id, companies, activeCompanyId]);
 
+  const queryClient = useQueryClient();
+  const prevCompanyRef = useRef<string | null>(activeCompanyId);
+
   const setActiveCompany = useCallback((companyId: string | null, companyName?: string | null) => {
     setActiveCompanyId(companyId);
     setActiveCompanyName(companyName || null);
   }, []);
+
+  // Clear all query cache when company changes
+  useEffect(() => {
+    if (activeCompanyId && prevCompanyRef.current && activeCompanyId !== prevCompanyRef.current) {
+      queryClient.removeQueries();
+      queryClient.invalidateQueries();
+    }
+    prevCompanyRef.current = activeCompanyId;
+  }, [activeCompanyId, queryClient]);
 
   return (
     <ActiveCompanyContext.Provider value={{

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { Plus, Edit, Trash2, Calendar, Play, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TemplateRosterBuilder from "@/components/TemplateRosterBuilder";
@@ -31,6 +32,7 @@ interface RosterTemplate {
 
 const RosterTemplates = () => {
   const { userRole } = useAuth();
+  const { companyId } = useUserCompanyId();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -47,16 +49,18 @@ const RosterTemplates = () => {
   });
 
   const { data: rosterTemplates, isLoading } = useQuery({
-    queryKey: ['roster-templates'],
+    queryKey: ['roster-templates', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('roster_templates')
         .select('*')
         .order('name');
-      
+      if (companyId) query = query.eq('company_id', companyId);
+      const { data, error } = await query;
       if (error) throw error;
       return data as RosterTemplate[];
-    }
+    },
+    enabled: !!companyId
   });
 
   const createMutation = useMutation({
