@@ -218,7 +218,7 @@ const ShiftTemplates = () => {
     setIsDialogOpen(true);
   };
 
-  const canManageShifts = userRole === 'admin';
+  const canManageShifts = userRole === 'admin' || userRole === 'super_admin';
 
   if (!canManageShifts) {
     return (

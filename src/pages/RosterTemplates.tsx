@@ -196,7 +196,7 @@ const RosterTemplates = () => {
     }
   };
 
-  const canManageRosters = userRole === 'admin';
+  const canManageRosters = userRole === 'admin' || userRole === 'super_admin';
 
   if (!canManageRosters) {
     return (
