@@ -228,6 +228,106 @@ export type Database = {
           },
         ]
       }
+      companies: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          settings: Json
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          settings?: Json
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          settings?: Json
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_modules: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          module_key: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          module_key: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          module_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_modules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_settings: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_logs: {
         Row: {
           body: string | null
@@ -601,6 +701,36 @@ export type Database = {
         }
         Relationships: []
       }
+      modules: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_available: boolean
+          key: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_available?: boolean
+          key: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_available?: boolean
+          key?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       notification_templates: {
         Row: {
           category: string | null
@@ -829,6 +959,7 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean | null
+          company_id: string | null
           created_at: string
           email: string | null
           employee_id: string | null
@@ -839,6 +970,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          company_id?: string | null
           created_at?: string
           email?: string | null
           employee_id?: string | null
@@ -849,6 +981,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          company_id?: string | null
           created_at?: string
           email?: string | null
           employee_id?: string | null
@@ -858,6 +991,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_employee_id_fkey"
             columns: ["employee_id"]
@@ -1510,6 +1650,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: undefined
       }
+      company_has_module: {
+        Args: { _company_id: string; _module_key: string }
+        Returns: boolean
+      }
       current_user_employee_id: { Args: never; Returns: string }
       get_effective_user_permissions: {
         Args: { p_user_id: string }
@@ -1527,8 +1671,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       user_can_edit_employees: { Args: { _user_id: string }; Returns: boolean }
       user_can_view_employees: { Args: { _user_id: string }; Returns: boolean }
+      user_company_id: { Args: { _user_id: string }; Returns: string }
       user_has_effective_permission: {
         Args: {
           p_location?: string
@@ -1547,7 +1693,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "hr_user"
+      app_role: "admin" | "hr_user" | "super_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1675,7 +1821,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "hr_user"],
+      app_role: ["admin", "hr_user", "super_admin"],
     },
   },
 } as const

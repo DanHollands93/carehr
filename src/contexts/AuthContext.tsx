@@ -9,7 +9,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  userRole: 'admin' | 'hr_user' | null;
+  userRole: 'admin' | 'hr_user' | 'super_admin' | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<'admin' | 'hr_user' | null>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'hr_user' | 'super_admin' | null>(null);
 
   const fetchUserRole = async (userId: string) => {
     try {
