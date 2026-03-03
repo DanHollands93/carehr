@@ -49,19 +49,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       secureLog('Fetching user role for userId:', userId);
       
-      // Simple query without complex error handling
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId)
-        .limit(1);
+        .eq('user_id', userId);
       
       if (error) {
         secureError('Error fetching user role:', error);
         return null;
       }
       
-      const role = data?.[0]?.role || null;
+      // Prioritize: super_admin > admin > hr_user
+      const roles = data?.map(r => r.role) || [];
+      const role = roles.includes('super_admin') ? 'super_admin' 
+                 : roles.includes('admin') ? 'admin' 
+                 : roles[0] || null;
       secureLog('User role fetched:', role);
       return role;
     } catch (error) {
