@@ -7,7 +7,7 @@ import { Navigate } from 'react-router-dom';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'hr_user';
+  requiredRole?: 'admin' | 'hr_user' | 'super_admin';
   requiredPermission?: string;
 }
 
