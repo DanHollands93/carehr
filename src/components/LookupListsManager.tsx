@@ -30,21 +30,25 @@ const LOOKUP_CATEGORIES = [
   { key: 'positions', label: 'Positions', description: 'Job positions for shifts and roles' }
 ];
 
-const LookupListsManager = () => {
+const LookupListsManager = ({ companyId }: { companyId?: string } = {}) => {
   const [selectedCategory, setSelectedCategory] = useState(LOOKUP_CATEGORIES[0].key);
   const [newValue, setNewValue] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: lookupItems = [], isLoading } = useQuery({
-    queryKey: ['lookup-items', selectedCategory],
+    queryKey: ['lookup-items', selectedCategory, companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('lookup_lists')
         .select('*')
-        .eq('category', selectedCategory)
-        .order('value');
+        .eq('category', selectedCategory);
       
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+      
+      const { data, error } = await query.order('value');
       if (error) throw error;
       return data as LookupList[];
     }
@@ -52,15 +56,17 @@ const LookupListsManager = () => {
 
   const addItemMutation = useMutation({
     mutationFn: async (value: string) => {
+      const insertData: any = { category: selectedCategory, value: value.trim(), is_active: true };
+      if (companyId) insertData.company_id = companyId;
       const { data, error } = await supabase
         .from('lookup_lists')
-        .insert([{ category: selectedCategory, value: value.trim(), is_active: true }]);
+        .insert([insertData]);
       
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lookup-items', selectedCategory] });
+      queryClient.invalidateQueries({ queryKey: ['lookup-items', selectedCategory, companyId] });
       // Also invalidate positions query used by shift templates
       if (selectedCategory === 'positions') {
         queryClient.invalidateQueries({ queryKey: ['lookup-positions'] });
@@ -91,7 +97,7 @@ const LookupListsManager = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lookup-items', selectedCategory] });
+      queryClient.invalidateQueries({ queryKey: ['lookup-items', selectedCategory, companyId] });
       // Also invalidate positions query used by shift templates
       if (selectedCategory === 'positions') {
         queryClient.invalidateQueries({ queryKey: ['lookup-positions'] });
