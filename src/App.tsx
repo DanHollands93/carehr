@@ -31,6 +31,8 @@ import HolidayApprovals from "./pages/HolidayApprovals";
 import EmailLogs from "./pages/EmailLogs";
 import StaffShifts from "./pages/StaffShifts";
 import TimeDiscrepancyManager from "./components/TimeDiscrepancyManager";
+import PlatformCompanies from "./pages/platform/PlatformCompanies";
+import PlatformCompanyDetail from "./pages/platform/PlatformCompanyDetail";
 
 const queryClient = new QueryClient();
 
@@ -128,6 +130,18 @@ const App = () => (
               <Route path="admin/email-logs" element={
                 <ProtectedRoute requiredPermission="view_email_logs">
                   <EmailLogs />
+                </ProtectedRoute>
+              } />
+              
+              {/* Platform Super Admin Routes */}
+              <Route path="platform/companies" element={
+                <ProtectedRoute requiredRole="super_admin">
+                  <PlatformCompanies />
+                </ProtectedRoute>
+              } />
+              <Route path="platform/companies/:id" element={
+                <ProtectedRoute requiredRole="super_admin">
+                  <PlatformCompanyDetail />
                 </ProtectedRoute>
               } />
             </Route>

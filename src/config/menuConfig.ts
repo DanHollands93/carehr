@@ -305,5 +305,16 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
         requiredPermission: "view_email_logs"
       }
     ]
+  },
+  {
+    label: "Platform",
+    items: [
+      {
+        title: "Companies",
+        path: "/platform/companies",
+        icon: "Building2",
+        requiredPermission: "__super_admin__"
+      }
+    ]
   }
 ];

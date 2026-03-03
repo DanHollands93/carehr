@@ -41,24 +41,25 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Check role-based access (legacy support)
-  if (requiredRole && userRole !== requiredRole) {
+  // Super admins can access everything
+  if (requiredRole && userRole !== requiredRole && userRole !== 'super_admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-          <p className="text-gray-600">You don't have permission to access this page.</p>
+          <h1 className="text-2xl font-bold text-destructive mb-4">Access Denied</h1>
+          <p className="text-muted-foreground">You don't have permission to access this page.</p>
         </div>
       </div>
     );
   }
 
-  // Check permission-based access
-  if (requiredPermission && !hasPermission(requiredPermission)) {
+  // Check permission-based access (super admins bypass)
+  if (requiredPermission && userRole !== 'super_admin' && !hasPermission(requiredPermission)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-          <p className="text-gray-600">You don't have the required permissions to access this page.</p>
+          <h1 className="text-2xl font-bold text-destructive mb-4">Access Denied</h1>
+          <p className="text-muted-foreground">You don't have the required permissions to access this page.</p>
         </div>
       </div>
     );
