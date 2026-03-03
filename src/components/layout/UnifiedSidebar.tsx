@@ -197,8 +197,8 @@ const UnifiedSidebar = ({
 
       <div className="p-4 border-t border-sidebar-border">
         <Button
-          variant="outline"
-          className="w-full justify-start border-sidebar-foreground/30 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          variant="ghost"
+          className="w-full justify-start bg-sidebar-accent/50 text-sidebar-foreground border border-sidebar-foreground/20 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           onClick={handleSignOut}
         >
           <LogOut className="w-4 h-4 mr-2" />
