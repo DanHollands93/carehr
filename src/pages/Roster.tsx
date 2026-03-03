@@ -285,8 +285,8 @@ const Roster = () => {
   });
 
   // Permission checks
-  const canViewRoster = hasPermission('view_roster') || hasPermission('edit_roster');
-  const canEditRoster = hasPermission('edit_roster');
+  const canViewRoster = userRole === 'super_admin' || hasPermission('view_roster') || hasPermission('edit_roster');
+  const canEditRoster = userRole === 'super_admin' || hasPermission('edit_roster');
 
   // Helper function to check for time overlaps
   const hasTimeOverlap = (newStart: string, newEnd: string, existingShifts: Shift[], excludeShiftId?: string) => {
