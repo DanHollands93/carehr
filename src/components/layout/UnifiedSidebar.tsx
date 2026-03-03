@@ -140,13 +140,13 @@ const UnifiedSidebar = ({
 
   const sidebarContent = (
     <>
-      <div className="p-4 border-b">
+      <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <User className="w-4 h-4 text-primary-foreground" />
+          <div className="w-8 h-8 bg-sidebar-accent rounded-full flex items-center justify-center">
+            <User className="w-4 h-4 text-sidebar-accent-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
+            <p className="text-sm font-medium text-sidebar-foreground truncate">
               {getDisplayGreeting()}
             </p>
           </div>
@@ -155,7 +155,7 @@ const UnifiedSidebar = ({
 
       <div className="flex-1 overflow-y-auto">
         {permissionsLoading ? (
-          <div className="p-4 text-center text-muted-foreground">
+          <div className="p-4 text-center text-sidebar-foreground/70">
             Loading menu...
           </div>
         ) : (
@@ -174,10 +174,10 @@ const UnifiedSidebar = ({
                             onClick={closeMobileSidebar} 
                             className={({ isActive }) => 
                               cn(
-                                "flex items-center gap-3 w-full transition-colors",
+                                "flex items-center gap-3 w-full transition-colors text-sidebar-foreground",
                                 isActive 
-                                  ? "bg-muted text-foreground font-semibold" 
-                                  : "hover:bg-secondary hover:bg-opacity-20"
+                                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold" 
+                                  : "hover:bg-sidebar-accent/50"
                               )
                             }
                           >
@@ -195,10 +195,10 @@ const UnifiedSidebar = ({
         )}
       </div>
 
-      <div className="p-4 border-t">
+      <div className="p-4 border-t border-sidebar-border">
         <Button
           variant="outline"
-          className="w-full justify-start"
+          className="w-full justify-start border-sidebar-foreground/30 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           onClick={handleSignOut}
         >
           <LogOut className="w-4 h-4 mr-2" />
