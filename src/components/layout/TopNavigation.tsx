@@ -77,6 +77,7 @@ const TopNavigation = () => {
   const isMenuItemVisible = (item: any) => {
     if (!item.requiredPermission) return true;
     if (item.requiredPermission === '__super_admin__') return userRole === 'super_admin';
+    if (userRole === 'super_admin') return true;
     return hasPermission(item.requiredPermission, item.location);
   };
 
