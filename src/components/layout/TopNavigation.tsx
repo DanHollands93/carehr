@@ -40,6 +40,7 @@ const TopNavigation = () => {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -69,8 +70,8 @@ const TopNavigation = () => {
         setActiveDropdown(null);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
   }, []);
 
   const isMenuItemVisible = (item: any) => {
@@ -325,8 +326,17 @@ const TopNavigation = () => {
                 );
               }
 
-              return (
-                <div key={group.label} className="relative">
+                <div
+                  key={group.label}
+                  className="relative"
+                  onMouseEnter={() => {
+                    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+                    setActiveDropdown(group.label);
+                  }}
+                  onMouseLeave={() => {
+                    closeTimerRef.current = setTimeout(() => setActiveDropdown(null), 150);
+                  }}
+                >
                   <button
                     onClick={() => setActiveDropdown(isOpen ? null : group.label)}
                     className={cn(
@@ -370,7 +380,6 @@ const TopNavigation = () => {
                     </div>
                   )}
                 </div>
-              );
             })}
           </nav>
         )}
