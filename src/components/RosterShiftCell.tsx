@@ -1,0 +1,289 @@
+import React, { useState } from 'react';
+import { format, parseISO } from 'date-fns';
+import { Check, Clock, AlertTriangle, GripVertical } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
+
+interface TimeRecord {
+  id: string;
+  status: string;
+  clock_in_time: string | null;
+  clock_out_time: string | null;
+  discrepancy_type: string | null;
+  approval_status: string | null;
+}
+
+interface ShiftWithTimeRecord {
+  id: string;
+  employee_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  position: string;
+  job_role_id: string;
+  roster_template_id?: string;
+  time_record?: TimeRecord | null;
+}
+
+interface RosterShiftCellProps {
+  shift: ShiftWithTimeRecord;
+  onEdit: () => void;
+  onApproveDiscrepancy?: (recordId: string) => void;
+  canEdit: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
+  shiftTemplateName?: string;
+}
+
+const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
+  shift,
+  onEdit,
+  onApproveDiscrepancy,
+  canEdit,
+  onDragStart,
+  shiftTemplateName,
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Parse time string "HH:mm" to minutes from midnight
+  const timeToMinutes = (time: string): number => {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  // Parse ISO timestamp to minutes from midnight
+  const isoToMinutes = (iso: string): number => {
+    const d = new Date(iso);
+    return d.getHours() * 60 + d.getMinutes();
+  };
+
+  const formatTime = (time: string) => {
+    const [h, m] = time.split(':');
+    return `${h}:${m}`;
+  };
+
+  const formatClockTime = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+  };
+
+  const scheduledStart = timeToMinutes(shift.start_time);
+  const scheduledEnd = timeToMinutes(shift.end_time);
+  const scheduledDuration = scheduledEnd - scheduledStart;
+
+  const tr = shift.time_record;
+  const hasTimeRecord = tr && (tr.clock_in_time || tr.clock_out_time);
+  const isDiscrepancy = tr?.status === 'discrepancy';
+  const isCompleted = tr?.status === 'completed';
+  const isClockedIn = tr?.status === 'clocked_in';
+
+  // Calculate actual clock positions relative to shift window
+  const actualStart = tr?.clock_in_time ? isoToMinutes(tr.clock_in_time) : null;
+  const actualEnd = tr?.clock_out_time ? isoToMinutes(tr.clock_out_time) : null;
+
+  // For the visual bar, we show a window from min(scheduled, actual) to max(scheduled, actual)
+  const windowStart = Math.min(scheduledStart, actualStart ?? scheduledStart);
+  const windowEnd = Math.max(scheduledEnd, actualEnd ?? scheduledEnd);
+  const windowDuration = windowEnd - windowStart || 1;
+
+  // Calculate percentages for the bars
+  const schedBarLeft = ((scheduledStart - windowStart) / windowDuration) * 100;
+  const schedBarWidth = (scheduledDuration / windowDuration) * 100;
+
+  const actualBarLeft = actualStart !== null ? ((actualStart - windowStart) / windowDuration) * 100 : 0;
+  const actualBarWidth = actualStart !== null
+    ? (((actualEnd ?? windowEnd) - actualStart) / windowDuration) * 100
+    : 0;
+
+  // Determine early/late segments for the actual bar
+  const getSegments = () => {
+    if (actualStart === null) return [];
+    const segments: { left: number; width: number; type: 'early' | 'on-time' | 'late' }[] = [];
+    const aEnd = actualEnd ?? windowEnd;
+
+    // Early clock-in (before scheduled start)
+    if (actualStart < scheduledStart) {
+      const earlyEnd = Math.min(scheduledStart, aEnd);
+      segments.push({
+        left: ((actualStart - windowStart) / windowDuration) * 100,
+        width: ((earlyEnd - actualStart) / windowDuration) * 100,
+        type: 'early',
+      });
+    }
+
+    // On-time portion
+    const onTimeStart = Math.max(actualStart, scheduledStart);
+    const onTimeEnd = Math.min(aEnd, scheduledEnd);
+    if (onTimeStart < onTimeEnd) {
+      segments.push({
+        left: ((onTimeStart - windowStart) / windowDuration) * 100,
+        width: ((onTimeEnd - onTimeStart) / windowDuration) * 100,
+        type: 'on-time',
+      });
+    }
+
+    // Late clock-in (started after scheduled start, mark gap as late)
+    if (actualStart > scheduledStart) {
+      segments.push({
+        left: ((scheduledStart - windowStart) / windowDuration) * 100,
+        width: ((Math.min(actualStart, scheduledEnd) - scheduledStart) / windowDuration) * 100,
+        type: 'late',
+      });
+    }
+
+    // Late clock-out (after scheduled end)
+    if (aEnd > scheduledEnd) {
+      segments.push({
+        left: ((scheduledEnd - windowStart) / windowDuration) * 100,
+        width: ((aEnd - scheduledEnd) / windowDuration) * 100,
+        type: 'late',
+      });
+    }
+
+    // Early clock-out (before scheduled end)
+    if (aEnd < scheduledEnd && actualStart !== null) {
+      segments.push({
+        left: ((aEnd - windowStart) / windowDuration) * 100,
+        width: ((scheduledEnd - aEnd) / windowDuration) * 100,
+        type: 'early',
+      });
+    }
+
+    return segments;
+  };
+
+  const statusIcon = () => {
+    if (isDiscrepancy) return <AlertTriangle className="w-3 h-3 text-destructive" />;
+    if (isCompleted) return <Check className="w-3 h-3 text-emerald-600" />;
+    if (isClockedIn) return <Clock className="w-3 h-3 text-amber-500" />;
+    return null;
+  };
+
+  const statusBorderClass = () => {
+    if (isDiscrepancy) return 'border-l-destructive';
+    if (isCompleted) return 'border-l-emerald-500';
+    if (isClockedIn) return 'border-l-amber-400';
+    return 'border-l-primary';
+  };
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={cn(
+              "group relative rounded-md border border-border bg-card p-2 cursor-pointer transition-all duration-150",
+              "border-l-[3px]",
+              statusBorderClass(),
+              isHovered && "shadow-md ring-1 ring-primary/20",
+              canEdit && "hover:shadow-md",
+              isDiscrepancy && "bg-destructive/5"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            draggable={canEdit}
+            onDragStart={onDragStart}
+          >
+            {/* Drag handle */}
+            {canEdit && (
+              <div className="absolute -left-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-60 transition-opacity">
+                <GripVertical className="w-3 h-3 text-muted-foreground" />
+              </div>
+            )}
+
+            {/* Header: position + status */}
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <span className="text-[11px] font-semibold text-foreground truncate leading-tight">
+                {shift.position || shiftTemplateName || 'Shift'}
+              </span>
+              {statusIcon()}
+            </div>
+
+            {/* Time text */}
+            <div className="text-[10px] text-muted-foreground leading-tight mb-1.5">
+              {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
+            </div>
+
+            {/* Visual timeline bar */}
+            <div className="relative h-2.5 bg-muted rounded-full overflow-hidden">
+              {/* Scheduled bar (background) */}
+              <div
+                className="absolute top-0 h-full bg-primary/20 rounded-full"
+                style={{ left: `${schedBarLeft}%`, width: `${schedBarWidth}%` }}
+              />
+
+              {/* Actual time segments */}
+              {hasTimeRecord && getSegments().map((seg, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "absolute top-0 h-full rounded-full",
+                    seg.type === 'on-time' && "bg-emerald-500",
+                    seg.type === 'early' && "bg-amber-400",
+                    seg.type === 'late' && "bg-destructive/70"
+                  )}
+                  style={{ left: `${seg.left}%`, width: `${Math.max(seg.width, 1)}%` }}
+                />
+              ))}
+
+              {/* No clock data indicator */}
+              {!hasTimeRecord && (
+                <div
+                  className="absolute top-0 h-full bg-primary/40 rounded-full"
+                  style={{ left: `${schedBarLeft}%`, width: `${schedBarWidth}%` }}
+                />
+              )}
+            </div>
+
+            {/* Clock times if available */}
+            {hasTimeRecord && (
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[9px] text-muted-foreground">
+                  {tr?.clock_in_time ? `In: ${formatClockTime(tr.clock_in_time)}` : 'No clock in'}
+                </span>
+                <span className="text-[9px] text-muted-foreground">
+                  {tr?.clock_out_time ? `Out: ${formatClockTime(tr.clock_out_time)}` : isClockedIn ? 'Active' : '—'}
+                </span>
+              </div>
+            )}
+
+            {/* Inline approve button for discrepancies */}
+            {isDiscrepancy && canEdit && tr?.approval_status === 'pending' && onApproveDiscrepancy && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full mt-1.5 h-5 text-[9px] border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onApproveDiscrepancy(tr.id);
+                }}
+              >
+                <Check className="w-2.5 h-2.5 mr-1" />
+                Approve
+              </Button>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="space-y-1 text-xs">
+            <p className="font-semibold">{shift.position || 'Shift'}</p>
+            <p>Scheduled: {formatTime(shift.start_time)} – {formatTime(shift.end_time)}</p>
+            {tr?.clock_in_time && <p>Clock In: {formatClockTime(tr.clock_in_time)}</p>}
+            {tr?.clock_out_time && <p>Clock Out: {formatClockTime(tr.clock_out_time)}</p>}
+            {isDiscrepancy && tr?.discrepancy_type && (
+              <p className="text-destructive">
+                Discrepancy: {tr.discrepancy_type.replace(/_/g, ' ')}
+              </p>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
+export default RosterShiftCell;
