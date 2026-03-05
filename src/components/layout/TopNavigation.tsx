@@ -298,7 +298,7 @@ const TopNavigation = () => {
 
         {/* Navigation row: Tab groups with dropdowns */}
         {!permissionsLoading && (
-          <nav className="flex items-center px-6 gap-1 overflow-x-auto scrollbar-hide">
+          <nav className="flex items-center px-6 gap-1 overflow-visible">
             {visibleGroups.map(group => {
               const isSingleItem = group.items.length === 1;
               const active = isGroupActive(group);
