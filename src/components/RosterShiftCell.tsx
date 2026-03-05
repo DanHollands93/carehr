@@ -12,6 +12,9 @@ interface TimeRecord {
   clock_out_time: string | null;
   discrepancy_type: string | null;
   approval_status: string | null;
+  early_minutes_paid?: number | null;
+  late_minutes_paid?: number | null;
+  notes?: string | null;
 }
 
 interface ShiftWithTimeRecord {
@@ -251,20 +254,29 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
               </div>
             )}
 
-            {/* Inline review button for discrepancies */}
-            {isDiscrepancy && canEdit && tr?.approval_status === 'pending' && onReviewDiscrepancy && (
+            {/* Inline review button for discrepancies - show for pending AND reviewed */}
+            {isDiscrepancy && canEdit && onReviewDiscrepancy && (
               <Button
                 size="sm"
                 variant="outline"
-                className="w-full mt-1.5 h-5 text-[9px] border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                className={cn(
+                  "w-full mt-1.5 h-5 text-[9px]",
+                  tr?.approval_status === 'reviewed'
+                    ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                    : "border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
                   onReviewDiscrepancy(shift);
                 }}
               >
                 <AlertTriangle className="w-2.5 h-2.5 mr-1" />
-                Review
+                {tr?.approval_status === 'reviewed' ? 'Reviewed ✓' : 'Review'}
               </Button>
+            )}
+            {/* Show reviewed badge for completed discrepancies without edit permission */}
+            {isDiscrepancy && !canEdit && tr?.approval_status === 'reviewed' && (
+              <div className="text-[9px] text-emerald-600 font-medium mt-1 text-center">Reviewed ✓</div>
             )}
           </div>
         </TooltipTrigger>

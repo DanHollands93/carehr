@@ -122,6 +122,59 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          changed_fields: string[] | null
+          company_id: string | null
+          id: string
+          ip_address: string | null
+          new_data: Json | null
+          notes: string | null
+          old_data: Json | null
+          performed_at: string
+          performed_by: string | null
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_fields?: string[] | null
+          company_id?: string | null
+          id?: string
+          ip_address?: string | null
+          new_data?: Json | null
+          notes?: string | null
+          old_data?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_fields?: string[] | null
+          company_id?: string | null
+          id?: string
+          ip_address?: string | null
+          new_data?: Json | null
+          notes?: string | null
+          old_data?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bulk_position_rules: {
         Row: {
           company_id: string | null
