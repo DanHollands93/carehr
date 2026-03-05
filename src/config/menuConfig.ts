@@ -157,6 +157,11 @@ export const menuConfig: MenuConfig = {
         label: "Email Logs", 
         href: "/admin/email-logs",
         permissions: ["view_email_logs"]
+      },
+      audit_log: {
+        label: "Audit Log",
+        href: "/admin/audit-log",
+        permissions: ["view_audit_log"]
       }
     }
   }
@@ -307,6 +312,12 @@ export const unifiedMenuConfig: UnifiedMenuGroup[] = [
         path: "/admin/email-logs",
         icon: "Mail",
         requiredPermission: "view_email_logs"
+      },
+      {
+        title: "Audit Log",
+        path: "/admin/audit-log",
+        icon: "FileText",
+        requiredPermission: "view_audit_log"
       }
     ]
   },

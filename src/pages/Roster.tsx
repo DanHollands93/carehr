@@ -61,6 +61,9 @@ interface ShiftWithTimeRecord extends Shift {
     clock_out_time: string | null;
     discrepancy_type: string | null;
     approval_status: string | null;
+    early_minutes_paid?: number | null;
+    late_minutes_paid?: number | null;
+    notes?: string | null;
   } | null;
 }
 
@@ -267,7 +270,10 @@ const Roster = () => {
             clock_in_time,
             clock_out_time,
             discrepancy_type,
-            approval_status
+            approval_status,
+            early_minutes_paid,
+            late_minutes_paid,
+            notes
           )
         `)
         .gte('date', startDate)

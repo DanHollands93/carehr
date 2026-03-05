@@ -32,6 +32,7 @@ import HolidayApprovals from "./pages/HolidayApprovals";
 import EmailLogs from "./pages/EmailLogs";
 import StaffShifts from "./pages/StaffShifts";
 import TimeDiscrepancyManager from "./components/TimeDiscrepancyManager";
+import AuditLog from "./pages/AuditLog";
 import PlatformCompanies from "./pages/platform/PlatformCompanies";
 import PlatformCompanyDetail from "./pages/platform/PlatformCompanyDetail";
 
@@ -132,6 +133,11 @@ const AppInner = () => {
               <Route path="admin/email-logs" element={
                 <ProtectedRoute requiredPermission="view_email_logs">
                   <EmailLogs />
+                </ProtectedRoute>
+              } />
+              <Route path="admin/audit-log" element={
+                <ProtectedRoute requiredPermission="view_audit_log">
+                  <AuditLog />
                 </ProtectedRoute>
               } />
               

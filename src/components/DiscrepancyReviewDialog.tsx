@@ -14,6 +14,9 @@ interface TimeRecord {
   clock_out_time: string | null;
   discrepancy_type: string | null;
   approval_status: string | null;
+  early_minutes_paid?: number | null;
+  late_minutes_paid?: number | null;
+  notes?: string | null;
 }
 
 interface ShiftWithTimeRecord {
@@ -95,6 +98,10 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
     const actualStart = isoToMinutes(tr.clock_in_time);
     const actualEnd = tr.clock_out_time ? isoToMinutes(tr.clock_out_time) : scheduledEnd;
 
+    const isReviewed = tr.approval_status === 'reviewed';
+    const earlyPaid = tr.early_minutes_paid || 0;
+    const latePaid = tr.late_minutes_paid || 0;
+
     const segments: DiscrepancySegment[] = [];
 
     // Clocked in early (before scheduled start)
@@ -106,12 +113,12 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         description: `Clocked in ${formatDuration(duration)} before shift started`,
         timeRange: `${minutesToTime(actualStart)} → ${minutesToTime(scheduledStart)}`,
         durationMinutes: duration,
-        paid: false,
+        paid: isReviewed ? earlyPaid >= duration : false,
       });
     }
 
     // Clocked in late (after scheduled start)
-    if (actualStart > scheduledStart + 5) { // 5-min grace
+    if (actualStart > scheduledStart + 5) {
       const duration = actualStart - scheduledStart;
       segments.push({
         type: 'late_start',
@@ -119,12 +126,12 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         description: `Clocked in ${formatDuration(duration)} after shift started`,
         timeRange: `${minutesToTime(scheduledStart)} → ${minutesToTime(actualStart)}`,
         durationMinutes: duration,
-        paid: false,
+        paid: isReviewed ? latePaid >= duration : false,
       });
     }
 
     // Clocked out early (before scheduled end)
-    if (actualEnd < scheduledEnd - 5) { // 5-min grace
+    if (actualEnd < scheduledEnd - 5) {
       const duration = scheduledEnd - actualEnd;
       segments.push({
         type: 'early_end',
@@ -132,7 +139,7 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         description: `Clocked out ${formatDuration(duration)} before shift ended`,
         timeRange: `${minutesToTime(actualEnd)} → ${minutesToTime(scheduledEnd)}`,
         durationMinutes: duration,
-        paid: false,
+        paid: isReviewed ? latePaid >= duration : false,
       });
     }
 
@@ -145,7 +152,7 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         description: `Clocked out ${formatDuration(duration)} after shift ended`,
         timeRange: `${minutesToTime(scheduledEnd)} → ${minutesToTime(actualEnd)}`,
         durationMinutes: duration,
-        paid: false,
+        paid: isReviewed ? earlyPaid >= duration : false,
       });
     }
 
@@ -157,7 +164,7 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
   // Reset when dialog opens with new data
   React.useEffect(() => {
     setSegments(initialSegments);
-    setNotes('');
+    setNotes(tr?.notes || '');
   }, [initialSegments]);
 
   const togglePaid = (index: number) => {
@@ -361,7 +368,7 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
           </Button>
           <Button onClick={handleSubmit} disabled={segments.length === 0}>
             <Check className="w-4 h-4 mr-2" />
-            Approve & Save
+            {tr?.approval_status === 'reviewed' ? 'Update Review' : 'Approve & Save'}
           </Button>
         </DialogFooter>
       </DialogContent>
