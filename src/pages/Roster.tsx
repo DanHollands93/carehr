@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import RosterShiftCell from "@/components/RosterShiftCell";
+import DiscrepancyReviewDialog, { DiscrepancyReviewResult } from "@/components/DiscrepancyReviewDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
 
@@ -107,7 +108,11 @@ const Roster = () => {
   const [showAddStaffDialog, setShowAddStaffDialog] = useState(false);
   const [staffSearchTerm, setStaffSearchTerm] = useState('');
   const [employeeToRemove, setEmployeeToRemove] = useState<Employee | null>(null);
-
+  const [discrepancyReview, setDiscrepancyReview] = useState<{
+    isOpen: boolean;
+    shift: ShiftWithTimeRecord | null;
+    employeeName: string;
+  }>({ isOpen: false, shift: null, employeeName: '' });
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun (7 days)
 
@@ -534,28 +539,40 @@ const Roster = () => {
     }
   };
 
-  // Approve a time clock discrepancy inline (paid or unpaid)
-  const approveDiscrepancyMutation = useMutation({
-    mutationFn: async ({ recordId, payDiscrepancy }: { recordId: string; payDiscrepancy: boolean }) => {
+  // Submit a full discrepancy review with per-segment paid/unpaid decisions
+  const submitDiscrepancyReviewMutation = useMutation({
+    mutationFn: async (result: DiscrepancyReviewResult) => {
+      // Calculate paid/unpaid minutes from segments
+      const earlyMinutesPaid = result.segments
+        .filter(s => (s.type === 'early_start' || s.type === 'late_end') && s.paid)
+        .reduce((sum, s) => sum + s.durationMinutes, 0);
+      const lateMinutesPaid = result.segments
+        .filter(s => (s.type === 'late_start' || s.type === 'early_end') && s.paid)
+        .reduce((sum, s) => sum + s.durationMinutes, 0);
+
       const { error } = await supabase
         .from('time_clock_records')
         .update({
-          approval_status: payDiscrepancy ? 'approved_paid' : 'approved_unpaid',
+          approval_status: 'reviewed',
           status: 'completed',
           approved_by: user?.id,
+          early_minutes_paid: earlyMinutesPaid,
+          late_minutes_paid: lateMinutesPaid,
+          notes: result.notes || null,
           updated_at: new Date().toISOString()
         })
-        .eq('id', recordId);
+        .eq('id', result.recordId);
       
       if (error) throw error;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast({ title: variables.payDiscrepancy ? "Approved — discrepancy will be paid" : "Approved — discrepancy unpaid" });
+      setDiscrepancyReview({ isOpen: false, shift: null, employeeName: '' });
+      toast({ title: "Discrepancy reviewed and approved" });
     },
     onError: (error) => {
       toast({ 
-        title: "Error approving discrepancy", 
+        title: "Error submitting review", 
         description: error.message,
         variant: "destructive" 
       });
@@ -1074,8 +1091,13 @@ const Roster = () => {
                                                 existingShift: shift
                                               });
                                             }}
-                                            onApproveDiscrepancy={(recordId, payDiscrepancy) => {
-                                              approveDiscrepancyMutation.mutate({ recordId, payDiscrepancy });
+                                            onReviewDiscrepancy={(s) => {
+                                              const emp = employees?.find(e => e.id === s.employee_id);
+                                              setDiscrepancyReview({
+                                                isOpen: true,
+                                                shift: s,
+                                                employeeName: emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown',
+                                              });
                                             }}
                                             onDragStart={(e) => {
                                               handleShiftDragStart(shift);
@@ -1122,6 +1144,17 @@ const Roster = () => {
             <p className="text-muted-foreground">Select an active roster above to begin {canEditRoster ? 'managing' : 'viewing'} shifts and staff assignments.</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Discrepancy Review Dialog */}
+      {discrepancyReview.shift && (
+        <DiscrepancyReviewDialog
+          isOpen={discrepancyReview.isOpen}
+          onClose={() => setDiscrepancyReview({ isOpen: false, shift: null, employeeName: '' })}
+          shift={discrepancyReview.shift}
+          employeeName={discrepancyReview.employeeName}
+          onSubmitReview={(result) => submitDiscrepancyReviewMutation.mutate(result)}
+        />
       )}
 
       {/* Add Staff Dialog */}
