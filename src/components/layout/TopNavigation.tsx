@@ -326,6 +326,7 @@ const TopNavigation = () => {
                 );
               }
 
+              return (
                 <div
                   key={group.label}
                   className="relative"
@@ -380,6 +381,7 @@ const TopNavigation = () => {
                     </div>
                   )}
                 </div>
+              );
             })}
           </nav>
         )}
