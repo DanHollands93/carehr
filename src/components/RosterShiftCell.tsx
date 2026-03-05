@@ -29,7 +29,7 @@ interface ShiftWithTimeRecord {
 interface RosterShiftCellProps {
   shift: ShiftWithTimeRecord;
   onEdit: () => void;
-  onApproveDiscrepancy?: (recordId: string) => void;
+  onApproveDiscrepancy?: (recordId: string, payDiscrepancy: boolean) => void;
   canEdit: boolean;
   onDragStart?: (e: React.DragEvent) => void;
   shiftTemplateName?: string;
@@ -251,20 +251,34 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
               </div>
             )}
 
-            {/* Inline approve button for discrepancies */}
+            {/* Inline approve buttons for discrepancies */}
             {isDiscrepancy && canEdit && tr?.approval_status === 'pending' && onApproveDiscrepancy && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full mt-1.5 h-5 text-[9px] border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onApproveDiscrepancy(tr.id);
-                }}
-              >
-                <Check className="w-2.5 h-2.5 mr-1" />
-                Approve
-              </Button>
+              <div className="flex gap-1 mt-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 h-5 text-[9px] border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApproveDiscrepancy(tr.id, true);
+                  }}
+                >
+                  <Check className="w-2.5 h-2.5 mr-0.5" />
+                  Pay
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 h-5 text-[9px] border-border text-muted-foreground hover:bg-muted"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApproveDiscrepancy(tr.id, false);
+                  }}
+                >
+                  <Check className="w-2.5 h-2.5 mr-0.5" />
+                  No Pay
+                </Button>
+              </div>
             )}
           </div>
         </TooltipTrigger>

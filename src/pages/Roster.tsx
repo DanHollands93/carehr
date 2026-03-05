@@ -350,6 +350,7 @@ const Roster = () => {
     }
   });
 
+  // Move a shift to a different employee/date (drag-drop)
   const updateShiftMutation = useMutation({
     mutationFn: async ({ shiftId, employeeId, date }: {
       shiftId: string;
@@ -373,6 +374,45 @@ const Roster = () => {
     onError: (error) => {
       toast({ 
         title: "Error moving shift", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    }
+  });
+
+  // Update shift details in-place (preserves time_clock_records)
+  const updateShiftDetailsMutation = useMutation({
+    mutationFn: async ({ shiftId, shiftData }: {
+      shiftId: string;
+      shiftData: {
+        start_time: string;
+        end_time: string;
+        position: string;
+        job_role_id: string;
+        pay_rate: number;
+      };
+    }) => {
+      const { error } = await supabase
+        .from('shifts')
+        .update({
+          start_time: shiftData.start_time,
+          end_time: shiftData.end_time,
+          position: shiftData.position,
+          job_role_id: shiftData.job_role_id,
+          actual_job_role_id: shiftData.job_role_id,
+          pay_rate: shiftData.pay_rate,
+        })
+        .eq('id', shiftId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast({ title: "Shift updated successfully" });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Error updating shift", 
         description: error.message,
         variant: "destructive" 
       });
@@ -494,13 +534,13 @@ const Roster = () => {
     }
   };
 
-  // Approve a time clock discrepancy inline
+  // Approve a time clock discrepancy inline (paid or unpaid)
   const approveDiscrepancyMutation = useMutation({
-    mutationFn: async (recordId: string) => {
+    mutationFn: async ({ recordId, payDiscrepancy }: { recordId: string; payDiscrepancy: boolean }) => {
       const { error } = await supabase
         .from('time_clock_records')
         .update({
-          approval_status: 'approved',
+          approval_status: payDiscrepancy ? 'approved_paid' : 'approved_unpaid',
           status: 'completed',
           approved_by: user?.id,
           updated_at: new Date().toISOString()
@@ -509,9 +549,9 @@ const Roster = () => {
       
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast({ title: "Discrepancy approved" });
+      toast({ title: variables.payDiscrepancy ? "Approved — discrepancy will be paid" : "Approved — discrepancy unpaid" });
     },
     onError: (error) => {
       toast({ 
@@ -677,10 +717,8 @@ const Roster = () => {
       return;
     }
     
-    deleteShiftMutation.mutate(shiftPopup.existingShift.id);
-    createShiftMutation.mutate({
-      employeeId: shiftPopup.employeeId,
-      date: format(new Date(shiftPopup.date), 'yyyy-MM-dd'),
+    updateShiftDetailsMutation.mutate({
+      shiftId: shiftPopup.existingShift.id,
       shiftData
     });
     setShiftPopup(prev => ({ ...prev, isOpen: false }));
@@ -783,10 +821,8 @@ const Roster = () => {
               });
               return;
             }
-            deleteShiftMutation.mutate(shiftPopup.existingShift!.id);
-            createShiftMutation.mutate({
-              employeeId: shiftPopup.employeeId,
-              date: shiftPopup.date,
+            updateShiftDetailsMutation.mutate({
+              shiftId: shiftPopup.existingShift!.id,
               shiftData
             });
             setShiftPopup(prev => ({ ...prev, isOpen: false }));
@@ -1038,8 +1074,8 @@ const Roster = () => {
                                                 existingShift: shift
                                               });
                                             }}
-                                            onApproveDiscrepancy={(recordId) => {
-                                              approveDiscrepancyMutation.mutate(recordId);
+                                            onApproveDiscrepancy={(recordId, payDiscrepancy) => {
+                                              approveDiscrepancyMutation.mutate({ recordId, payDiscrepancy });
                                             }}
                                             onDragStart={(e) => {
                                               handleShiftDragStart(shift);
