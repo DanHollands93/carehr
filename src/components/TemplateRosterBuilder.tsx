@@ -16,6 +16,7 @@ import StaffSortingDialog from "@/components/StaffSortingDialog";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import RoleSelectionDialog from "@/components/RoleSelectionDialog";
 import RosterSectionManager from "@/components/RosterSectionManager";
+import AllocationLocationManager from "@/components/AllocationLocationManager";
 import { useAllEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
 import { useRosterSections } from "@/hooks/useRosterSections";
 import { useIsMobile } from "@/hooks/use-mobile";
