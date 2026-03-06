@@ -83,6 +83,7 @@ interface RosterTemplate {
   end_date: string | null;
   is_active: boolean;
   category_id?: string;
+  allow_allocations?: boolean;
 }
 
 const Roster = () => {
