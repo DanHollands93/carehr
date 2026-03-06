@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Clock, ArrowLeft, ArrowRight, Loader2, Save, Info } from "lucide-react";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { cn } from "@/lib/utils";
 
 interface SystemSetting {
@@ -63,19 +64,27 @@ const EXCEPTION_RULES: Omit<ExceptionRule, 'minutes' | 'action'>[] = [
 const AutoExceptionsSettings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { companyId } = useUserCompanyId();
 
   const settingKeys = EXCEPTION_RULES.flatMap(r => [r.key, r.actionKey]);
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ['system-settings', 'auto-exceptions'],
+    queryKey: ['system-settings', 'auto-exceptions', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const query = supabase
         .from('system_settings')
         .select('*')
         .in('setting_key', settingKeys);
+      
+      if (companyId) {
+        query.eq('company_id', companyId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as SystemSetting[];
     },
+    enabled: !!companyId,
   });
 
   const getVal = (key: string, fallback: string) => {
