@@ -92,6 +92,7 @@ const ShiftCreationPopup = ({
   existingShift
 }: ShiftCreationPopupProps) => {
   const { toast } = useToast();
+  const { companyId } = useUserCompanyId();
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
