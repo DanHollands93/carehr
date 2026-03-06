@@ -1,6 +1,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 
 interface SystemSetting {
   setting_key: string;
@@ -9,10 +10,12 @@ interface SystemSetting {
 }
 
 export const useTimeClockSettings = () => {
+  const { companyId } = useUserCompanyId();
+
   const { data: settings, isLoading } = useQuery({
-    queryKey: ['system-settings'],
+    queryKey: ['system-settings', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const query = supabase
         .from('system_settings')
         .select('*')
         .in('setting_key', [
@@ -26,9 +29,15 @@ export const useTimeClockSettings = () => {
           'late_clock_out_auto_action'
         ]);
       
+      if (companyId) {
+        query.eq('company_id', companyId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as SystemSetting[];
-    }
+    },
+    enabled: !!companyId,
   });
 
   const getSettingValue = (key: string, defaultValue: number = 15): number => {
