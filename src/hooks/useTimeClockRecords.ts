@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, differenceInMinutes, addDays, startOfDay, endOfDay } from "date-fns";
 
-interface TimeClockRecord {
+export interface TimeClockRecord {
   id: string;
   employee_id: string;
   shift_id: string | null;
@@ -20,6 +20,14 @@ interface TimeClockRecord {
   approved_by: string | null;
   approval_status: 'pending' | 'approved' | 'rejected';
   notes: string | null;
+  clock_in_photo_url: string | null;
+  clock_out_photo_url: string | null;
+  clock_in_latitude: number | null;
+  clock_in_longitude: number | null;
+  clock_in_accuracy: number | null;
+  clock_out_latitude: number | null;
+  clock_out_longitude: number | null;
+  clock_out_accuracy: number | null;
 }
 
 interface ShiftWithRecord {
