@@ -38,22 +38,48 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
   const [addingRuleToSection, setAddingRuleToSection] = useState<string | null>(null);
   const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
 
-  // Fetch job roles filtered by company
+  // Fetch job roles from lookup lists (positions category) and match to job_roles table
   const { data: jobRoles } = useQuery({
     queryKey: ['job-roles-for-sections', companyId],
     queryFn: async () => {
-      let query = supabase
+      // Fetch lookup list positions for this company
+      let lookupQuery = supabase
+        .from('lookup_lists')
+        .select('value')
+        .in('category', ['positions', 'position'])
+        .eq('is_active', true);
+      
+      if (companyId) {
+        lookupQuery = lookupQuery.eq('company_id', companyId);
+      }
+
+      const { data: lookupData, error: lookupError } = await lookupQuery;
+      if (lookupError) throw lookupError;
+
+      // Get unique position names from lookup lists
+      const positionNames = [...new Set((lookupData || []).map(l => l.value))];
+
+      // Now fetch matching job_roles
+      let rolesQuery = supabase
         .from('job_roles')
         .select('id, title, department')
         .order('title');
       
       if (companyId) {
-        query = query.eq('company_id', companyId);
+        rolesQuery = rolesQuery.eq('company_id', companyId);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+      const { data: rolesData, error: rolesError } = await rolesQuery;
+      if (rolesError) throw rolesError;
+
+      // If lookup lists have positions, filter job_roles to only those matching
+      if (positionNames.length > 0) {
+        return (rolesData || []).filter(r => 
+          positionNames.some(p => p.toLowerCase() === r.title.toLowerCase())
+        );
+      }
+
+      return rolesData;
     },
     enabled: !!companyId,
   });
