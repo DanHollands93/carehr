@@ -992,7 +992,7 @@ const TemplateRosterBuilder = ({
                           {group.employeeIds.map((empId) => {
                             const employee = employees.find(e => e.id === empId);
                             if (!employee) return null;
-                            return renderEmployeeRow(employee);
+                            return renderEmployeeRow(employee, group.sectionJobRoleIds);
                           })}
                         </React.Fragment>
                       ));
