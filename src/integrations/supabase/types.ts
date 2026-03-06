@@ -1951,7 +1951,15 @@ export type Database = {
         Row: {
           approval_status: string | null
           approved_by: string | null
+          clock_in_accuracy: number | null
+          clock_in_latitude: number | null
+          clock_in_longitude: number | null
+          clock_in_photo_url: string | null
           clock_in_time: string | null
+          clock_out_accuracy: number | null
+          clock_out_latitude: number | null
+          clock_out_longitude: number | null
+          clock_out_photo_url: string | null
           clock_out_time: string | null
           company_id: string | null
           created_at: string
@@ -1973,7 +1981,15 @@ export type Database = {
         Insert: {
           approval_status?: string | null
           approved_by?: string | null
+          clock_in_accuracy?: number | null
+          clock_in_latitude?: number | null
+          clock_in_longitude?: number | null
+          clock_in_photo_url?: string | null
           clock_in_time?: string | null
+          clock_out_accuracy?: number | null
+          clock_out_latitude?: number | null
+          clock_out_longitude?: number | null
+          clock_out_photo_url?: string | null
           clock_out_time?: string | null
           company_id?: string | null
           created_at?: string
@@ -1995,7 +2011,15 @@ export type Database = {
         Update: {
           approval_status?: string | null
           approved_by?: string | null
+          clock_in_accuracy?: number | null
+          clock_in_latitude?: number | null
+          clock_in_longitude?: number | null
+          clock_in_photo_url?: string | null
           clock_in_time?: string | null
+          clock_out_accuracy?: number | null
+          clock_out_latitude?: number | null
+          clock_out_longitude?: number | null
+          clock_out_photo_url?: string | null
           clock_out_time?: string | null
           company_id?: string | null
           created_at?: string
