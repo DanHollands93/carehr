@@ -13,6 +13,7 @@ import { useCareerHistory } from "@/hooks/useCareerHistory";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { cn } from "@/lib/utils";
 
 interface ShiftTemplate {
