@@ -70,6 +70,68 @@ const AuditLog = () => {
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [selectedLog, setSelectedLog] = useState<any>(null);
 
+  // Generate a human-readable description for audit entries
+  const getActionDescription = (log: any): string | null => {
+    const { table_name, action, changed_fields, new_data, old_data } = log;
+
+    if (table_name === 'time_clock_records') {
+      if (action === 'UPDATE' && changed_fields) {
+        if (changed_fields.includes('approval_status') && new_data?.approval_status === 'reviewed') {
+          if (new_data?.notes?.includes('Auto-approved')) return 'Auto exception applied';
+          return 'Discrepancy reviewed';
+        }
+        if (changed_fields.includes('approval_status') && new_data?.approval_status === 'pending') {
+          return 'Review removed — reset to pending';
+        }
+        if (changed_fields.includes('status') && new_data?.status === 'clocked_in') return 'Clocked in';
+        if (changed_fields.includes('clock_out_time')) return 'Clocked out';
+        if (changed_fields.includes('early_minutes_paid') || changed_fields.includes('late_minutes_paid')) return 'Exception pay updated';
+      }
+      if (action === 'INSERT') return 'Time record created';
+    }
+
+    if (table_name === 'shifts') {
+      if (action === 'INSERT') return 'Shift created';
+      if (action === 'DELETE') return 'Shift removed';
+      if (action === 'UPDATE') {
+        if (changed_fields?.includes('employee_id') || changed_fields?.includes('date')) return 'Shift moved';
+        if (changed_fields?.includes('start_time') || changed_fields?.includes('end_time')) return 'Shift times changed';
+        return 'Shift updated';
+      }
+    }
+
+    if (table_name === 'system_settings') {
+      if (action === 'UPDATE') return `Setting "${new_data?.setting_key}" changed`;
+    }
+
+    if (table_name === 'company_settings') {
+      if (action === 'UPDATE') return `Company setting "${new_data?.setting_key}" changed`;
+    }
+
+    if (table_name === 'holiday_requests') {
+      if (action === 'INSERT') return 'Holiday request submitted';
+      if (action === 'UPDATE' && changed_fields?.includes('status')) return `Holiday ${new_data?.status}`;
+    }
+
+    if (table_name === 'employees') {
+      if (action === 'INSERT') return 'Employee added';
+      if (action === 'DELETE') return 'Employee removed';
+      if (action === 'UPDATE') return 'Employee details updated';
+    }
+
+    if (table_name === 'user_role_assignments' || table_name === 'user_roles') {
+      if (action === 'INSERT') return 'Role assigned';
+      if (action === 'DELETE') return 'Role removed';
+    }
+
+    if (table_name === 'user_permissions') {
+      if (action === 'INSERT') return 'Permission granted';
+      if (action === 'DELETE') return 'Permission revoked';
+    }
+
+    return null;
+  };
+
   const { data, isLoading } = useQuery({
     queryKey: ['audit-logs', companyId, page, tableFilter, actionFilter, search],
     queryFn: async () => {
@@ -111,7 +173,8 @@ const AuditLog = () => {
     const tableName = (TABLE_LABELS[log.table_name] || log.table_name).toLowerCase();
     const userName = log.performer ? `${log.performer.first_name || ''} ${log.performer.last_name || ''}`.toLowerCase() : '';
     const changedFields = (log.changed_fields || []).join(' ').toLowerCase();
-    return tableName.includes(s) || userName.includes(s) || changedFields.includes(s) || log.record_id?.includes(s);
+    const desc = (getActionDescription(log) || '').toLowerCase();
+    return tableName.includes(s) || userName.includes(s) || changedFields.includes(s) || desc.includes(s) || log.record_id?.includes(s);
   }) || [];
 
   const totalPages = Math.ceil((data?.total || 0) / PAGE_SIZE);
@@ -181,6 +244,7 @@ const AuditLog = () => {
                   const userName = log.performer
                     ? `${log.performer.first_name || ''} ${log.performer.last_name || ''}`.trim() || log.performer.email
                     : 'System';
+                  const description = getActionDescription(log);
                   
                   return (
                     <div
@@ -198,11 +262,15 @@ const AuditLog = () => {
                           <span className="text-sm font-medium text-foreground">
                             {TABLE_LABELS[log.table_name] || log.table_name}
                           </span>
-                          {log.changed_fields && log.changed_fields.length > 0 && (
+                          {description ? (
+                            <span className="text-xs text-primary font-medium">
+                              — {description}
+                            </span>
+                          ) : log.changed_fields && log.changed_fields.length > 0 ? (
                             <span className="text-xs text-muted-foreground truncate">
                               ({log.changed_fields.join(', ')})
                             </span>
-                          )}
+                          ) : null}
                         </div>
                         <p className="text-xs text-muted-foreground">
                           by <span className="font-medium">{userName}</span>
