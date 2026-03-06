@@ -75,10 +75,12 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   const scheduledDuration = scheduledEnd - scheduledStart;
 
   const tr = shift.time_record;
-  const hasTimeRecord = tr && (tr.clock_in_time || tr.clock_out_time);
+  const hasClockedData = tr && (tr.clock_in_time || tr.clock_out_time);
+  const hasTimeRecord = !!tr; // time_clock_record exists (even if no clock times)
   const isDiscrepancy = tr?.status === 'discrepancy';
   const isCompleted = tr?.status === 'completed';
   const isClockedIn = tr?.status === 'clocked_in';
+  const isNoShow = tr?.discrepancy_type === 'did_not_clock_in' && !tr?.clock_in_time;
 
   // Calculate actual clock positions relative to shift window
   const actualStart = tr?.clock_in_time ? isoToMinutes(tr.clock_in_time) : null;
@@ -93,16 +95,26 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   const schedBarLeft = ((scheduledStart - windowStart) / windowDuration) * 100;
   const schedBarWidth = (scheduledDuration / windowDuration) * 100;
 
-  const actualBarLeft = actualStart !== null ? ((actualStart - windowStart) / windowDuration) * 100 : 0;
-  const actualBarWidth = actualStart !== null
-    ? (((actualEnd ?? windowEnd) - actualStart) / windowDuration) * 100
-    : 0;
+  // Only show colored segments for shifts with actual discrepancies or clock issues
+  // Don't show red/amber segments for completed/approved shifts with minor variances
+  const shouldShowSegments = hasClockedData && (isDiscrepancy || isClockedIn);
 
   // Determine early/late segments for the actual bar
   const getSegments = () => {
     if (actualStart === null) return [];
+    
     const segments: { left: number; width: number; type: 'early' | 'on-time' | 'late' }[] = [];
     const aEnd = actualEnd ?? windowEnd;
+
+    if (isCompleted && !isDiscrepancy && !tr?.discrepancy_type) {
+      // For completed shifts without discrepancy, show entirely as on-time
+      segments.push({
+        left: ((Math.min(actualStart, scheduledStart) - windowStart) / windowDuration) * 100,
+        width: ((Math.max(aEnd, scheduledEnd) - Math.min(actualStart, scheduledStart)) / windowDuration) * 100,
+        type: 'on-time',
+      });
+      return segments;
+    }
 
     // Early clock-in (before scheduled start)
     if (actualStart < scheduledStart) {
@@ -219,8 +231,16 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
                 style={{ left: `${schedBarLeft}%`, width: `${schedBarWidth}%` }}
               />
 
-              {/* Actual time segments */}
-              {hasTimeRecord && getSegments().map((seg, i) => (
+              {/* No-show: entire shift is missing */}
+              {isNoShow && (
+                <div
+                  className="absolute top-0 h-full bg-destructive/50 rounded-full border border-dashed border-destructive/60"
+                  style={{ left: `${schedBarLeft}%`, width: `${schedBarWidth}%` }}
+                />
+              )}
+
+              {/* Actual time segments (only for shifts with clock data and discrepancies) */}
+              {shouldShowSegments && getSegments().map((seg, i) => (
                 <div
                   key={i}
                   className={cn(
@@ -233,8 +253,17 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
                 />
               ))}
 
-              {/* No clock data indicator */}
-              {!hasTimeRecord && (
+              {/* Completed shifts without discrepancy — show as solid green */}
+              {hasClockedData && isCompleted && !isDiscrepancy && !tr?.discrepancy_type && getSegments().map((seg, i) => (
+                <div
+                  key={i}
+                  className="absolute top-0 h-full rounded-full bg-emerald-500"
+                  style={{ left: `${seg.left}%`, width: `${Math.max(seg.width, 1)}%` }}
+                />
+              ))}
+
+              {/* No clock data and not a no-show — just show scheduled placeholder */}
+              {!hasClockedData && !isNoShow && (
                 <div
                   className="absolute top-0 h-full bg-primary/40 rounded-full"
                   style={{ left: `${schedBarLeft}%`, width: `${schedBarWidth}%` }}
@@ -242,8 +271,13 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
               )}
             </div>
 
-            {/* Clock times if available */}
-            {hasTimeRecord && (
+            {/* Clock times or no-show label */}
+            {isNoShow && (
+              <div className="text-[9px] text-destructive font-medium mt-1 text-center">
+                No clock in
+              </div>
+            )}
+            {hasClockedData && (
               <div className="flex items-center justify-between mt-1">
                 <span className="text-[9px] text-muted-foreground">
                   {tr?.clock_in_time ? `In: ${formatClockTime(tr.clock_in_time)}` : 'No clock in'}

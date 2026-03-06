@@ -91,18 +91,33 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
 
   // Build discrepancy segments
   const initialSegments = useMemo(() => {
-    if (!tr?.clock_in_time) return [];
-    
     const scheduledStart = timeToMinutes(shift.start_time);
     const scheduledEnd = timeToMinutes(shift.end_time);
-    const actualStart = isoToMinutes(tr.clock_in_time);
-    const actualEnd = tr.clock_out_time ? isoToMinutes(tr.clock_out_time) : scheduledEnd;
-
-    const isReviewed = tr.approval_status === 'reviewed';
-    const earlyPaid = tr.early_minutes_paid || 0;
-    const latePaid = tr.late_minutes_paid || 0;
+    const isReviewed = tr?.approval_status === 'reviewed';
+    const earlyPaid = tr?.early_minutes_paid || 0;
+    const latePaid = tr?.late_minutes_paid || 0;
+    const isNoShow = tr?.discrepancy_type === 'did_not_clock_in' && !tr?.clock_in_time;
 
     const segments: DiscrepancySegment[] = [];
+
+    // No-show: entire shift is missing
+    if (isNoShow) {
+      const duration = scheduledEnd - scheduledStart;
+      segments.push({
+        type: 'late_start', // treat as missing time
+        label: 'Did Not Clock In',
+        description: `Employee did not clock in for the entire shift`,
+        timeRange: `${minutesToTime(scheduledStart)} → ${minutesToTime(scheduledEnd)}`,
+        durationMinutes: duration,
+        paid: false,
+      });
+      return segments;
+    }
+
+    if (!tr?.clock_in_time) return [];
+    
+    const actualStart = isoToMinutes(tr.clock_in_time);
+    const actualEnd = tr.clock_out_time ? isoToMinutes(tr.clock_out_time) : scheduledEnd;
 
     // Clocked in early (before scheduled start)
     if (actualStart < scheduledStart) {
@@ -186,6 +201,8 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
 
   const scheduledStart = timeToMinutes(shift.start_time);
   const scheduledEnd = timeToMinutes(shift.end_time);
+  const isNoShow = tr.discrepancy_type === 'did_not_clock_in' && !tr.clock_in_time;
+  const hasClockedData = !!(tr.clock_in_time || tr.clock_out_time);
   const actualStart = tr.clock_in_time ? isoToMinutes(tr.clock_in_time) : scheduledStart;
   const actualEnd = tr.clock_out_time ? isoToMinutes(tr.clock_out_time) : scheduledEnd;
 
@@ -244,48 +261,58 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
                 style={{ left: `${pct(scheduledStart)}%`, width: `${pct(scheduledEnd) - pct(scheduledStart)}%` }}
               />
 
-              {/* Actual on-time block */}
-              <div
-                className="absolute top-5.5 h-3.5 bg-emerald-500/80 rounded"
-                style={{
-                  left: `${pct(Math.max(actualStart, scheduledStart))}%`,
-                  width: `${pct(Math.min(actualEnd, scheduledEnd)) - pct(Math.max(actualStart, scheduledStart))}%`
-                }}
-              />
+              {isNoShow ? (
+                /* No-show: entire shift missing */
+                <div
+                  className="absolute top-5.5 h-3.5 bg-destructive/50 rounded border border-dashed border-destructive/60"
+                  style={{ left: `${pct(scheduledStart)}%`, width: `${pct(scheduledEnd) - pct(scheduledStart)}%` }}
+                />
+              ) : (
+                <>
+                  {/* Actual on-time block */}
+                  <div
+                    className="absolute top-5.5 h-3.5 bg-emerald-500/80 rounded"
+                    style={{
+                      left: `${pct(Math.max(actualStart, scheduledStart))}%`,
+                      width: `${Math.max(pct(Math.min(actualEnd, scheduledEnd)) - pct(Math.max(actualStart, scheduledStart)), 0)}%`
+                    }}
+                  />
 
-              {/* Extra segments */}
-              {actualStart < scheduledStart && (
-                <div
-                  className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-l"
-                  style={{ left: `${pct(actualStart)}%`, width: `${pct(scheduledStart) - pct(actualStart)}%` }}
-                />
-              )}
-              {actualEnd > scheduledEnd && (
-                <div
-                  className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-r"
-                  style={{ left: `${pct(scheduledEnd)}%`, width: `${pct(actualEnd) - pct(scheduledEnd)}%` }}
-                />
-              )}
-              {actualStart > scheduledStart && (
-                <div
-                  className="absolute top-5.5 h-3.5 bg-destructive/40 rounded-l border border-dashed border-destructive/60"
-                  style={{ left: `${pct(scheduledStart)}%`, width: `${pct(actualStart) - pct(scheduledStart)}%` }}
-                />
-              )}
-              {actualEnd < scheduledEnd && (
-                <div
-                  className="absolute top-5.5 h-3.5 bg-destructive/40 rounded-r border border-dashed border-destructive/60"
-                  style={{ left: `${pct(actualEnd)}%`, width: `${pct(scheduledEnd) - pct(actualEnd)}%` }}
-                />
-              )}
+                  {/* Extra segments */}
+                  {actualStart < scheduledStart && (
+                    <div
+                      className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-l"
+                      style={{ left: `${pct(actualStart)}%`, width: `${pct(scheduledStart) - pct(actualStart)}%` }}
+                    />
+                  )}
+                  {actualEnd > scheduledEnd && (
+                    <div
+                      className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-r"
+                      style={{ left: `${pct(scheduledEnd)}%`, width: `${pct(actualEnd) - pct(scheduledEnd)}%` }}
+                    />
+                  )}
+                  {actualStart > scheduledStart && (
+                    <div
+                      className="absolute top-5.5 h-3.5 bg-destructive/40 rounded-l border border-dashed border-destructive/60"
+                      style={{ left: `${pct(scheduledStart)}%`, width: `${pct(actualStart) - pct(scheduledStart)}%` }}
+                    />
+                  )}
+                  {actualEnd < scheduledEnd && (
+                    <div
+                      className="absolute top-5.5 h-3.5 bg-destructive/40 rounded-r border border-dashed border-destructive/60"
+                      style={{ left: `${pct(actualEnd)}%`, width: `${pct(scheduledEnd) - pct(actualEnd)}%` }}
+                    />
+                  )}
 
-              {/* Time labels */}
-              <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(actualStart)}%` }}>
-                {minutesToTime(actualStart)}
-              </span>
-              <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(actualEnd)}%`, transform: 'translateX(-100%)' }}>
-                {minutesToTime(actualEnd)}
-              </span>
+                  {/* Time labels */}
+                  <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(actualStart)}%` }}>
+                    {minutesToTime(actualStart)}
+                  </span>
+                  <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(actualEnd)}%`, transform: 'translateX(-100%)' }}>
+                    {minutesToTime(actualEnd)}
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Legend */}

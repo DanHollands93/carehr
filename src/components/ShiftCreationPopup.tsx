@@ -283,7 +283,7 @@ const ShiftCreationPopup = ({
   const selectedCareerEntry = careerHistory?.find(entry => entry.id === selectedCareerHistoryId);
   const isLoading = careerLoading || jobRolesLoading;
 
-  const hasTimeRecord = existingShift?.time_record && (existingShift.time_record.clock_in_time || existingShift.time_record.clock_out_time);
+  const hasTimeRecord = !!existingShift?.time_record; // Show tab if any time_clock_record exists (including no-shows)
   const [activeTab, setActiveTab] = useState<'shift' | 'timeclock'>('shift');
 
   // Reset tab when dialog opens
@@ -456,6 +456,8 @@ const ShiftCreationPopup = ({
             const isCompleted = tr.status === 'completed' && !tr.discrepancy_type;
             const isClockedIn = tr.status === 'clocked_in';
             const isReviewed = tr.approval_status === 'reviewed';
+            const isNoShow = tr.discrepancy_type === 'did_not_clock_in' && !tr.clock_in_time;
+            const hasClockedData = !!(tr.clock_in_time || tr.clock_out_time);
             
             const fmtClock = (iso: string) => {
               const d = new Date(iso);
@@ -479,28 +481,39 @@ const ShiftCreationPopup = ({
             const earlyPaid = tr.early_minutes_paid || 0;
             const latePaid = tr.late_minutes_paid || 0;
 
-            interface Seg { type: 'early_start' | 'late_start' | 'early_end' | 'late_end'; label: string; desc: string; range: string; dur: number; paid: boolean; }
+            interface Seg { type: 'early_start' | 'late_start' | 'early_end' | 'late_end' | 'no_show'; label: string; desc: string; range: string; dur: number; paid: boolean; }
             const segs: Seg[] = [];
 
-            if (tr.clock_in_time && aStart < sStart) {
-              const d = sStart - aStart;
-              segs.push({ type: 'early_start', label: 'Early Clock In', desc: `Clocked in ${fmtDur(d)} before shift`, range: `${mToTime(aStart)} → ${mToTime(sStart)}`, dur: d, paid: isReviewed ? earlyPaid >= d : false });
-            }
-            if (tr.clock_in_time && aStart > sStart + 5) {
-              const d = aStart - sStart;
-              segs.push({ type: 'late_start', label: 'Late Clock In', desc: `Clocked in ${fmtDur(d)} after shift started`, range: `${mToTime(sStart)} → ${mToTime(aStart)}`, dur: d, paid: isReviewed ? latePaid >= d : false });
-            }
-            if (tr.clock_out_time && aEnd < sEnd - 5) {
-              const d = sEnd - aEnd;
-              segs.push({ type: 'early_end', label: 'Early Clock Out', desc: `Clocked out ${fmtDur(d)} before shift ended`, range: `${mToTime(aEnd)} → ${mToTime(sEnd)}`, dur: d, paid: isReviewed ? latePaid >= d : false });
-            }
-            if (tr.clock_out_time && aEnd > sEnd) {
-              const d = aEnd - sEnd;
-              segs.push({ type: 'late_end', label: 'Late Clock Out', desc: `Clocked out ${fmtDur(d)} after shift ended`, range: `${mToTime(sEnd)} → ${mToTime(aEnd)}`, dur: d, paid: isReviewed ? earlyPaid >= d : false });
+            if (isNoShow) {
+              const d = sEnd - sStart;
+              segs.push({ type: 'no_show', label: 'Did Not Clock In', desc: `Employee did not clock in for the entire shift`, range: `${mToTime(sStart)} → ${mToTime(sEnd)}`, dur: d, paid: false });
+            } else if (hasClockedData) {
+              if (tr.clock_in_time && aStart < sStart) {
+                const d = sStart - aStart;
+                segs.push({ type: 'early_start', label: 'Early Clock In', desc: `Clocked in ${fmtDur(d)} before shift`, range: `${mToTime(aStart)} → ${mToTime(sStart)}`, dur: d, paid: isReviewed ? earlyPaid >= d : false });
+              }
+              if (tr.clock_in_time && aStart > sStart + 5) {
+                const d = aStart - sStart;
+                segs.push({ type: 'late_start', label: 'Late Clock In', desc: `Clocked in ${fmtDur(d)} after shift started`, range: `${mToTime(sStart)} → ${mToTime(aStart)}`, dur: d, paid: isReviewed ? latePaid >= d : false });
+              }
+              if (tr.clock_out_time && aEnd < sEnd - 5) {
+                const d = sEnd - aEnd;
+                segs.push({ type: 'early_end', label: 'Early Clock Out', desc: `Clocked out ${fmtDur(d)} before shift ended`, range: `${mToTime(aEnd)} → ${mToTime(sEnd)}`, dur: d, paid: isReviewed ? latePaid >= d : false });
+              }
+              if (tr.clock_out_time && aEnd > sEnd) {
+                const d = aEnd - sEnd;
+                segs.push({ type: 'late_end', label: 'Late Clock Out', desc: `Clocked out ${fmtDur(d)} after shift ended`, range: `${mToTime(sEnd)} → ${mToTime(aEnd)}`, dur: d, paid: isReviewed ? earlyPaid >= d : false });
+              }
             }
 
-            const segIcon = (t: Seg['type']) => (t === 'early_start' || t === 'late_end') ? <Clock className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />;
-            const segColor = (t: Seg['type']) => (t === 'early_start' || t === 'late_end') ? 'text-amber-600' : 'text-destructive';
+            const segIcon = (t: Seg['type']) => {
+              if (t === 'no_show') return <AlertTriangle className="w-4 h-4" />;
+              return (t === 'early_start' || t === 'late_end') ? <Clock className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />;
+            };
+            const segColor = (t: Seg['type']) => {
+              if (t === 'no_show') return 'text-destructive';
+              return (t === 'early_start' || t === 'late_end') ? 'text-amber-600' : 'text-destructive';
+            };
 
             return (
               <div className="space-y-4 py-1">
@@ -509,24 +522,29 @@ const ShiftCreationPopup = ({
                   <span className="text-sm font-medium text-foreground">Status</span>
                   <Badge variant="outline" className={cn(
                     "text-xs",
-                    isDiscrepancy && !isReviewed && "border-amber-300 text-amber-700",
+                    isNoShow && "border-destructive text-destructive",
+                    isDiscrepancy && !isNoShow && !isReviewed && "border-amber-300 text-amber-700",
                     isDiscrepancy && isReviewed && "border-emerald-300 text-emerald-700",
                     isCompleted && "border-emerald-300 text-emerald-700",
                     isClockedIn && "border-amber-300 text-amber-700"
                   )}>
-                    {isDiscrepancy && isReviewed ? 'Reviewed' : isDiscrepancy ? 'Discrepancy' : isCompleted ? 'Completed' : 'Clocked In'}
+                    {isNoShow ? 'No Show' : isDiscrepancy && isReviewed ? 'Reviewed' : isDiscrepancy ? 'Discrepancy' : isCompleted ? 'Completed' : 'Clocked In'}
                   </Badge>
                 </div>
 
                 {/* Clock times */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg bg-muted/50 p-3">
+                  <div className={cn("rounded-lg p-3", isNoShow ? "bg-destructive/10" : "bg-muted/50")}>
                     <span className="text-muted-foreground text-xs">Clock In</span>
-                    <p className="font-mono text-lg font-semibold text-foreground">{tr.clock_in_time ? fmtClock(tr.clock_in_time) : '—'}</p>
+                    <p className={cn("font-mono text-lg font-semibold", isNoShow ? "text-destructive" : "text-foreground")}>
+                      {tr.clock_in_time ? fmtClock(tr.clock_in_time) : isNoShow ? 'Missing' : '—'}
+                    </p>
                   </div>
-                  <div className="rounded-lg bg-muted/50 p-3">
+                  <div className={cn("rounded-lg p-3", isNoShow ? "bg-destructive/10" : "bg-muted/50")}>
                     <span className="text-muted-foreground text-xs">Clock Out</span>
-                    <p className="font-mono text-lg font-semibold text-foreground">{tr.clock_out_time ? fmtClock(tr.clock_out_time) : isClockedIn ? 'Active' : '—'}</p>
+                    <p className={cn("font-mono text-lg font-semibold", isNoShow ? "text-destructive" : "text-foreground")}>
+                      {tr.clock_out_time ? fmtClock(tr.clock_out_time) : isNoShow ? 'Missing' : isClockedIn ? 'Active' : '—'}
+                    </p>
                   </div>
                 </div>
 
@@ -537,32 +555,55 @@ const ShiftCreationPopup = ({
                 </div>
 
                 {/* Visual Timeline */}
-                {(isDiscrepancy || segs.length > 0) && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Timeline</p>
-                    <div className="relative h-10 bg-muted rounded-lg overflow-hidden">
-                      <div className="absolute top-1 h-3.5 bg-primary/25 rounded border border-primary/30" style={{ left: `${pct(sStart)}%`, width: `${pct(sEnd) - pct(sStart)}%` }} />
-                      <div className="absolute top-5.5 h-3.5 bg-emerald-500/80 rounded" style={{ left: `${pct(Math.max(aStart, sStart))}%`, width: `${pct(Math.min(aEnd, sEnd)) - pct(Math.max(aStart, sStart))}%` }} />
-                      {aStart < sStart && <div className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-l" style={{ left: `${pct(aStart)}%`, width: `${pct(sStart) - pct(aStart)}%` }} />}
-                      {aEnd > sEnd && <div className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-r" style={{ left: `${pct(sEnd)}%`, width: `${pct(aEnd) - pct(sEnd)}%` }} />}
-                      {aStart > sStart && <div className="absolute top-5.5 h-3.5 bg-destructive/40 rounded-l border border-dashed border-destructive/60" style={{ left: `${pct(sStart)}%`, width: `${pct(aStart) - pct(sStart)}%` }} />}
-                      {aEnd < sEnd && <div className="absolute top-5.5 h-3.5 bg-destructive/40 rounded-r border border-dashed border-destructive/60" style={{ left: `${pct(aEnd)}%`, width: `${pct(sEnd) - pct(aEnd)}%` }} />}
-                      <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(aStart)}%` }}>{mToTime(aStart)}</span>
-                      <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(aEnd)}%`, transform: 'translateX(-100%)' }}>{mToTime(aEnd)}</span>
-                    </div>
-                    <div className="flex gap-3 mt-5 text-[10px] text-muted-foreground">
-                      <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-primary/25 border border-primary/30" /> Scheduled</div>
-                      <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-emerald-500/80" /> On Time</div>
-                      <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-amber-400/80" /> Extra</div>
-                      <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-destructive/40 border border-dashed border-destructive/60" /> Missing</div>
-                    </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Timeline</p>
+                  <div className="relative h-10 bg-muted rounded-lg overflow-hidden">
+                    {/* Scheduled block */}
+                    <div className="absolute top-1 h-3.5 bg-primary/25 rounded border border-primary/30" style={{ left: `${pct(sStart)}%`, width: `${pct(sEnd) - pct(sStart)}%` }} />
+
+                    {isNoShow ? (
+                      /* No-show: entire shift is missing */
+                      <div className="absolute top-5.5 h-3.5 bg-destructive/50 rounded border border-dashed border-destructive/60" style={{ left: `${pct(sStart)}%`, width: `${pct(sEnd) - pct(sStart)}%` }} />
+                    ) : hasClockedData ? (
+                      <>
+                        {/* On-time portion */}
+                        <div className="absolute top-5.5 h-3.5 bg-emerald-500/80 rounded" style={{ left: `${pct(Math.max(aStart, sStart))}%`, width: `${Math.max(pct(Math.min(aEnd, sEnd)) - pct(Math.max(aStart, sStart)), 0)}%` }} />
+                        {/* Early start */}
+                        {aStart < sStart && <div className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-l" style={{ left: `${pct(aStart)}%`, width: `${pct(sStart) - pct(aStart)}%` }} />}
+                        {/* Late end (overtime) */}
+                        {aEnd > sEnd && <div className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-r" style={{ left: `${pct(sEnd)}%`, width: `${pct(aEnd) - pct(sEnd)}%` }} />}
+                        {/* Late start (missing) */}
+                        {aStart > sStart && <div className="absolute top-5.5 h-3.5 bg-destructive/40 rounded-l border border-dashed border-destructive/60" style={{ left: `${pct(sStart)}%`, width: `${pct(aStart) - pct(sStart)}%` }} />}
+                        {/* Early end (missing) */}
+                        {aEnd < sEnd && <div className="absolute top-5.5 h-3.5 bg-destructive/40 rounded-r border border-dashed border-destructive/60" style={{ left: `${pct(aEnd)}%`, width: `${pct(sEnd) - pct(aEnd)}%` }} />}
+                      </>
+                    ) : (
+                      /* Scheduled but no data yet */
+                      <div className="absolute top-5.5 h-3.5 bg-primary/30 rounded" style={{ left: `${pct(sStart)}%`, width: `${pct(sEnd) - pct(sStart)}%` }} />
+                    )}
+
+                    {/* Time labels */}
+                    {hasClockedData && (
+                      <>
+                        <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(aStart)}%` }}>{mToTime(aStart)}</span>
+                        <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(aEnd)}%`, transform: 'translateX(-100%)' }}>{mToTime(aEnd)}</span>
+                      </>
+                    )}
                   </div>
-                )}
+                  <div className="flex gap-3 mt-5 text-[10px] text-muted-foreground">
+                    <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-primary/25 border border-primary/30" /> Scheduled</div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-emerald-500/80" /> On Time</div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-amber-400/80" /> Extra</div>
+                    <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-destructive/40 border border-dashed border-destructive/60" /> Missing</div>
+                  </div>
+                </div>
 
                 {/* Discrepancy Segments */}
                 {segs.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Discrepancy Segments</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      {isNoShow ? 'Issue' : 'Discrepancy Segments'}
+                    </p>
                     <div className="space-y-2">
                       {segs.map((seg, i) => (
                         <div key={i} className={cn(
@@ -583,6 +624,14 @@ const ShiftCreationPopup = ({
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Completed without issues */}
+                {isCompleted && segs.length === 0 && (
+                  <div className="text-center py-3 text-sm text-emerald-600">
+                    <Check className="w-5 h-5 mx-auto mb-1" />
+                    Shift completed without issues
                   </div>
                 )}
 
