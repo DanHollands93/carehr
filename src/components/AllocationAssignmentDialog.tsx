@@ -315,7 +315,7 @@ const AllocationAssignmentDialog = ({
                   </Badge>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {(assignments['unassigned'] || []).map(empId => renderEmployeeCard(empId))}
+                  {(assignments['unassigned'] || []).map(empId => renderEmployeeCard(empId, true))}
                   {(assignments['unassigned'] || []).length === 0 && (
                     <p className="text-xs text-muted-foreground col-span-2 py-2 text-center">
                       All staff assigned
