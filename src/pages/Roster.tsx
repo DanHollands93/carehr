@@ -509,7 +509,7 @@ const Roster = () => {
         pay_rate: number;
       };
     }) => {
-      const { error } = await supabase
+      const { data: newShift, error } = await supabase
         .from('shifts')
         .insert([{
           employee_id: employeeId,
@@ -521,13 +521,24 @@ const Roster = () => {
           actual_job_role_id: shiftData.job_role_id,
           pay_rate: shiftData.pay_rate,
           roster_template_id: selectedRosterTemplate?.id
-        }]);
+        }])
+        .select()
+        .single();
       
       if (error) throw error;
+
+      // Try to reattach any orphaned clock records for this employee+date
+      const reattachedCount = await tryReattachOrphanedRecords(newShift.id, employeeId, date);
+      return { reattachedCount };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast({ title: "Shift added successfully" });
+      queryClient.invalidateQueries({ queryKey: ['orphaned-clock-records'] });
+      if (result.reattachedCount > 0) {
+        toast({ title: `Shift added — ${result.reattachedCount} clock record(s) reattached for review` });
+      } else {
+        toast({ title: "Shift added successfully" });
+      }
     },
     onError: (error) => {
       toast({ 
