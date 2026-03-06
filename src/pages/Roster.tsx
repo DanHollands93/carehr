@@ -1073,6 +1073,15 @@ const Roster = () => {
   }) => {
     if (!canEditRoster) return;
     const formattedDate = format(new Date(shiftPopup.date), 'yyyy-MM-dd');
+    const existingShifts = getShiftsForEmployeeAndDate(shiftPopup.employeeId, formattedDate);
+    if (hasTimeOverlap(shiftData.start_time, shiftData.end_time, existingShifts)) {
+      toast({
+        title: "Time Overlap Error",
+        description: "This shift overlaps with another existing shift. Please choose different times.",
+        variant: "destructive"
+      });
+      return;
+    }
     createShiftMutation.mutate({
       employeeId: shiftPopup.employeeId,
       date: formattedDate,
@@ -1210,6 +1219,15 @@ const Roster = () => {
             });
             setShiftPopup(prev => ({ ...prev, isOpen: false }));
           } : (shiftData) => {
+            const existingShifts = getShiftsForEmployeeAndDate(shiftPopup.employeeId, shiftPopup.date);
+            if (hasTimeOverlap(shiftData.start_time, shiftData.end_time, existingShifts)) {
+              toast({
+                title: "Time Overlap Error",
+                description: "This shift overlaps with another existing shift. Please choose different times.",
+                variant: "destructive"
+              });
+              return;
+            }
             createShiftMutation.mutate({
               employeeId: shiftPopup.employeeId,
               date: shiftPopup.date,
@@ -1443,7 +1461,7 @@ const Roster = () => {
                                   <td
                                     key={day.toISOString()}
                                     className={cn(
-                                      "p-1.5 min-w-[140px] align-top",
+                                      "p-1.5 min-w-[140px] align-top group/cell",
                                       isToday && "bg-primary/5"
                                     )}
                                     onDragOver={handleDragOver}
@@ -1517,6 +1535,23 @@ const Roster = () => {
                                               }}
                                             />
                                           ))}
+                                          {/* Add another shift button */}
+                                          {canEditRoster && (
+                                            <div
+                                              className="flex items-center justify-center py-1 opacity-0 group-hover/cell:opacity-100 transition-opacity cursor-pointer rounded border border-dashed border-border/40 hover:border-primary/30 hover:bg-primary/5"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShiftPopup({
+                                                  isOpen: true,
+                                                  employeeId: employee.id,
+                                                  employeeName: `${employee.first_name} ${employee.last_name}`,
+                                                  date: dateStr,
+                                                });
+                                              }}
+                                            >
+                                              <Plus className="w-3 h-3 text-muted-foreground" />
+                                            </div>
+                                          )}
                                         </div>
                                       ) : canEditRoster ? (
                                         <div className="flex items-center justify-center h-full min-h-[56px] opacity-0 hover:opacity-100 transition-opacity">
