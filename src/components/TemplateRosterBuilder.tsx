@@ -524,6 +524,7 @@ const TemplateRosterBuilder = ({
     );
   };
 
+  const handleCustomSort = (newOrder: string[]) => {
     setCustomOrder(newOrder);
     setSortBy('custom');
     setShowSortDialog(false);
