@@ -139,8 +139,8 @@ const StaffShifts = () => {
                 <StaffShiftCard
                   key={record.id}
                   record={record}
-                  onClockIn={clockIn}
-                  onClockOut={clockOut}
+                  onClockIn={(args) => clockIn(args)}
+                  onClockOut={(args) => clockOut(args)}
                   isClockingIn={isClockingIn}
                   isClockingOut={isClockingOut}
                   validateClockTime={validateClockTime}
