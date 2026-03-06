@@ -185,7 +185,8 @@ const RosterTemplates = () => {
       description: template.description || "",
       repeat_type: template.repeat_type,
       repeat_interval: template.repeat_interval,
-      end_date: template.end_date || ""
+      end_date: template.end_date || "",
+      allow_allocations: template.allow_allocations || false
     });
     setIsDialogOpen(true);
   };
