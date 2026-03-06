@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, GripVertical, Trash2, Edit, Tag, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRosterSections } from "@/hooks/useRosterSections";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 
 interface RosterSectionManagerProps {
   templateId: string;
@@ -28,6 +29,8 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
     getRulesForSection
   } = useRosterSections(templateId);
 
+  const { companyId } = useUserCompanyId();
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [sectionName, setSectionName] = useState("");
@@ -35,17 +38,24 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
   const [addingRuleToSection, setAddingRuleToSection] = useState<string | null>(null);
   const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
 
-  // Fetch job roles
+  // Fetch job roles filtered by company
   const { data: jobRoles } = useQuery({
-    queryKey: ['job-roles-for-sections'],
+    queryKey: ['job-roles-for-sections', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('job_roles')
         .select('id, title, department')
         .order('title');
+      
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!companyId,
   });
 
   const handleCreateSection = () => {
