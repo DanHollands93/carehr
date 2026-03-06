@@ -1041,6 +1041,20 @@ const TemplateRosterBuilder = ({
         {/* Roster Sections Manager */}
         <RosterSectionManager templateId={templateId} />
 
+        {/* Allocation Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Allocation Settings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AllocationLocationManager
+              templateId={templateId}
+              allowAllocations={templateSettings?.allow_allocations || false}
+              onToggleAllocations={(enabled) => toggleAllocationsMutation.mutate(enabled)}
+            />
+          </CardContent>
+        </Card>
+
         {/* Staff Management Section */}
         <Card>
           <CardHeader>
