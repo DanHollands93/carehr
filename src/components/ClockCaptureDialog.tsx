@@ -97,18 +97,24 @@ const ClockCaptureDialog = ({
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 640, height: 480 },
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      // Set status first so the <video> element renders, then attach stream
       setPhotoStatus('camera');
     } catch {
       setPhotoStatus('error');
       toast({ title: 'Camera access denied', description: 'Please allow camera access to take a photo.', variant: 'destructive' });
     }
   };
+
+  // Attach stream to video element once it renders
+  useEffect(() => {
+    if (photoStatus === 'camera' && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [photoStatus]);
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach(t => t.stop());
