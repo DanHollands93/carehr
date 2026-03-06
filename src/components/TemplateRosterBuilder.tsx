@@ -287,36 +287,62 @@ const TemplateRosterBuilder = ({
 
   const saveTemplateAssignmentsMutation = useMutation({
     mutationFn: async () => {
-      // Delete existing assignments
-      const { error: deleteError } = await supabase
+      // Delete existing template_shifts
+      const { error: deleteShiftsError } = await supabase
+        .from('template_shifts')
+        .delete()
+        .eq('roster_template_id', templateId);
+      
+      if (deleteShiftsError) throw deleteShiftsError;
+
+      // Also clean up roster_template_assignments
+      const { error: deleteAssignError } = await supabase
         .from('roster_template_assignments')
         .delete()
         .eq('roster_template_id', templateId);
       
-      if (deleteError) throw deleteError;
+      if (deleteAssignError) throw deleteAssignError;
 
-      // Insert new assignments
       // Filter out invalid entries (no shift template or placeholder rows)
       const validShifts = templateShifts.filter(shift => 
         shift.shift_template_id && shift.shift_template_id.trim() !== '' && shift.day_index >= 0
       );
 
       if (validShifts.length > 0) {
-        const assignments = validShifts.map(shift => ({
+        // Save to template_shifts
+        const shifts = validShifts.map(shift => ({
           roster_template_id: templateId,
           employee_id: shift.employee_id,
-          day_of_period: shift.day_index,
-          shift_template_id: shift.shift_template_id || null
+          day_index: shift.day_index,
+          shift_template_id: shift.shift_template_id || null,
+          job_role_id: shift.job_role_id || null,
+          pay_rate: shift.pay_rate || null
         }));
 
         const { error: insertError } = await supabase
-          .from('roster_template_assignments')
-          .insert(assignments);
+          .from('template_shifts')
+          .insert(shifts);
         
         if (insertError) throw insertError;
       }
+
+      // Save roster_template_assignments for all staff in roster (for the live roster view)
+      const allStaffIds = [...staffInRoster];
+      if (allStaffIds.length > 0) {
+        const assignments = allStaffIds.map(empId => ({
+          roster_template_id: templateId,
+          employee_id: empId
+        }));
+
+        const { error: assignError } = await supabase
+          .from('roster_template_assignments')
+          .insert(assignments);
+        
+        if (assignError) throw assignError;
+      }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['template-shifts-data'] });
       queryClient.invalidateQueries({ queryKey: ['template-assignments'] });
       toast({ title: "Template saved successfully" });
       onSave();
