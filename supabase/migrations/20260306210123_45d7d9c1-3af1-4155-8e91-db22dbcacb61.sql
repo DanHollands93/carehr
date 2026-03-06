@@ -1,0 +1,1 @@
+DELETE FROM company_settings WHERE setting_key = 'clock_in_photo';
