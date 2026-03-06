@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import RosterShiftCell from "@/components/RosterShiftCell";
 import DiscrepancyReviewDialog, { DiscrepancyReviewResult } from "@/components/DiscrepancyReviewDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
+import { useTimeClockSettings } from "@/hooks/useTimeClockSettings";
 
 interface Employee {
   id: string;
@@ -299,6 +300,122 @@ const Roster = () => {
     },
     enabled: !!selectedRosterTemplate?.id
   });
+
+  // Auto-exception settings
+  const {
+    earlyClockInMinutes, lateClockInMinutes, earlyClockOutMinutes, lateClockOutMinutes,
+    earlyClockInAutoAction, lateClockInAutoAction, earlyClockOutAutoAction, lateClockOutAutoAction,
+  } = useTimeClockSettings();
+
+  // Auto-apply exceptions for discrepancies within threshold
+  const autoApplyProcessedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!shifts || !user?.id) return;
+
+    const timeToMinutes = (time: string): number => {
+      const [h, m] = time.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const isoToMinutes = (iso: string): number => {
+      const d = new Date(iso);
+      return d.getHours() * 60 + d.getMinutes();
+    };
+
+    const eligibleRecords = shifts.filter(s => {
+      const tr = s.time_record;
+      if (!tr) return false;
+      if (tr.approval_status === 'reviewed') return false;
+      if (tr.discrepancy_type === 'did_not_clock_in') return false;
+      if (!tr.clock_in_time) return false;
+      if (autoApplyProcessedRef.current.has(tr.id)) return false;
+      // Only process records with a discrepancy type or status
+      return tr.status === 'discrepancy' || !!tr.discrepancy_type;
+    });
+
+    if (eligibleRecords.length === 0) return;
+
+    const processAutoExceptions = async () => {
+      for (const shift of eligibleRecords) {
+        const tr = shift.time_record!;
+        const scheduledStart = timeToMinutes(shift.start_time);
+        const scheduledEnd = timeToMinutes(shift.end_time);
+        const actualStart = isoToMinutes(tr.clock_in_time!);
+        const actualEnd = tr.clock_out_time ? isoToMinutes(tr.clock_out_time) : null;
+
+        let allWithinThreshold = true;
+        let earlyMinutesPaid = 0;
+        let lateMinutesPaid = 0;
+
+        // Check early clock-in
+        if (actualStart < scheduledStart) {
+          const diff = scheduledStart - actualStart;
+          if (diff <= earlyClockInMinutes) {
+            if (earlyClockInAutoAction === 'paid') earlyMinutesPaid += diff;
+          } else {
+            allWithinThreshold = false;
+          }
+        }
+
+        // Check late clock-in
+        if (actualStart > scheduledStart + 2) {
+          const diff = actualStart - scheduledStart;
+          if (diff <= lateClockInMinutes) {
+            if (lateClockInAutoAction === 'paid') lateMinutesPaid += diff;
+          } else {
+            allWithinThreshold = false;
+          }
+        }
+
+        // Check early clock-out
+        if (actualEnd !== null && actualEnd < scheduledEnd - 2) {
+          const diff = scheduledEnd - actualEnd;
+          if (diff <= earlyClockOutMinutes) {
+            if (earlyClockOutAutoAction === 'paid') lateMinutesPaid += diff;
+          } else {
+            allWithinThreshold = false;
+          }
+        }
+
+        // Check late clock-out
+        if (actualEnd !== null && actualEnd > scheduledEnd) {
+          const diff = actualEnd - scheduledEnd;
+          if (diff <= lateClockOutMinutes) {
+            if (lateClockOutAutoAction === 'paid') earlyMinutesPaid += diff;
+          } else {
+            allWithinThreshold = false;
+          }
+        }
+
+        // If all discrepancies are within threshold, auto-apply
+        if (allWithinThreshold) {
+          autoApplyProcessedRef.current.add(tr.id);
+          try {
+            await supabase
+              .from('time_clock_records')
+              .update({
+                approval_status: 'reviewed',
+                status: 'completed',
+                approved_by: user.id,
+                early_minutes_paid: earlyMinutesPaid,
+                late_minutes_paid: lateMinutesPaid,
+                notes: 'Auto-approved: within exception threshold',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', tr.id);
+          } catch (err) {
+            console.error('Auto-exception failed for record:', tr.id, err);
+          }
+        }
+      }
+
+      // Refresh shifts after auto-processing
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    };
+
+    processAutoExceptions();
+  }, [shifts, user?.id, earlyClockInMinutes, lateClockInMinutes, earlyClockOutMinutes, lateClockOutMinutes,
+      earlyClockInAutoAction, lateClockInAutoAction, earlyClockOutAutoAction, lateClockOutAutoAction]);
 
   // Permission checks
   const canViewRoster = userRole === 'super_admin' || hasPermission('view_roster') || hasPermission('edit_roster');
