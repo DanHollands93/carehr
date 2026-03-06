@@ -376,6 +376,24 @@ const Roster = () => {
   // Roster sections for grouping employees by shift job roles
   const { sections: rosterSections, groupEmployeesByShiftRoles } = useRosterSections(selectedRosterTemplate?.id);
 
+  // Allocation locations & daily allocations
+  const { locations: allocationLocations } = useAllocationLocations(selectedRosterTemplate?.id);
+  const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+  const weekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+  const { bulkSetAllocations, getAllocationsForDate } = useDailyAllocations(
+    selectedRosterTemplate?.id, weekStartStr, weekEndStr
+  );
+
+  // Fetch job roles for allocation dialog
+  const { data: jobRolesData } = useQuery({
+    queryKey: ['job-roles-for-allocations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('job_roles').select('id, title');
+      if (error) throw error;
+      return data as { id: string; title: string }[];
+    }
+  });
+
   // Auto-apply exceptions for discrepancies within threshold
   const autoApplyProcessedRef = useRef<Set<string>>(new Set());
 
