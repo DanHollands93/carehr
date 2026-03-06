@@ -569,6 +569,84 @@ const Roster = () => {
     }
   });
 
+  // Manual clock in/out mutation
+  const manualClockMutation = useMutation({
+    mutationFn: async ({ shiftId, recordId, type, dateTime }: {
+      shiftId: string;
+      recordId: string | null;
+      type: 'clock_in' | 'clock_out';
+      dateTime: string;
+    }) => {
+      const isoDateTime = new Date(dateTime).toISOString();
+
+      if (type === 'clock_in') {
+        if (recordId) {
+          const { error } = await supabase
+            .from('time_clock_records')
+            .update({
+              clock_in_time: isoDateTime,
+              status: 'clocked_in',
+              notes: `Manual clock in by manager (${new Date().toISOString()})`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', recordId);
+          if (error) throw error;
+        } else {
+          const { data: shift, error: shiftErr } = await supabase
+            .from('shifts')
+            .select('employee_id, date, start_time, end_time')
+            .eq('id', shiftId)
+            .single();
+          if (shiftErr) throw shiftErr;
+
+          const { error } = await supabase
+            .from('time_clock_records')
+            .insert({
+              employee_id: shift.employee_id,
+              shift_id: shiftId,
+              shift_date: shift.date,
+              shift_start_time: shift.start_time,
+              shift_end_time: shift.end_time,
+              clock_in_time: isoDateTime,
+              status: 'clocked_in',
+              notes: `Manual clock in by manager (${new Date().toISOString()})`,
+            });
+          if (error) throw error;
+        }
+      } else {
+        if (!recordId) throw new Error('Cannot clock out without existing record');
+        // Get existing notes to append
+        const { data: existing } = await supabase
+          .from('time_clock_records')
+          .select('notes')
+          .eq('id', recordId)
+          .single();
+        const existingNotes = existing?.notes || '';
+        const newNote = `Manual clock out by manager (${new Date().toISOString()})`;
+        const combinedNotes = existingNotes ? `${existingNotes}, ${newNote}` : newNote;
+
+        const { error } = await supabase
+          .from('time_clock_records')
+          .update({
+            clock_out_time: isoDateTime,
+            status: 'completed',
+            notes: combinedNotes,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', recordId);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast({ title: "Manual clock entry recorded" });
+      setShiftPopup(prev => ({ ...prev, isOpen: false }));
+    },
+    onError: (error) => {
+      toast({ title: "Error recording manual clock", description: error.message, variant: "destructive" });
+    }
+  });
+
   // Add ad-hoc staff: create a roster_template_assignment so they persist
   const addAdHocStaffMutation = useMutation({
     mutationFn: async (employee: Employee) => {
@@ -1016,6 +1094,9 @@ const Roster = () => {
           }}
           onRemoveReview={(recordId) => {
             removeReviewMutation.mutate(recordId);
+          }}
+          onManualClock={(shiftId, recordId, type, dateTime) => {
+            manualClockMutation.mutate({ shiftId, recordId, type, dateTime });
           }}
           shiftTemplates={shiftTemplates || []}
           employeeName={shiftPopup.employeeName}

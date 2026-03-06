@@ -68,6 +68,7 @@ interface ShiftCreationPopupProps {
   onDeleteShift?: () => void;
   onReviewDiscrepancy?: (shift: Shift) => void;
   onRemoveReview?: (recordId: string) => void;
+  onManualClock?: (shiftId: string, recordId: string | null, type: 'clock_in' | 'clock_out', dateTime: string) => void;
   shiftTemplates: ShiftTemplate[];
   employeeName: string;
   employeeId?: string;
@@ -82,6 +83,7 @@ const ShiftCreationPopup = ({
   onDeleteShift,
   onReviewDiscrepancy,
   onRemoveReview,
+  onManualClock,
   shiftTemplates,
   employeeName,
   employeeId,
@@ -285,11 +287,19 @@ const ShiftCreationPopup = ({
 
   const hasTimeRecord = !!existingShift?.time_record; // Show tab if any time_clock_record exists (including no-shows)
   const [activeTab, setActiveTab] = useState<'shift' | 'timeclock'>('shift');
+  const [manualClockMode, setManualClockMode] = useState<'clock_in' | 'clock_out' | null>(null);
+  const [manualDate, setManualDate] = useState(date);
+  const [manualTime, setManualTime] = useState('');
 
   // Reset tab when dialog opens
   useEffect(() => {
-    if (isOpen) setActiveTab('shift');
-  }, [isOpen]);
+    if (isOpen) {
+      setActiveTab('shift');
+      setManualClockMode(null);
+      setManualDate(date);
+      setManualTime('');
+    }
+  }, [isOpen, date]);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -301,8 +311,8 @@ const ShiftCreationPopup = ({
           <div className="text-sm text-muted-foreground">Date: {date}</div>
         </DialogHeader>
 
-        {/* Tabs - only show when there's time clock data */}
-        {hasTimeRecord && (
+        {/* Tabs - show when there's time clock data OR manual clock is available */}
+        {(hasTimeRecord || (existingShift && onManualClock)) && (
           <div className="flex border-b border-border">
             <button
               className={cn(
@@ -340,7 +350,7 @@ const ShiftCreationPopup = ({
         
         <div className="overflow-y-auto flex-1">
           {/* SHIFT DETAILS TAB */}
-          {(activeTab === 'shift' || !hasTimeRecord) && (
+          {(activeTab === 'shift' || (!hasTimeRecord && !(existingShift && onManualClock))) && (
             <div className="space-y-4 py-1">
               {/* Template Selection */}
               <div className="space-y-2">
@@ -551,14 +561,74 @@ const ShiftCreationPopup = ({
                     <p className={cn("font-mono text-lg font-semibold", isNoShow ? "text-destructive" : "text-foreground")}>
                       {tr.clock_in_time ? fmtClock(tr.clock_in_time) : isNoShow ? 'Missing' : '—'}
                     </p>
+                    {tr.notes?.includes('Manual clock in') && (
+                      <span className="text-[10px] text-amber-600 font-medium">✎ Manually entered</span>
+                    )}
                   </div>
                   <div className={cn("rounded-lg p-3", isNoShow ? "bg-destructive/10" : "bg-muted/50")}>
                     <span className="text-muted-foreground text-xs">Clock Out</span>
                     <p className={cn("font-mono text-lg font-semibold", isNoShow ? "text-destructive" : "text-foreground")}>
                       {tr.clock_out_time ? fmtClock(tr.clock_out_time) : isNoShow ? 'Missing' : isClockedIn ? 'Active' : '—'}
                     </p>
+                    {tr.notes?.includes('Manual clock out') && (
+                      <span className="text-[10px] text-amber-600 font-medium">✎ Manually entered</span>
+                    )}
                   </div>
                 </div>
+
+                {/* Manual Clock In/Out Buttons */}
+                {onManualClock && (
+                  <div className="space-y-3">
+                    {!tr.clock_in_time && manualClockMode !== 'clock_in' && (
+                      <Button variant="outline" size="sm" className="w-full border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => { setManualClockMode('clock_in'); setManualTime(existingShift!.start_time); setManualDate(existingShift!.date); }}>
+                        <Clock className="w-3.5 h-3.5 mr-2" />
+                        Manual Clock In
+                      </Button>
+                    )}
+                    {tr.clock_in_time && !tr.clock_out_time && manualClockMode !== 'clock_out' && (
+                      <Button variant="outline" size="sm" className="w-full border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => { setManualClockMode('clock_out'); setManualTime(existingShift!.end_time); setManualDate(existingShift!.date); }}>
+                        <Clock className="w-3.5 h-3.5 mr-2" />
+                        Manual Clock Out
+                      </Button>
+                    )}
+
+                    {manualClockMode && (
+                      <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-600" />
+                          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                            Manual {manualClockMode === 'clock_in' ? 'Clock In' : 'Clock Out'}
+                          </p>
+                        </div>
+                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                          This will be recorded as a manual entry in the audit log.
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Date</Label>
+                            <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="text-sm" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Time</Label>
+                            <Input type="time" value={manualTime} onChange={(e) => setManualTime(e.target.value)} className="text-sm" />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" className="flex-1" onClick={() => setManualClockMode(null)}>
+                            Cancel
+                          </Button>
+                          <Button size="sm" className="flex-1 bg-amber-600 hover:bg-amber-700 text-white" disabled={!manualDate || !manualTime} onClick={() => {
+                            const dateTime = `${manualDate}T${manualTime}:00`;
+                            onManualClock(existingShift!.id, tr.id, manualClockMode, dateTime);
+                            setManualClockMode(null);
+                          }}>
+                            Confirm {manualClockMode === 'clock_in' ? 'Clock In' : 'Clock Out'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Scheduled reference */}
                 <div className="flex items-center justify-between text-sm bg-muted/30 rounded-lg p-2">
@@ -675,6 +745,66 @@ const ShiftCreationPopup = ({
               </div>
             );
           })()}
+
+          {/* TIME CLOCK TAB - No time record yet, manual clock available */}
+          {activeTab === 'timeclock' && !hasTimeRecord && existingShift && onManualClock && (
+            <div className="space-y-4 py-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">Status</span>
+                <Badge variant="outline" className="text-xs border-muted text-muted-foreground">No Clock Data</Badge>
+              </div>
+              
+              <div className="flex items-center justify-between text-sm bg-muted/30 rounded-lg p-2">
+                <span className="text-muted-foreground">Scheduled</span>
+                <span className="font-mono font-medium text-foreground">{existingShift.start_time} – {existingShift.end_time}</span>
+              </div>
+
+              <div className="space-y-3">
+                {manualClockMode !== 'clock_in' && (
+                  <Button variant="outline" size="sm" className="w-full border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => { setManualClockMode('clock_in'); setManualTime(existingShift.start_time); setManualDate(existingShift.date); }}>
+                    <Clock className="w-3.5 h-3.5 mr-2" />
+                    Manual Clock In
+                  </Button>
+                )}
+
+                {manualClockMode && (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                      <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                        Manual Clock In
+                      </p>
+                    </div>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      This will be recorded as a manual entry in the audit log.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Date</Label>
+                        <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="text-sm" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Time</Label>
+                        <Input type="time" value={manualTime} onChange={(e) => setManualTime(e.target.value)} className="text-sm" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="flex-1" onClick={() => setManualClockMode(null)}>
+                        Cancel
+                      </Button>
+                      <Button size="sm" className="flex-1 bg-amber-600 hover:bg-amber-700 text-white" disabled={!manualDate || !manualTime} onClick={() => {
+                        const dateTime = `${manualDate}T${manualTime}:00`;
+                        onManualClock(existingShift.id, null, 'clock_in', dateTime);
+                        setManualClockMode(null);
+                      }}>
+                        Confirm Clock In
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

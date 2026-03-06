@@ -83,11 +83,20 @@ const AuditLog = () => {
         if (changed_fields.includes('approval_status') && new_data?.approval_status === 'pending') {
           return 'Review removed — reset to pending';
         }
-        if (changed_fields.includes('status') && new_data?.status === 'clocked_in') return 'Clocked in';
-        if (changed_fields.includes('clock_out_time')) return 'Clocked out';
+        if (changed_fields.includes('status') && new_data?.status === 'clocked_in') {
+          if (new_data?.notes?.includes('Manual clock in')) return 'Manual clock in (by manager)';
+          return 'Clocked in';
+        }
+        if (changed_fields.includes('clock_out_time')) {
+          if (new_data?.notes?.includes('Manual clock out')) return 'Manual clock out (by manager)';
+          return 'Clocked out';
+        }
         if (changed_fields.includes('early_minutes_paid') || changed_fields.includes('late_minutes_paid')) return 'Exception pay updated';
       }
-      if (action === 'INSERT') return 'Time record created';
+      if (action === 'INSERT') {
+        if (new_data?.notes?.includes('Manual clock in')) return 'Manual clock in (by manager)';
+        return 'Time record created';
+      }
     }
 
     if (table_name === 'shifts') {
