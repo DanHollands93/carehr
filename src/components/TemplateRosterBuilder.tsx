@@ -824,72 +824,52 @@ const TemplateRosterBuilder = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {employees.map((employee) => (
-                      <tr key={employee.id} className="border-b">
-                        <td className="p-3 font-medium min-w-[160px]">
-                          <div>
-                            <div>{employee.first_name} {employee.last_name}</div>
-                            <div className="flex justify-end">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 w-6 p-0 hover:bg-red-100"
-                                onClick={() => openRemoveStaffDialog(employee.id, `${employee.first_name} ${employee.last_name}`)}
-                                title="Remove staff member from roster"
-                              >
-                                <UserMinus className="w-3 h-3 text-red-500" />
-                              </Button>
-                            </div>
-                          </div>
-                        </td>
-                        {weekDays.map((dayIndex) => {
-                          const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
-                          const template = shift ? shiftTemplates?.find(t => t.id === shift.shift_template_id) : null;
-                          
-                          return (
+                    {(() => {
+                      // Group employees by section
+                      if (sections.length === 0) {
+                        // No sections - render all employees flat
+                        return employees.map((employee) => renderEmployeeRow(employee));
+                      }
+
+                      // Build section groups
+                      const sectionGroups: { sectionId: string | null; sectionName: string; employees: typeof employees }[] = [];
+                      const assignedToSection = new Set<string>();
+
+                      for (const section of sections) {
+                        const sectionEmployees = employees.filter(emp => {
+                          const empJobRoleIds = (allEmployeeJobRoles || [])
+                            .filter(ejr => ejr.employee_id === emp.id)
+                            .map(ejr => ejr.job_role_id);
+                          const matchedSection = getSectionForEmployee(empJobRoleIds);
+                          return matchedSection === section.id;
+                        });
+                        sectionEmployees.forEach(e => assignedToSection.add(e.id));
+                        sectionGroups.push({ sectionId: section.id, sectionName: section.name, employees: sectionEmployees });
+                      }
+
+                      // Unsectioned employees
+                      const unsectioned = employees.filter(e => !assignedToSection.has(e.id));
+                      if (unsectioned.length > 0) {
+                        sectionGroups.push({ sectionId: null, sectionName: 'Other Staff', employees: unsectioned });
+                      }
+
+                      return sectionGroups.map((group) => (
+                        <>
+                          <tr key={`section-${group.sectionId || 'other'}`} className="bg-muted/50">
                             <td
-                              key={dayIndex}
-                              className="p-2 border-r border-l min-w-32"
-                              onDrop={!isMobile ? () => handleDrop(employee.id, dayIndex) : undefined}
-                              onDragOver={!isMobile ? handleDragOver : undefined}
+                              colSpan={weekDays.length + 1}
+                              className="px-3 py-2 font-semibold text-sm text-foreground border-b border-t"
                             >
-                              <div 
-                                className="min-h-16 border-2 border-dashed border-gray-200 rounded p-2 hover:border-gray-300 transition-colors cursor-pointer"
-                                style={{
-                                  backgroundColor: (!isMobile && (draggedTemplate || draggedShift)) ? '#f0f9ff' : 'transparent'
-                                }}
-                                onClick={() => handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, dayIndex)}
-                              >
-                                {shift && template ? (
-                                  <div 
-                                    draggable={!isMobile}
-                                    onDragStart={!isMobile ? () => handleShiftDragStart(shift) : undefined}
-                                    onDragEnd={!isMobile ? handleDragEnd : undefined}
-                                    className="p-2 rounded text-xs cursor-pointer hover:shadow-md transition-shadow"
-                                    style={{ 
-                                      backgroundColor: template.color + '20',
-                                      borderColor: template.color
-                                    }}
-                                    onDoubleClick={!isMobile ? () => removeShift(shift) : undefined}
-                                    title={isMobile ? "Tap to edit or remove" : "Drag to move or delete, double-click to remove"}
-                                  >
-                                    <div className="font-medium">{template.position}</div>
-                                    <div>{template.start_time} - {template.end_time}</div>
-                                    {shift.pay_rate && (
-                                      <div className="text-xs text-gray-500">£{shift.pay_rate}/hr</div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center h-full">
-                                    <Plus className="w-4 h-4 text-gray-400" />
-                                  </div>
-                                )}
-                              </div>
+                              {group.sectionName}
+                              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                ({group.employees.length} staff)
+                              </span>
                             </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                          </tr>
+                          {group.employees.map((employee) => renderEmployeeRow(employee))}
+                        </>
+                      ));
+                    })()}
                   </tbody>
                 </table>
               </div>
