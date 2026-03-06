@@ -1461,7 +1461,7 @@ const Roster = () => {
                                   <td
                                     key={day.toISOString()}
                                     className={cn(
-                                      "p-1.5 min-w-[140px] align-top",
+                                      "p-1.5 min-w-[140px] align-top group/cell",
                                       isToday && "bg-primary/5"
                                     )}
                                     onDragOver={handleDragOver}
