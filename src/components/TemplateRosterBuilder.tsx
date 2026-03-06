@@ -120,6 +120,7 @@ const TemplateRosterBuilder = ({
   });
   
   const { data: allEmployeeJobRoles } = useAllEmployeeJobRoles();
+  const { sections, getSectionForEmployee } = useRosterSections(templateId);
 
   // Calculate period length in days
   const getPeriodDays = () => {
