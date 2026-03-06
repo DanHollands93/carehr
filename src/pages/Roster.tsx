@@ -374,7 +374,7 @@ const Roster = () => {
   } = useTimeClockSettings();
 
   // Roster sections for grouping employees by shift job roles
-  const { sections: rosterSections, groupEmployeesByShiftRoles } = useRosterSections(selectedRosterTemplate?.id);
+  const { sections: rosterSections, roleRules: sectionRoleRules, groupEmployeesByShiftRoles } = useRosterSections(selectedRosterTemplate?.id);
 
   // Allocation locations & daily allocations
   const { locations: allocationLocations } = useAllocationLocations(selectedRosterTemplate?.id);
