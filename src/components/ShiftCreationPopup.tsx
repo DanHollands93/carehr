@@ -207,7 +207,7 @@ const ShiftCreationPopup = ({
     return null;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     console.log('Submit clicked');
     console.log('Selected career history ID:', selectedCareerHistoryId);
     
