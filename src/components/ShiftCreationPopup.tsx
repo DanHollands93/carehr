@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, Clock, AlertTriangle, Check } from "lucide-react";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface ShiftTemplate {
   id: string;
@@ -21,6 +23,18 @@ interface ShiftTemplate {
   pay_value?: number;
 }
 
+interface TimeRecord {
+  id: string;
+  status: string;
+  clock_in_time: string | null;
+  clock_out_time: string | null;
+  discrepancy_type: string | null;
+  approval_status: string | null;
+  early_minutes_paid?: number | null;
+  late_minutes_paid?: number | null;
+  notes?: string | null;
+}
+
 interface Shift {
   id: string;
   employee_id: string;
@@ -29,6 +43,7 @@ interface Shift {
   end_time: string;
   position: string;
   job_role_id: string;
+  time_record?: TimeRecord | null;
 }
 
 interface JobRole {
@@ -49,6 +64,7 @@ interface ShiftCreationPopupProps {
     pay_rate: number;
   }) => void;
   onDeleteShift?: () => void;
+  onReviewDiscrepancy?: (shift: Shift) => void;
   shiftTemplates: ShiftTemplate[];
   employeeName: string;
   employeeId?: string;
@@ -61,6 +77,7 @@ const ShiftCreationPopup = ({
   onClose,
   onCreateShift,
   onDeleteShift,
+  onReviewDiscrepancy,
   shiftTemplates,
   employeeName,
   employeeId,
@@ -378,7 +395,129 @@ const ShiftCreationPopup = ({
             </div>
           </div>
 
-          {/* Actions */}
+          {/* Time Clock Data */}
+          {existingShift?.time_record && (existingShift.time_record.clock_in_time || existingShift.time_record.clock_out_time) && (() => {
+            const tr = existingShift.time_record!;
+            const isDiscrepancy = tr.status === 'discrepancy';
+            const isCompleted = tr.status === 'completed';
+            const isClockedIn = tr.status === 'clocked_in';
+            const isReviewed = tr.approval_status === 'reviewed';
+            
+            const formatClockTime = (iso: string) => {
+              const d = new Date(iso);
+              return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+            };
+
+            const formatDuration = (mins: number) => {
+              const h = Math.floor(mins / 60);
+              const m = mins % 60;
+              if (h > 0 && m > 0) return `${h}h ${m}m`;
+              if (h > 0) return `${h}h`;
+              return `${m}m`;
+            };
+            
+            return (
+              <div className={cn(
+                "rounded-lg border p-3 space-y-2",
+                isDiscrepancy && !isReviewed && "border-amber-300 bg-amber-50/50 dark:bg-amber-950/10",
+                isDiscrepancy && isReviewed && "border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/10",
+                isCompleted && "border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/10",
+                isClockedIn && "border-amber-300 bg-amber-50/50 dark:bg-amber-950/10"
+              )}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Time Clock Data</span>
+                  </div>
+                  <Badge variant="outline" className={cn(
+                    "text-[10px]",
+                    isDiscrepancy && !isReviewed && "border-amber-300 text-amber-700",
+                    isDiscrepancy && isReviewed && "border-emerald-300 text-emerald-700",
+                    isCompleted && "border-emerald-300 text-emerald-700",
+                    isClockedIn && "border-amber-300 text-amber-700"
+                  )}>
+                    {isDiscrepancy && isReviewed ? 'Reviewed' : isDiscrepancy ? 'Discrepancy' : isCompleted ? 'Completed' : 'Clocked In'}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground text-xs">Clock In</span>
+                    <p className="font-mono font-medium text-foreground">
+                      {tr.clock_in_time ? formatClockTime(tr.clock_in_time) : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">Clock Out</span>
+                    <p className="font-mono font-medium text-foreground">
+                      {tr.clock_out_time ? formatClockTime(tr.clock_out_time) : isClockedIn ? 'Active' : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Show reviewed discrepancy decisions */}
+                {isDiscrepancy && isReviewed && (
+                  <div className="space-y-1.5 pt-1 border-t border-border/50">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Review Decisions</span>
+                    {(tr.early_minutes_paid != null && tr.early_minutes_paid > 0) && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-foreground">Extra time (early/overtime) paid</span>
+                        <Badge variant="outline" className="border-emerald-300 text-emerald-700 text-[10px]">
+                          <Check className="w-3 h-3 mr-1" />
+                          {formatDuration(tr.early_minutes_paid)}
+                        </Badge>
+                      </div>
+                    )}
+                    {(tr.early_minutes_paid != null && tr.early_minutes_paid === 0) && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-foreground">Extra time (early/overtime)</span>
+                        <Badge variant="outline" className="border-muted text-muted-foreground text-[10px]">Unpaid</Badge>
+                      </div>
+                    )}
+                    {(tr.late_minutes_paid != null && tr.late_minutes_paid > 0) && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-foreground">Missing time paid</span>
+                        <Badge variant="outline" className="border-emerald-300 text-emerald-700 text-[10px]">
+                          <Check className="w-3 h-3 mr-1" />
+                          {formatDuration(tr.late_minutes_paid)}
+                        </Badge>
+                      </div>
+                    )}
+                    {(tr.late_minutes_paid != null && tr.late_minutes_paid === 0) && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-foreground">Missing time</span>
+                        <Badge variant="outline" className="border-muted text-muted-foreground text-[10px]">Unpaid</Badge>
+                      </div>
+                    )}
+                    {tr.notes && (
+                      <div className="text-xs text-muted-foreground italic mt-1">
+                        Note: {tr.notes}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Review/Amend button */}
+                {isDiscrepancy && onReviewDiscrepancy && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "w-full mt-1",
+                      isReviewed
+                        ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                        : "border-amber-300 text-amber-700 hover:bg-amber-50"
+                    )}
+                    onClick={() => onReviewDiscrepancy(existingShift)}
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 mr-2" />
+                    {isReviewed ? 'Amend Review' : 'Review Discrepancy'}
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="flex justify-between pt-4">
             <div>
               {existingShift && onDeleteShift && (
