@@ -102,7 +102,8 @@ const StaffShiftCard = ({
     }
   };
 
-  const canClockIn = record.status === 'scheduled' && !record.clock_in_time;
+  const isAdHoc = !record.shift_id;
+  const canClockIn = !isAdHoc && record.status === 'scheduled' && !record.clock_in_time;
   const canClockOut = record.clock_in_time && !record.clock_out_time;
 
   const needsCaptureForClockIn = requireGeoClockIn || requirePhotoClockIn;
