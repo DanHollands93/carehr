@@ -198,20 +198,22 @@ export const useTimeClockRecords = () => {
       const record = todayRecords?.find(r => r.id === recordId);
       if (!record) throw new Error('Record not found');
       
-      // Check for discrepancies
-      const today = format(now, 'yyyy-MM-dd');
-      const shiftStartDateTime = parseISO(`${today}T${record.shift_start_time}`);
-      const minutesDiff = differenceInMinutes(now, shiftStartDateTime);
-      
       let status: 'clocked_in' | 'discrepancy' = 'clocked_in';
       let discrepancyType: string | null = null;
-      
-      if (Math.abs(minutesDiff) > 15) {
-        status = 'discrepancy';
-        if (minutesDiff < -15) {
-          discrepancyType = 'early_clock_in';
-        } else if (minutesDiff > 15) {
-          discrepancyType = 'late_clock_in';
+
+      // Only check for discrepancies if this is a rostered shift (has shift_start_time)
+      if (record.shift_start_time) {
+        const today = format(now, 'yyyy-MM-dd');
+        const shiftStartDateTime = parseISO(`${today}T${record.shift_start_time}`);
+        const minutesDiff = differenceInMinutes(now, shiftStartDateTime);
+        
+        if (Math.abs(minutesDiff) > 15) {
+          status = 'discrepancy';
+          if (minutesDiff < -15) {
+            discrepancyType = 'early_clock_in';
+          } else if (minutesDiff > 15) {
+            discrepancyType = 'late_clock_in';
+          }
         }
       }
       
