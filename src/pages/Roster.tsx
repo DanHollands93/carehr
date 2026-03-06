@@ -1089,6 +1089,14 @@ const Roster = () => {
     });
     setShiftPopup(prev => ({ ...prev, isOpen: false }));
   };
+
+  const handleUpdateShiftFromPopup = (shiftData: {
+    start_time: string;
+    end_time: string;
+    position: string;
+    job_role_id: string;
+    pay_rate: number;
+  }) => {
     if (!canEditRoster || !shiftPopup.existingShift) return;
     
     const existingShifts = getShiftsForEmployeeAndDate(shiftPopup.employeeId, shiftPopup.date);
