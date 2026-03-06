@@ -230,6 +230,7 @@ const StaffShifts = () => {
               <ul className="text-xs md:text-sm text-muted-foreground space-y-1 pl-2">
                 <li>• Clock in at the start of your shift</li>
                 <li>• Clock out when your shift ends</li>
+                <li>• Use "Ad-hoc Clock In" for unrostered work like training</li>
                 <li>• You'll get warnings if clocking in/out outside the allowed time window</li>
                 <li>• Use the calendar above to see your upcoming shifts</li>
                 <li>• Contact your manager if you have any issues</li>
@@ -238,6 +239,21 @@ const StaffShifts = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Ad-hoc capture dialog */}
+      <ClockCaptureDialog
+        isOpen={showAdHocCapture}
+        onClose={() => setShowAdHocCapture(false)}
+        onComplete={(captureData: CaptureData) => {
+          setShowAdHocCapture(false);
+          adHocClockIn({ captureData });
+        }}
+        requirePhoto={!!requirePhotoClockIn}
+        requireGeo={!!requireGeoClockIn}
+        isClockIn={true}
+        employeeId={employeeProfile?.employee_id || ''}
+        isLoading={isAdHocClockingIn}
+      />
     </div>
   );
 };
