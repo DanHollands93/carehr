@@ -16,6 +16,7 @@ import { Plus, Edit, Trash2, Calendar, Play, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TemplateRosterBuilder from "@/components/TemplateRosterBuilder";
 import TemplateDeployment from "@/components/TemplateDeployment";
+import AllocationLocationManager from "@/components/AllocationLocationManager";
 
 type RepeatType = 'weekly' | 'bi_weekly' | 'monthly' | 'custom';
 
