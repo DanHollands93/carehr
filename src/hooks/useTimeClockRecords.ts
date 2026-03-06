@@ -334,14 +334,52 @@ export const useTimeClockRecords = () => {
     };
   };
 
+  const adHocClockInMutation = useMutation({
+    mutationFn: async ({ captureData }: { captureData?: { latitude?: number; longitude?: number; accuracy?: number; photoUrl?: string } } = {}) => {
+      if (!employeeProfile?.employee_id) throw new Error('No employee profile');
+      const now = new Date();
+      const today = format(now, 'yyyy-MM-dd');
+
+      const insertData: Record<string, any> = {
+        employee_id: employeeProfile.employee_id,
+        shift_id: null,
+        shift_date: today,
+        shift_start_time: null,
+        shift_end_time: null,
+        clock_in_time: now.toISOString(),
+        status: 'clocked_in',
+        notes: 'Ad-hoc clock in',
+      };
+
+      if (captureData?.latitude != null) insertData.clock_in_latitude = captureData.latitude;
+      if (captureData?.longitude != null) insertData.clock_in_longitude = captureData.longitude;
+      if (captureData?.accuracy != null) insertData.clock_in_accuracy = captureData.accuracy;
+      if (captureData?.photoUrl) insertData.clock_in_photo_url = captureData.photoUrl;
+
+      const { error } = await supabase
+        .from('time_clock_records')
+        .insert(insertData);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['time-clock-records'] });
+      toast({ title: "Ad-hoc clock in recorded!" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     todayRecords,
     upcomingShifts,
     isLoading,
     clockIn: clockInMutation.mutate,
     clockOut: clockOutMutation.mutate,
+    adHocClockIn: adHocClockInMutation.mutate,
     isClockingIn: clockInMutation.isPending,
     isClockingOut: clockOutMutation.isPending,
+    isAdHocClockingIn: adHocClockInMutation.isPending,
     validateClockTime
   };
 };
