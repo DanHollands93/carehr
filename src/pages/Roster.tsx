@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import RosterShiftCell from "@/components/RosterShiftCell";
+import OrphanedClockRecord, { OrphanedRecord } from "@/components/OrphanedClockRecord";
 import DiscrepancyReviewDialog, { DiscrepancyReviewResult } from "@/components/DiscrepancyReviewDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
