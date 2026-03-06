@@ -176,27 +176,36 @@ const StaffShiftCard = ({
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start">
             <CardTitle className="text-lg">
-              {record.shift_start_time} - {record.shift_end_time}
+              {isAdHoc ? (
+                <span className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs font-normal">Ad-hoc</Badge>
+                  Unrostered Shift
+                </span>
+              ) : (
+                `${record.shift_start_time} - ${record.shift_end_time}`
+              )}
             </CardTitle>
             {getStatusBadge()}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <Clock className="w-4 h-4" />
-            <span>
-              Duration: {(() => {
-                const [startHour, startMin] = record.shift_start_time.split(':').map(Number);
-                const [endHour, endMin] = record.shift_end_time.split(':').map(Number);
-                const startMinutes = startHour * 60 + startMin;
-                const endMinutes = endHour * 60 + endMin;
-                const duration = endMinutes - startMinutes;
-                const hours = Math.floor(duration / 60);
-                const minutes = duration % 60;
-                return `${hours}h ${minutes}m`;
-              })()}
-            </span>
-          </div>
+          {!isAdHoc && (
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <Clock className="w-4 h-4" />
+              <span>
+                Duration: {(() => {
+                  const [startHour, startMin] = record.shift_start_time.split(':').map(Number);
+                  const [endHour, endMin] = record.shift_end_time.split(':').map(Number);
+                  const startMinutes = startHour * 60 + startMin;
+                  const endMinutes = endHour * 60 + endMin;
+                  const duration = endMinutes - startMinutes;
+                  const hours = Math.floor(duration / 60);
+                  const minutes = duration % 60;
+                  return `${hours}h ${minutes}m`;
+                })()}
+              </span>
+            </div>
+          )}
 
           {allocationLocation && (
             <div className="flex items-center space-x-2 text-sm text-primary font-medium">
