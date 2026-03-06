@@ -353,6 +353,7 @@ const ShiftCreationPopup = ({
   }, [isOpen, date]);
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
         <DialogHeader>
