@@ -1535,6 +1535,23 @@ const Roster = () => {
                                               }}
                                             />
                                           ))}
+                                          {/* Add another shift button */}
+                                          {canEditRoster && (
+                                            <div
+                                              className="flex items-center justify-center py-1 opacity-0 group-hover:opacity-100 hover:!opacity-100 transition-opacity cursor-pointer rounded border border-dashed border-border/40 hover:border-primary/30 hover:bg-primary/5"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShiftPopup({
+                                                  isOpen: true,
+                                                  employeeId: employee.id,
+                                                  employeeName: `${employee.first_name} ${employee.last_name}`,
+                                                  date: dateStr,
+                                                });
+                                              }}
+                                            >
+                                              <Plus className="w-3 h-3 text-muted-foreground" />
+                                            </div>
+                                          )}
                                         </div>
                                       ) : canEditRoster ? (
                                         <div className="flex items-center justify-center h-full min-h-[56px] opacity-0 hover:opacity-100 transition-opacity">
