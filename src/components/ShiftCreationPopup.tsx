@@ -127,19 +127,20 @@ const ShiftCreationPopup = ({
       setEndTime(existingShift.end_time);
       
       // Find matching career history entry by job_role_id or position
+      // Only pre-select if there's a clear match — never auto-select a different role
       if (careerHistory && careerHistory.length > 0) {
-        const matchByJobRoleId = careerHistory.find(entry => 
-          entry.job_role_id === existingShift.job_role_id
-        );
+        const matchByJobRoleId = existingShift.job_role_id 
+          ? careerHistory.find(entry => entry.job_role_id === existingShift.job_role_id)
+          : null;
         const matchByTitle = careerHistory.find(entry => 
           entry.job_title === existingShift.position
         );
         const match = matchByJobRoleId || matchByTitle;
         if (match) {
           setSelectedCareerHistoryId(match.id);
-        } else if (careerHistory.length === 1) {
-          setSelectedCareerHistoryId(careerHistory[0].id);
         }
+        // Do NOT auto-select a career entry when editing if no match is found
+        // This prevents accidentally overwriting the shift's role
       }
       
       // Find matching template
