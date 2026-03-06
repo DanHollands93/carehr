@@ -167,14 +167,15 @@ export const useRosterSections = (templateId: string | undefined) => {
   };
 
   // Group employees into sections based on their shifts' job roles
+  // Employees can appear in MULTIPLE sections if they have shifts with different roles
   const groupEmployeesByShiftRoles = <T extends { employee_id: string; job_role_id?: string | null }>(
     employees: { id: string }[],
     shiftsData: T[]
-  ): { sectionId: string | null; sectionName: string; employeeIds: string[] }[] => {
+  ): { sectionId: string | null; sectionName: string; employeeIds: string[]; sectionJobRoleIds?: string[] }[] => {
     if (!sections || sections.length === 0) return [];
 
-    const groups: { sectionId: string | null; sectionName: string; employeeIds: string[] }[] = [];
-    const assignedToSection = new Set<string>();
+    const groups: { sectionId: string | null; sectionName: string; employeeIds: string[]; sectionJobRoleIds?: string[] }[] = [];
+    const assignedToAnySection = new Set<string>();
 
     for (const section of sections) {
       const sectionRuleJobRoleIds = (roleRules || [])
@@ -182,7 +183,7 @@ export const useRosterSections = (templateId: string | undefined) => {
         .map(r => r.job_role_id);
       
       if (sectionRuleJobRoleIds.length === 0) {
-        groups.push({ sectionId: section.id, sectionName: section.name, employeeIds: [] });
+        groups.push({ sectionId: section.id, sectionName: section.name, employeeIds: [], sectionJobRoleIds: [] });
         continue;
       }
 
@@ -195,14 +196,14 @@ export const useRosterSections = (templateId: string | undefined) => {
         );
         if (hasMatchingShift) {
           matchingEmployeeIds.add(emp.id);
-          assignedToSection.add(emp.id);
+          assignedToAnySection.add(emp.id);
         }
       }
-      groups.push({ sectionId: section.id, sectionName: section.name, employeeIds: Array.from(matchingEmployeeIds) });
+      groups.push({ sectionId: section.id, sectionName: section.name, employeeIds: Array.from(matchingEmployeeIds), sectionJobRoleIds: sectionRuleJobRoleIds });
     }
 
     // Unsectioned employees
-    const unsectioned = employees.filter(e => !assignedToSection.has(e.id)).map(e => e.id);
+    const unsectioned = employees.filter(e => !assignedToAnySection.has(e.id)).map(e => e.id);
     if (unsectioned.length > 0) {
       groups.push({ sectionId: null, sectionName: 'Other Staff', employeeIds: unsectioned });
     }
