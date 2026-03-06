@@ -216,7 +216,19 @@ const AllocationAssignmentDialog = ({
     return groups;
   };
 
-  const renderEmployeeCard = (empId: string) => {
+  const assignToLocation = (employeeId: string, targetLocationId: string) => {
+    setAssignments(prev => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        next[key] = next[key].filter(id => id !== employeeId);
+      }
+      if (!next[targetLocationId]) next[targetLocationId] = [];
+      next[targetLocationId].push(employeeId);
+      return next;
+    });
+  };
+
+  const renderEmployeeCard = (empId: string, showQuickAssign: boolean = false) => {
     const shiftInfo = getEmployeeShiftInfo(empId);
     return (
       <div
@@ -239,6 +251,28 @@ const AllocationAssignmentDialog = ({
             </div>
           )}
         </div>
+        {showQuickAssign && locations.length > 0 && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <Plus className="w-3.5 h-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-1" align="end">
+              <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">Assign to</div>
+              {locations.map(loc => (
+                <button
+                  key={loc.id}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                  onClick={() => assignToLocation(empId, loc.id)}
+                >
+                  <MapPin className="w-3 h-3 text-primary shrink-0" />
+                  <span className="truncate">{loc.name}</span>
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
     );
   };
