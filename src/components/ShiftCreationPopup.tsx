@@ -13,6 +13,7 @@ import { useCareerHistory } from "@/hooks/useCareerHistory";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { cn } from "@/lib/utils";
 
 interface ShiftTemplate {
@@ -91,6 +92,7 @@ const ShiftCreationPopup = ({
   existingShift
 }: ShiftCreationPopupProps) => {
   const { toast } = useToast();
+  const { companyId } = useUserCompanyId();
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
@@ -205,7 +207,7 @@ const ShiftCreationPopup = ({
     return null;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     console.log('Submit clicked');
     console.log('Selected career history ID:', selectedCareerHistoryId);
     
@@ -233,19 +235,37 @@ const ShiftCreationPopup = ({
       return;
     }
 
-    // Find the best matching job role
-    const matchingJobRole = findBestJobRoleMatch(selectedCareerEntry, jobRoles || []);
+    // Find the best matching job role, or auto-create from career entry title
+    let matchingJobRole = findBestJobRoleMatch(selectedCareerEntry, jobRoles || []);
     
     if (!matchingJobRole) {
-      console.log('No matching job role found for:', selectedCareerEntry.job_title, selectedCareerEntry.location);
-      console.log('Available job roles:', jobRoles);
-      
-      toast({
-        title: "Job Role Not Found",
-        description: `No matching job role found for "${selectedCareerEntry.job_title}" at "${selectedCareerEntry.location}". Please ensure a job role exists with matching title.`,
-        variant: "destructive"
-      });
-      return;
+      console.log('No matching job role found, auto-creating for:', selectedCareerEntry.job_title);
+      try {
+        const { data: newRole, error } = await supabase
+          .from('job_roles')
+          .insert([{ title: selectedCareerEntry.job_title, company_id: companyId || undefined }])
+          .select()
+          .single();
+        
+        if (error || !newRole) {
+          console.error('Failed to auto-create job role:', error);
+          toast({
+            title: "Job Role Not Found",
+            description: `Could not find or create job role for "${selectedCareerEntry.job_title}". Please check your lookup lists.`,
+            variant: "destructive"
+          });
+          return;
+        }
+        matchingJobRole = newRole;
+      } catch (err) {
+        console.error('Error auto-creating job role:', err);
+        toast({
+          title: "Error",
+          description: "Failed to create job role automatically.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     const shiftData = {
