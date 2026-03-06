@@ -157,7 +157,8 @@ const RosterTemplates = () => {
       description: "",
       repeat_type: "weekly",
       repeat_interval: 1,
-      end_date: ""
+      end_date: "",
+      allow_allocations: false
     });
     setEditingTemplate(null);
   };
