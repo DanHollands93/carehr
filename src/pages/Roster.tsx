@@ -99,7 +99,7 @@ const Roster = () => {
     employeeId: string;
     employeeName: string;
     date: string;
-    existingShift?: Shift;
+    existingShift?: ShiftWithTimeRecord;
   }>({
     isOpen: false,
     employeeId: '',
@@ -861,6 +861,15 @@ const Roster = () => {
             deleteShiftMutation.mutate(shiftPopup.existingShift!.id);
             setShiftPopup(prev => ({ ...prev, isOpen: false }));
           } : undefined}
+          onReviewDiscrepancy={(shift) => {
+            const emp = employees?.find(e => e.id === shift.employee_id);
+            setShiftPopup(prev => ({ ...prev, isOpen: false }));
+            setDiscrepancyReview({
+              isOpen: true,
+              shift: shift as ShiftWithTimeRecord,
+              employeeName: emp ? `${emp.first_name} ${emp.last_name}` : shiftPopup.employeeName,
+            });
+          }}
           shiftTemplates={shiftTemplates || []}
           employeeName={shiftPopup.employeeName}
           employeeId={shiftPopup.employeeId}
