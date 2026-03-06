@@ -78,6 +78,8 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   const hasClockedData = tr && (tr.clock_in_time || tr.clock_out_time);
   const hasTimeRecord = !!tr; // time_clock_record exists (even if no clock times)
   const isDiscrepancy = tr?.status === 'discrepancy';
+  const hasDiscrepancyType = !!tr?.discrepancy_type;
+  const needsReview = isDiscrepancy || (hasDiscrepancyType && tr?.approval_status !== 'reviewed');
   const isCompleted = tr?.status === 'completed';
   const isClockedIn = tr?.status === 'clocked_in';
   const isNoShow = tr?.discrepancy_type === 'did_not_clock_in' && !tr?.clock_in_time;
@@ -95,9 +97,7 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   const schedBarLeft = ((scheduledStart - windowStart) / windowDuration) * 100;
   const schedBarWidth = (scheduledDuration / windowDuration) * 100;
 
-  // Only show colored segments for shifts with actual discrepancies or clock issues
-  // Don't show red/amber segments for completed/approved shifts with minor variances
-  const shouldShowSegments = hasClockedData && (isDiscrepancy || isClockedIn);
+  const shouldShowSegments = hasClockedData && (isDiscrepancy || hasDiscrepancyType || isClockedIn);
 
   // Determine early/late segments for the actual bar
   const getSegments = () => {
@@ -168,14 +168,14 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   };
 
   const statusIcon = () => {
-    if (isDiscrepancy) return <AlertTriangle className="w-3 h-3 text-destructive" />;
+    if (isDiscrepancy || needsReview) return <AlertTriangle className="w-3 h-3 text-destructive" />;
     if (isCompleted) return <Check className="w-3 h-3 text-emerald-600" />;
     if (isClockedIn) return <Clock className="w-3 h-3 text-amber-500" />;
     return null;
   };
 
   const statusBorderClass = () => {
-    if (isDiscrepancy) return 'border-l-destructive';
+    if (isDiscrepancy || needsReview) return 'border-l-destructive';
     if (isCompleted) return 'border-l-emerald-500';
     if (isClockedIn) return 'border-l-amber-400';
     return 'border-l-primary';
@@ -192,7 +192,7 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
               statusBorderClass(),
               isHovered && "shadow-md ring-1 ring-primary/20",
               canEdit && "hover:shadow-md",
-              isDiscrepancy && "bg-destructive/5"
+              (isDiscrepancy || needsReview) && "bg-destructive/5"
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -289,7 +289,7 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
             )}
 
             {/* Inline review button for discrepancies - show for pending AND reviewed */}
-            {isDiscrepancy && canEdit && onReviewDiscrepancy && (
+            {(isDiscrepancy || hasDiscrepancyType) && canEdit && onReviewDiscrepancy && (
               <Button
                 size="sm"
                 variant="outline"
@@ -309,7 +309,7 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
               </Button>
             )}
             {/* Show reviewed badge for completed discrepancies without edit permission */}
-            {isDiscrepancy && !canEdit && tr?.approval_status === 'reviewed' && (
+            {(isDiscrepancy || hasDiscrepancyType) && !canEdit && tr?.approval_status === 'reviewed' && (
               <div className="text-[9px] text-emerald-600 font-medium mt-1 text-center">Reviewed ✓</div>
             )}
           </div>
