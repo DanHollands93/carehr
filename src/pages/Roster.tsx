@@ -1776,6 +1776,40 @@ const Roster = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Allocation Assignment Dialog */}
+      {selectedRosterTemplate?.allow_allocations && (
+        <AllocationAssignmentDialog
+          isOpen={allocationDialog.isOpen}
+          onClose={() => setAllocationDialog({ isOpen: false, date: '', dateLabel: '' })}
+          date={allocationDialog.date}
+          dateLabel={allocationDialog.dateLabel}
+          locations={allocationLocations}
+          employees={employees}
+          shiftsForDay={
+            (shifts || [])
+              .filter(s => s.date === allocationDialog.date)
+              .map(s => ({
+                employee_id: s.employee_id,
+                job_role_id: s.job_role_id,
+                position: s.position,
+                start_time: s.start_time,
+                end_time: s.end_time
+              }))
+          }
+          existingAllocations={getAllocationsForDate(allocationDialog.date)}
+          jobRoles={jobRolesData || []}
+          onSave={(assignments) => {
+            bulkSetAllocations.mutate(
+              assignments.map(a => ({
+                employeeId: a.employeeId,
+                date: allocationDialog.date,
+                locationId: a.locationId
+              }))
+            );
+          }}
+        />
+      )}
     </div>
   );
 };
