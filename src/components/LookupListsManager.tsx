@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 
 interface LookupList {
   id: string;
@@ -30,7 +31,9 @@ const LOOKUP_CATEGORIES = [
   { key: 'positions', label: 'Positions', description: 'Job positions for shifts and roles' }
 ];
 
-const LookupListsManager = ({ companyId }: { companyId?: string } = {}) => {
+const LookupListsManager = ({ companyId: propCompanyId }: { companyId?: string } = {}) => {
+  const { companyId: activeCompanyId } = useUserCompanyId();
+  const companyId = propCompanyId || activeCompanyId;
   const [selectedCategory, setSelectedCategory] = useState(LOOKUP_CATEGORIES[0].key);
   const [newValue, setNewValue] = useState("");
   const { toast } = useToast();
