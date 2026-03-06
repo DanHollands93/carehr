@@ -286,7 +286,15 @@ const Roster = () => {
             approval_status,
             early_minutes_paid,
             late_minutes_paid,
-            notes
+            notes,
+            clock_in_photo_url,
+            clock_out_photo_url,
+            clock_in_latitude,
+            clock_in_longitude,
+            clock_in_accuracy,
+            clock_out_latitude,
+            clock_out_longitude,
+            clock_out_accuracy
           )
         `)
         .gte('date', startDate)

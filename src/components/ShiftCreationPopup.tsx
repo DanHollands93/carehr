@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Clock, AlertTriangle, Check, RotateCcw } from "lucide-react";
+import { Trash2, Clock, AlertTriangle, Check, RotateCcw, Camera, Navigation, MapPin } from "lucide-react";
+import { useCompanyClockSettings } from "@/hooks/useCompanyClockSettings";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +37,14 @@ interface TimeRecord {
   early_minutes_paid?: number | null;
   late_minutes_paid?: number | null;
   notes?: string | null;
+  clock_in_photo_url?: string | null;
+  clock_out_photo_url?: string | null;
+  clock_in_latitude?: number | null;
+  clock_in_longitude?: number | null;
+  clock_in_accuracy?: number | null;
+  clock_out_latitude?: number | null;
+  clock_out_longitude?: number | null;
+  clock_out_accuracy?: number | null;
 }
 
 interface Shift {
@@ -307,6 +316,31 @@ const ShiftCreationPopup = ({
   const [manualClockMode, setManualClockMode] = useState<'clock_in' | 'clock_out' | null>(null);
   const [manualDate, setManualDate] = useState(date);
   const [manualTime, setManualTime] = useState('');
+  const [showPhotoDialog, setShowPhotoDialog] = useState<'clock_in' | 'clock_out' | null>(null);
+  const [showGeoDialog, setShowGeoDialog] = useState<'clock_in' | 'clock_out' | null>(null);
+  const [signedPhotoUrl, setSignedPhotoUrl] = useState<string | null>(null);
+
+  const {
+    requirePhotoClockIn,
+    requirePhotoClockOut,
+    requireGeoClockIn,
+    requireGeoClockOut,
+  } = useCompanyClockSettings();
+
+  const showPhotoButtons = requirePhotoClockIn || requirePhotoClockOut;
+  const showGeoButtons = requireGeoClockIn || requireGeoClockOut;
+
+  const handleViewPhoto = async (type: 'clock_in' | 'clock_out') => {
+    const photoPath = type === 'clock_in' 
+      ? existingShift?.time_record?.clock_in_photo_url 
+      : existingShift?.time_record?.clock_out_photo_url;
+    if (!photoPath) return;
+    const { data } = await supabase.storage
+      .from('clock-photos')
+      .createSignedUrl(photoPath, 300);
+    setSignedPhotoUrl(data?.signedUrl || null);
+    setShowPhotoDialog(type);
+  };
 
   // Reset tab when dialog opens
   useEffect(() => {
@@ -319,6 +353,7 @@ const ShiftCreationPopup = ({
   }, [isOpen, date]);
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
         <DialogHeader>
@@ -581,6 +616,20 @@ const ShiftCreationPopup = ({
                     {tr.notes?.includes('Manual clock in') && (
                       <span className="text-[10px] text-amber-600 font-medium">✎ Manually entered</span>
                     )}
+                    {tr.clock_in_time && (
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {showPhotoButtons && tr.clock_in_photo_url && (
+                          <Button variant="outline" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => handleViewPhoto('clock_in')}>
+                            <Camera className="w-3 h-3 mr-0.5" /> Photo
+                          </Button>
+                        )}
+                        {showGeoButtons && tr.clock_in_latitude != null && (
+                          <Button variant="outline" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setShowGeoDialog('clock_in')}>
+                            <Navigation className="w-3 h-3 mr-0.5" /> Location
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className={cn("rounded-lg p-3", isNoShow ? "bg-destructive/10" : "bg-muted/50")}>
                     <span className="text-muted-foreground text-xs">Clock Out</span>
@@ -589,6 +638,20 @@ const ShiftCreationPopup = ({
                     </p>
                     {tr.notes?.includes('Manual clock out') && (
                       <span className="text-[10px] text-amber-600 font-medium">✎ Manually entered</span>
+                    )}
+                    {tr.clock_out_time && (
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {showPhotoButtons && tr.clock_out_photo_url && (
+                          <Button variant="outline" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => handleViewPhoto('clock_out')}>
+                            <Camera className="w-3 h-3 mr-0.5" /> Photo
+                          </Button>
+                        )}
+                        {showGeoButtons && tr.clock_out_latitude != null && (
+                          <Button variant="outline" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setShowGeoDialog('clock_out')}>
+                            <Navigation className="w-3 h-3 mr-0.5" /> Location
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -825,6 +888,66 @@ const ShiftCreationPopup = ({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Photo Viewer Dialog */}
+    <Dialog open={showPhotoDialog !== null} onOpenChange={(open) => !open && setShowPhotoDialog(null)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {showPhotoDialog === 'clock_in' ? 'Clock In' : 'Clock Out'} Photo
+          </DialogTitle>
+        </DialogHeader>
+        {signedPhotoUrl ? (
+          <img src={signedPhotoUrl} alt="Clock photo" className="w-full rounded-md" />
+        ) : (
+          <p className="text-sm text-muted-foreground">Unable to load photo.</p>
+        )}
+      </DialogContent>
+    </Dialog>
+
+    {/* Geo Viewer Dialog */}
+    <Dialog open={showGeoDialog !== null} onOpenChange={(open) => !open && setShowGeoDialog(null)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {showGeoDialog === 'clock_in' ? 'Clock In' : 'Clock Out'} Location
+          </DialogTitle>
+        </DialogHeader>
+        {showGeoDialog && (() => {
+          const tr = existingShift?.time_record;
+          if (!tr) return <p className="text-sm text-muted-foreground">No data.</p>;
+          const lat = showGeoDialog === 'clock_in' ? tr.clock_in_latitude : tr.clock_out_latitude;
+          const lng = showGeoDialog === 'clock_in' ? tr.clock_in_longitude : tr.clock_out_longitude;
+          const acc = showGeoDialog === 'clock_in' ? tr.clock_in_accuracy : tr.clock_out_accuracy;
+          if (lat == null || lng == null) return <p className="text-sm text-muted-foreground">No location data.</p>;
+          const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+          return (
+            <div className="space-y-3">
+              <div className="rounded-lg border p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Navigation className="w-4 h-4 text-primary" />
+                  <span className="font-medium">Coordinates</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {lat.toFixed(6)}, {lng.toFixed(6)}
+                </p>
+                {acc != null && (
+                  <p className="text-xs text-muted-foreground">
+                    Accuracy: ±{Math.round(acc)}m
+                  </p>
+                )}
+              </div>
+              <Button variant="outline" className="w-full" asChild>
+                <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                  <MapPin className="w-4 h-4 mr-2" /> Open in Google Maps
+                </a>
+              </Button>
+            </div>
+          );
+        })()}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
