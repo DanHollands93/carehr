@@ -455,7 +455,75 @@ const TemplateRosterBuilder = ({
     return acc;
   }, {} as Record<string, ShiftTemplate[]>) || {};
 
-  const handleCustomSort = (newOrder: string[]) => {
+  const renderEmployeeRow = (employee: Employee) => {
+    return (
+      <tr key={employee.id} className="border-b">
+        <td className="p-3 font-medium min-w-[160px]">
+          <div>
+            <div>{employee.first_name} {employee.last_name}</div>
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 hover:bg-destructive/10"
+                onClick={() => openRemoveStaffDialog(employee.id, `${employee.first_name} ${employee.last_name}`)}
+                title="Remove staff member from roster"
+              >
+                <UserMinus className="w-3 h-3 text-destructive" />
+              </Button>
+            </div>
+          </div>
+        </td>
+        {weekDays.map((dayIndex) => {
+          const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
+          const template = shift ? shiftTemplates?.find(t => t.id === shift.shift_template_id) : null;
+          
+          return (
+            <td
+              key={dayIndex}
+              className="p-2 border-r border-l min-w-32"
+              onDrop={!isMobile ? () => handleDrop(employee.id, dayIndex) : undefined}
+              onDragOver={!isMobile ? handleDragOver : undefined}
+            >
+              <div 
+                className="min-h-16 border-2 border-dashed border-border/40 rounded p-2 hover:border-border transition-colors cursor-pointer"
+                style={{
+                  backgroundColor: (!isMobile && (draggedTemplate || draggedShift)) ? 'hsl(var(--primary) / 0.05)' : 'transparent'
+                }}
+                onClick={() => handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, dayIndex)}
+              >
+                {shift && template ? (
+                  <div 
+                    draggable={!isMobile}
+                    onDragStart={!isMobile ? () => handleShiftDragStart(shift) : undefined}
+                    onDragEnd={!isMobile ? handleDragEnd : undefined}
+                    className="p-2 rounded text-xs cursor-pointer hover:shadow-md transition-shadow"
+                    style={{ 
+                      backgroundColor: template.color + '20',
+                      borderColor: template.color
+                    }}
+                    onDoubleClick={!isMobile ? () => removeShift(shift) : undefined}
+                    title={isMobile ? "Tap to edit or remove" : "Drag to move or delete, double-click to remove"}
+                  >
+                    <div className="font-medium">{template.position}</div>
+                    <div>{template.start_time} - {template.end_time}</div>
+                    {shift.pay_rate && (
+                      <div className="text-xs text-muted-foreground">£{shift.pay_rate}/hr</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center h-full">
+                    <Plus className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+            </td>
+          );
+        })}
+      </tr>
+    );
+  };
+
     setCustomOrder(newOrder);
     setSortBy('custom');
     setShowSortDialog(false);
