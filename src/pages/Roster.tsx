@@ -1122,7 +1122,7 @@ const Roster = () => {
     pay_rate: number;
   }) => {
     if (!canEditRoster) return;
-    const formattedDate = format(new Date(shiftPopup.date), 'yyyy-MM-dd');
+    const formattedDate = shiftPopup.date;
     const existingShifts = getShiftsForEmployeeAndDate(shiftPopup.employeeId, formattedDate);
     if (hasTimeOverlap(shiftData.start_time, shiftData.end_time, existingShifts)) {
       toast({
