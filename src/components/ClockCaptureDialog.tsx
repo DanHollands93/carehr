@@ -238,7 +238,19 @@ const ClockCaptureDialog = ({
                 {photoStatus === 'error' && <XCircle className="h-4 w-4 text-destructive" />}
               </div>
 
-              {(photoStatus === 'camera' || photoStatus === 'idle') && (
+              {photoStatus === 'idle' && (
+                <div className="space-y-2">
+                  <div className="w-full rounded-md bg-muted aspect-[4/3] flex items-center justify-center">
+                    <Camera className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <Button onClick={startCamera} className="w-full">
+                    <Camera className="h-4 w-4 mr-2" />
+                    Open Camera
+                  </Button>
+                </div>
+              )}
+
+              {photoStatus === 'camera' && (
                 <div className="space-y-2">
                   <video
                     ref={videoRef}
@@ -247,7 +259,7 @@ const ClockCaptureDialog = ({
                     muted
                     className="w-full rounded-md bg-muted aspect-[4/3] object-cover"
                   />
-                  <Button onClick={takePhoto} className="w-full" disabled={photoStatus === 'idle'}>
+                  <Button onClick={takePhoto} className="w-full">
                     <Camera className="h-4 w-4 mr-2" />
                     Take Photo
                   </Button>
