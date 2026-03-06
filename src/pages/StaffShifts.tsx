@@ -1,16 +1,20 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Clock, User, MapPin } from "lucide-react";
+import { Calendar, Clock, User, MapPin, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTimeClockRecords } from "@/hooks/useTimeClockRecords";
 import { useTimeClockSettings } from "@/hooks/useTimeClockSettings";
+import { useCompanyClockSettings } from "@/hooks/useCompanyClockSettings";
 import StaffShiftCard from "@/components/StaffShiftCard";
 import UpcomingShiftsCalendar from "@/components/UpcomingShiftsCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import ClockCaptureDialog, { type CaptureData } from "@/components/ClockCaptureDialog";
 
 const StaffShifts = () => {
   const { user } = useAuth();
@@ -20,10 +24,19 @@ const StaffShifts = () => {
     isLoading, 
     clockIn, 
     clockOut, 
+    adHocClockIn,
     isClockingIn, 
     isClockingOut,
+    isAdHocClockingIn,
     validateClockTime 
   } = useTimeClockRecords();
+
+  const {
+    requireGeoClockIn,
+    requirePhotoClockIn,
+  } = useCompanyClockSettings();
+
+  const [showAdHocCapture, setShowAdHocCapture] = useState(false);
 
   // Fetch employee profile to get employee_id
   const { data: employeeProfile } = useQuery({
@@ -128,9 +141,31 @@ const StaffShifts = () => {
               <User className="w-3 h-3 md:w-4 md:h-4 lg:w-5 lg:h-5" />
               <span>Today's Shifts</span>
             </h2>
-            <Badge variant="outline" className="self-start sm:self-center text-xs">
-              {todayRecords?.length || 0} shifts
-            </Badge>
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              <Badge variant="outline" className="text-xs">
+                {todayRecords?.length || 0} shifts
+              </Badge>
+              {/* Only show ad-hoc button if not already clocked into an ad-hoc shift */}
+              {!todayRecords?.some(r => !r.shift_id && r.clock_in_time && !r.clock_out_time) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const needsCapture = requireGeoClockIn || requirePhotoClockIn;
+                    if (needsCapture) {
+                      setShowAdHocCapture(true);
+                    } else {
+                      adHocClockIn({});
+                    }
+                  }}
+                  disabled={isAdHocClockingIn}
+                  className="text-xs"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  {isAdHocClockingIn ? 'Clocking In...' : 'Ad-hoc Clock In'}
+                </Button>
+              )}
+            </div>
           </div>
 
           {todayRecords && todayRecords.length > 0 ? (
@@ -155,7 +190,7 @@ const StaffShifts = () => {
                   <Clock className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground" />
                   <h3 className="text-sm md:text-base lg:text-lg font-medium text-foreground">No shifts today</h3>
                   <p className="text-xs md:text-sm lg:text-base text-muted-foreground px-2 md:px-4">
-                    You don't have any shifts scheduled for today. Enjoy your day off!
+                    You don't have any shifts scheduled for today. Use the "Ad-hoc Clock In" button if you need to record unrostered work.
                   </p>
                 </div>
               </CardContent>
@@ -195,6 +230,7 @@ const StaffShifts = () => {
               <ul className="text-xs md:text-sm text-muted-foreground space-y-1 pl-2">
                 <li>• Clock in at the start of your shift</li>
                 <li>• Clock out when your shift ends</li>
+                <li>• Use "Ad-hoc Clock In" for unrostered work like training</li>
                 <li>• You'll get warnings if clocking in/out outside the allowed time window</li>
                 <li>• Use the calendar above to see your upcoming shifts</li>
                 <li>• Contact your manager if you have any issues</li>
@@ -203,6 +239,21 @@ const StaffShifts = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Ad-hoc capture dialog */}
+      <ClockCaptureDialog
+        isOpen={showAdHocCapture}
+        onClose={() => setShowAdHocCapture(false)}
+        onComplete={(captureData: CaptureData) => {
+          setShowAdHocCapture(false);
+          adHocClockIn({ captureData });
+        }}
+        requirePhoto={!!requirePhotoClockIn}
+        requireGeo={!!requireGeoClockIn}
+        isClockIn={true}
+        employeeId={employeeProfile?.employee_id || ''}
+        isLoading={isAdHocClockingIn}
+      />
     </div>
   );
 };

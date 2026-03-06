@@ -126,6 +126,27 @@ export const useTimeClockRecords = () => {
         
         records.push(recordWithShiftInfo);
       }
+
+      // Also fetch ad-hoc records (no shift linked) for today
+      const { data: adHocRecords, error: adHocError } = await supabase
+        .from('time_clock_records')
+        .select('*')
+        .eq('employee_id', employeeProfile.employee_id)
+        .is('shift_id', null)
+        .eq('shift_date', today);
+
+      if (adHocError) {
+        console.error('Error fetching ad-hoc records:', adHocError);
+      } else if (adHocRecords) {
+        for (const rec of adHocRecords) {
+          records.push({
+            ...rec,
+            shift_date: rec.shift_date || today,
+            shift_start_time: rec.shift_start_time || '',
+            shift_end_time: rec.shift_end_time || '',
+          } as TimeClockRecord);
+        }
+      }
       
       console.log('Final records for today:', records);
       return records;
@@ -177,20 +198,22 @@ export const useTimeClockRecords = () => {
       const record = todayRecords?.find(r => r.id === recordId);
       if (!record) throw new Error('Record not found');
       
-      // Check for discrepancies
-      const today = format(now, 'yyyy-MM-dd');
-      const shiftStartDateTime = parseISO(`${today}T${record.shift_start_time}`);
-      const minutesDiff = differenceInMinutes(now, shiftStartDateTime);
-      
       let status: 'clocked_in' | 'discrepancy' = 'clocked_in';
       let discrepancyType: string | null = null;
-      
-      if (Math.abs(minutesDiff) > 15) {
-        status = 'discrepancy';
-        if (minutesDiff < -15) {
-          discrepancyType = 'early_clock_in';
-        } else if (minutesDiff > 15) {
-          discrepancyType = 'late_clock_in';
+
+      // Only check for discrepancies if this is a rostered shift (has shift_start_time)
+      if (record.shift_start_time) {
+        const today = format(now, 'yyyy-MM-dd');
+        const shiftStartDateTime = parseISO(`${today}T${record.shift_start_time}`);
+        const minutesDiff = differenceInMinutes(now, shiftStartDateTime);
+        
+        if (Math.abs(minutesDiff) > 15) {
+          status = 'discrepancy';
+          if (minutesDiff < -15) {
+            discrepancyType = 'early_clock_in';
+          } else if (minutesDiff > 15) {
+            discrepancyType = 'late_clock_in';
+          }
         }
       }
       
@@ -236,20 +259,22 @@ export const useTimeClockRecords = () => {
       const record = todayRecords?.find(r => r.id === recordId);
       if (!record) throw new Error('Record not found');
       
-      // Check for discrepancies
-      const today = format(now, 'yyyy-MM-dd');
-      const shiftEndDateTime = parseISO(`${today}T${record.shift_end_time}`);
-      const minutesDiff = differenceInMinutes(now, shiftEndDateTime);
-      
       let status: 'completed' | 'discrepancy' = 'completed';
       let discrepancyType: string | null = record.discrepancy_type;
-      
-      if (Math.abs(minutesDiff) > 15) {
-        status = 'discrepancy';
-        if (minutesDiff < -15) {
-          discrepancyType = discrepancyType ? `${discrepancyType},early_clock_out` : 'early_clock_out';
-        } else if (minutesDiff > 15) {
-          discrepancyType = discrepancyType ? `${discrepancyType},late_clock_out` : 'late_clock_out';
+
+      // Only check for discrepancies if this is a rostered shift (has shift_end_time)
+      if (record.shift_end_time) {
+        const today = format(now, 'yyyy-MM-dd');
+        const shiftEndDateTime = parseISO(`${today}T${record.shift_end_time}`);
+        const minutesDiff = differenceInMinutes(now, shiftEndDateTime);
+        
+        if (Math.abs(minutesDiff) > 15) {
+          status = 'discrepancy';
+          if (minutesDiff < -15) {
+            discrepancyType = discrepancyType ? `${discrepancyType},early_clock_out` : 'early_clock_out';
+          } else if (minutesDiff > 15) {
+            discrepancyType = discrepancyType ? `${discrepancyType},late_clock_out` : 'late_clock_out';
+          }
         }
       }
       
@@ -313,14 +338,52 @@ export const useTimeClockRecords = () => {
     };
   };
 
+  const adHocClockInMutation = useMutation({
+    mutationFn: async ({ captureData }: { captureData?: { latitude?: number; longitude?: number; accuracy?: number; photoUrl?: string } } = {}) => {
+      if (!employeeProfile?.employee_id) throw new Error('No employee profile');
+      const now = new Date();
+      const today = format(now, 'yyyy-MM-dd');
+
+      const insertData: Record<string, any> = {
+        employee_id: employeeProfile.employee_id,
+        shift_id: null,
+        shift_date: today,
+        shift_start_time: null,
+        shift_end_time: null,
+        clock_in_time: now.toISOString(),
+        status: 'clocked_in',
+        notes: 'Ad-hoc clock in',
+      };
+
+      if (captureData?.latitude != null) insertData.clock_in_latitude = captureData.latitude;
+      if (captureData?.longitude != null) insertData.clock_in_longitude = captureData.longitude;
+      if (captureData?.accuracy != null) insertData.clock_in_accuracy = captureData.accuracy;
+      if (captureData?.photoUrl) insertData.clock_in_photo_url = captureData.photoUrl;
+
+      const { error } = await supabase
+        .from('time_clock_records')
+        .insert(insertData as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['time-clock-records'] });
+      toast({ title: "Ad-hoc clock in recorded!" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     todayRecords,
     upcomingShifts,
     isLoading,
     clockIn: clockInMutation.mutate,
     clockOut: clockOutMutation.mutate,
+    adHocClockIn: adHocClockInMutation.mutate,
     isClockingIn: clockInMutation.isPending,
     isClockingOut: clockOutMutation.isPending,
+    isAdHocClockingIn: adHocClockInMutation.isPending,
     validateClockTime
   };
 };
