@@ -316,6 +316,31 @@ const ShiftCreationPopup = ({
   const [manualClockMode, setManualClockMode] = useState<'clock_in' | 'clock_out' | null>(null);
   const [manualDate, setManualDate] = useState(date);
   const [manualTime, setManualTime] = useState('');
+  const [showPhotoDialog, setShowPhotoDialog] = useState<'clock_in' | 'clock_out' | null>(null);
+  const [showGeoDialog, setShowGeoDialog] = useState<'clock_in' | 'clock_out' | null>(null);
+  const [signedPhotoUrl, setSignedPhotoUrl] = useState<string | null>(null);
+
+  const {
+    requirePhotoClockIn,
+    requirePhotoClockOut,
+    requireGeoClockIn,
+    requireGeoClockOut,
+  } = useCompanyClockSettings();
+
+  const showPhotoButtons = requirePhotoClockIn || requirePhotoClockOut;
+  const showGeoButtons = requireGeoClockIn || requireGeoClockOut;
+
+  const handleViewPhoto = async (type: 'clock_in' | 'clock_out') => {
+    const photoPath = type === 'clock_in' 
+      ? existingShift?.time_record?.clock_in_photo_url 
+      : existingShift?.time_record?.clock_out_photo_url;
+    if (!photoPath) return;
+    const { data } = await supabase.storage
+      .from('clock-photos')
+      .createSignedUrl(photoPath, 300);
+    setSignedPhotoUrl(data?.signedUrl || null);
+    setShowPhotoDialog(type);
+  };
 
   // Reset tab when dialog opens
   useEffect(() => {
