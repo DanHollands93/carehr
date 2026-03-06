@@ -1210,6 +1210,15 @@ const Roster = () => {
             });
             setShiftPopup(prev => ({ ...prev, isOpen: false }));
           } : (shiftData) => {
+            const existingShifts = getShiftsForEmployeeAndDate(shiftPopup.employeeId, shiftPopup.date);
+            if (hasTimeOverlap(shiftData.start_time, shiftData.end_time, existingShifts)) {
+              toast({
+                title: "Time Overlap Error",
+                description: "This shift overlaps with another existing shift. Please choose different times.",
+                variant: "destructive"
+              });
+              return;
+            }
             createShiftMutation.mutate({
               employeeId: shiftPopup.employeeId,
               date: shiftPopup.date,
