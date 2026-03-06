@@ -900,27 +900,11 @@ const TemplateRosterBuilder = ({
                         return employees.map((employee) => renderEmployeeRow(employee));
                       }
 
-                      // Build section groups
-                      const sectionGroups: { sectionId: string | null; sectionName: string; employees: typeof employees }[] = [];
-                      const assignedToSection = new Set<string>();
-
-                      for (const section of sections) {
-                        const sectionEmployees = employees.filter(emp => {
-                          const empJobRoleIds = (allEmployeeJobRoles || [])
-                            .filter(ejr => ejr.employee_id === emp.id)
-                            .map(ejr => ejr.job_role_id);
-                          const matchedSection = getSectionForEmployee(empJobRoleIds);
-                          return matchedSection === section.id;
-                        });
-                        sectionEmployees.forEach(e => assignedToSection.add(e.id));
-                        sectionGroups.push({ sectionId: section.id, sectionName: section.name, employees: sectionEmployees });
-                      }
-
-                      // Unsectioned employees
-                      const unsectioned = employees.filter(e => !assignedToSection.has(e.id));
-                      if (unsectioned.length > 0) {
-                        sectionGroups.push({ sectionId: null, sectionName: 'Other Staff', employees: unsectioned });
-                      }
+                      // Build section groups based on shift job roles
+                      const sectionGroups = groupEmployeesByShiftRoles(
+                        employees,
+                        templateShifts.map(s => ({ employee_id: s.employee_id, job_role_id: s.job_role_id || null }))
+                      );
 
                       return sectionGroups.map((group) => (
                         <>
