@@ -26,25 +26,11 @@ const SETTING_META: Record<string, { label: string; icon: React.ElementType; cat
 };
 
 const CompanySettingsManager = ({ companyId: propCompanyId }: { companyId?: string } = {}) => {
-  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { companyId: activeCompanyId } = useUserCompanyId();
 
-  const { data: profile } = useQuery({
-    queryKey: ["profile-company", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", user!.id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id && !propCompanyId,
-  });
-
-  const companyId = propCompanyId || profile?.company_id;
+  const companyId = propCompanyId || activeCompanyId;
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["company-settings", companyId],
