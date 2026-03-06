@@ -1799,6 +1799,8 @@ const Roster = () => {
           }
           existingAllocations={getAllocationsForDate(allocationDialog.date)}
           jobRoles={jobRolesData || []}
+          sections={rosterSections}
+          sectionRoleRules={sectionRoleRules}
           onSave={(assignments) => {
             bulkSetAllocations.mutate(
               assignments.map(a => ({
