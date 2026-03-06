@@ -1426,13 +1426,15 @@ const Roster = () => {
                                   )}
                                 </div>
                               </td>
-                              {weekDays.map((day) => {
+                               {weekDays.map((day) => {
                                 const dateStr = format(day, 'yyyy-MM-dd');
                                 const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
                                 const dayShifts = shifts?.filter(shift => 
                                   shift.employee_id === employee.id && 
                                   shift.date === dateStr
                                 ) || [];
+                                const dayOrphaned = getOrphanedRecordsForEmployeeAndDate(employee.id, dateStr);
+                                const hasContent = dayShifts.length > 0 || dayOrphaned.length > 0;
                                 return (
                                   <td
                                     key={day.toISOString()}
@@ -1445,7 +1447,7 @@ const Roster = () => {
                                       e.preventDefault();
                                       handleDrop(employee.id, dateStr);
                                     }}
-                                    onClick={() => canEditRoster && dayShifts.length === 0 && setShiftPopup({
+                                    onClick={() => canEditRoster && !hasContent && setShiftPopup({
                                       isOpen: true,
                                       employeeId: employee.id,
                                       employeeName: `${employee.first_name} ${employee.last_name}`,
@@ -1454,14 +1456,12 @@ const Roster = () => {
                                   >
                                     <div className={cn(
                                       "min-h-[60px] rounded-md p-0.5 transition-colors",
-                                      dayShifts.length === 0 && canEditRoster && "border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer",
-                                      dayShifts.length === 0 && !canEditRoster && "border border-dashed border-border/30"
+                                      !hasContent && canEditRoster && "border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer",
+                                      !hasContent && !canEditRoster && "border border-dashed border-border/30"
                                     )}>
-                                      {dayShifts.length > 0 ? (
+                                      {hasContent ? (
                                         <div className="space-y-1">
                                           {dayShifts.map((shift) => {
-                                            // Determine if this shift belongs to the current section
-                                            // Shifts with no job_role_id are never faded (they belong everywhere)
                                             const isFaded = sectionJobRoleIds && shift.job_role_id
                                               ? !sectionJobRoleIds.includes(shift.job_role_id)
                                               : false;
@@ -1497,6 +1497,22 @@ const Roster = () => {
                                               />
                                             );
                                           })}
+                                          {dayOrphaned.map((record) => (
+                                            <OrphanedClockRecord
+                                              key={`orphan-${record.id}`}
+                                              record={record}
+                                              canEdit={canEditRoster}
+                                              onReview={(r) => {
+                                                // Open shift creation popup so they can attach a shift
+                                                setShiftPopup({
+                                                  isOpen: true,
+                                                  employeeId: employee.id,
+                                                  employeeName: `${employee.first_name} ${employee.last_name}`,
+                                                  date: dateStr,
+                                                });
+                                              }}
+                                            />
+                                          ))}
                                         </div>
                                       ) : canEditRoster ? (
                                         <div className="flex items-center justify-center h-full min-h-[56px] opacity-0 hover:opacity-100 transition-opacity">
