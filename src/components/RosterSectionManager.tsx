@@ -38,7 +38,7 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
   const [addingRuleToSection, setAddingRuleToSection] = useState<string | null>(null);
   const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
 
-  // Fetch job roles from lookup lists (positions category) and match to job_roles table
+  // Fetch job roles matching lookup list positions for this company
   const { data: jobRoles } = useQuery({
     queryKey: ['job-roles-for-sections', companyId],
     queryFn: async () => {
@@ -46,7 +46,7 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
       let lookupQuery = supabase
         .from('lookup_lists')
         .select('value')
-        .in('category', ['positions', 'position'])
+        .eq('category', 'positions')
         .eq('is_active', true);
       
       if (companyId) {
@@ -56,10 +56,9 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
       const { data: lookupData, error: lookupError } = await lookupQuery;
       if (lookupError) throw lookupError;
 
-      // Get unique position names from lookup lists
       const positionNames = [...new Set((lookupData || []).map(l => l.value))];
 
-      // Now fetch matching job_roles
+      // Fetch job_roles for matching
       let rolesQuery = supabase
         .from('job_roles')
         .select('id, title, department')
@@ -72,14 +71,13 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
       const { data: rolesData, error: rolesError } = await rolesQuery;
       if (rolesError) throw rolesError;
 
-      // If lookup lists have positions, filter job_roles to only those matching
-      if (positionNames.length > 0) {
-        return (rolesData || []).filter(r => 
-          positionNames.some(p => p.toLowerCase() === r.title.toLowerCase())
-        );
-      }
+      // If no lookup positions defined, show all job roles
+      if (positionNames.length === 0) return rolesData;
 
-      return rolesData;
+      // Filter job_roles to those matching lookup list values (case-insensitive)
+      return (rolesData || []).filter(r => 
+        positionNames.some(p => p.toLowerCase() === r.title.toLowerCase())
+      );
     },
     enabled: !!companyId,
   });
