@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -120,7 +120,7 @@ const TemplateRosterBuilder = ({
   });
   
   const { data: allEmployeeJobRoles } = useAllEmployeeJobRoles();
-  const { sections, getSectionForEmployee } = useRosterSections(templateId);
+  const { sections, groupEmployeesByShiftRoles } = useRosterSections(templateId);
 
   // Calculate period length in days
   const getPeriodDays = () => {
@@ -900,43 +900,31 @@ const TemplateRosterBuilder = ({
                         return employees.map((employee) => renderEmployeeRow(employee));
                       }
 
-                      // Build section groups
-                      const sectionGroups: { sectionId: string | null; sectionName: string; employees: typeof employees }[] = [];
-                      const assignedToSection = new Set<string>();
-
-                      for (const section of sections) {
-                        const sectionEmployees = employees.filter(emp => {
-                          const empJobRoleIds = (allEmployeeJobRoles || [])
-                            .filter(ejr => ejr.employee_id === emp.id)
-                            .map(ejr => ejr.job_role_id);
-                          const matchedSection = getSectionForEmployee(empJobRoleIds);
-                          return matchedSection === section.id;
-                        });
-                        sectionEmployees.forEach(e => assignedToSection.add(e.id));
-                        sectionGroups.push({ sectionId: section.id, sectionName: section.name, employees: sectionEmployees });
-                      }
-
-                      // Unsectioned employees
-                      const unsectioned = employees.filter(e => !assignedToSection.has(e.id));
-                      if (unsectioned.length > 0) {
-                        sectionGroups.push({ sectionId: null, sectionName: 'Other Staff', employees: unsectioned });
-                      }
+                      // Build section groups based on shift job roles
+                      const sectionGroups = groupEmployeesByShiftRoles(
+                        employees,
+                        templateShifts.map(s => ({ employee_id: s.employee_id, job_role_id: s.job_role_id || null }))
+                      );
 
                       return sectionGroups.map((group) => (
-                        <>
-                          <tr key={`section-${group.sectionId || 'other'}`} className="bg-muted/50">
+                        <React.Fragment key={`section-${group.sectionId || 'other'}`}>
+                          <tr className="bg-muted/50">
                             <td
                               colSpan={weekDays.length + 1}
                               className="px-3 py-2 font-semibold text-sm text-foreground border-b border-t"
                             >
                               {group.sectionName}
                               <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                ({group.employees.length} staff)
+                                ({group.employeeIds.length} staff)
                               </span>
                             </td>
                           </tr>
-                          {group.employees.map((employee) => renderEmployeeRow(employee))}
-                        </>
+                          {group.employeeIds.map((empId) => {
+                            const employee = employees.find(e => e.id === empId);
+                            if (!employee) return null;
+                            return renderEmployeeRow(employee);
+                          })}
+                        </React.Fragment>
                       ));
                     })()}
                   </tbody>

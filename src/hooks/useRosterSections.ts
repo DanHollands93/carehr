@@ -155,6 +155,61 @@ export const useRosterSections = (templateId: string | undefined) => {
     return null;
   };
 
+  // Get the section for a specific job role ID (shift-based assignment)
+  const getSectionForJobRole = (jobRoleId: string | null): string | null => {
+    if (!jobRoleId || !roleRules || !sections || sections.length === 0) return null;
+    
+    for (const section of sections) {
+      const sectionRules = roleRules.filter(r => r.section_id === section.id);
+      if (sectionRules.some(rule => rule.job_role_id === jobRoleId)) return section.id;
+    }
+    return null;
+  };
+
+  // Group employees into sections based on their shifts' job roles
+  const groupEmployeesByShiftRoles = <T extends { employee_id: string; job_role_id?: string | null }>(
+    employees: { id: string }[],
+    shiftsData: T[]
+  ): { sectionId: string | null; sectionName: string; employeeIds: string[] }[] => {
+    if (!sections || sections.length === 0) return [];
+
+    const groups: { sectionId: string | null; sectionName: string; employeeIds: string[] }[] = [];
+    const assignedToSection = new Set<string>();
+
+    for (const section of sections) {
+      const sectionRuleJobRoleIds = (roleRules || [])
+        .filter(r => r.section_id === section.id)
+        .map(r => r.job_role_id);
+      
+      if (sectionRuleJobRoleIds.length === 0) {
+        groups.push({ sectionId: section.id, sectionName: section.name, employeeIds: [] });
+        continue;
+      }
+
+      // Find employees who have at least one shift with a job_role matching this section
+      const matchingEmployeeIds = new Set<string>();
+      for (const emp of employees) {
+        const empShifts = shiftsData.filter(s => s.employee_id === emp.id);
+        const hasMatchingShift = empShifts.some(s => 
+          s.job_role_id && sectionRuleJobRoleIds.includes(s.job_role_id)
+        );
+        if (hasMatchingShift) {
+          matchingEmployeeIds.add(emp.id);
+          assignedToSection.add(emp.id);
+        }
+      }
+      groups.push({ sectionId: section.id, sectionName: section.name, employeeIds: Array.from(matchingEmployeeIds) });
+    }
+
+    // Unsectioned employees
+    const unsectioned = employees.filter(e => !assignedToSection.has(e.id)).map(e => e.id);
+    if (unsectioned.length > 0) {
+      groups.push({ sectionId: null, sectionName: 'Other Staff', employeeIds: unsectioned });
+    }
+
+    return groups;
+  };
+
   const getRulesForSection = (sectionId: string) => {
     return roleRules?.filter(r => r.section_id === sectionId) || [];
   };
@@ -169,6 +224,8 @@ export const useRosterSections = (templateId: string | undefined) => {
     addRoleRule,
     removeRoleRule,
     getSectionForEmployee,
+    getSectionForJobRole,
+    groupEmployeesByShiftRoles,
     getRulesForSection
   };
 };

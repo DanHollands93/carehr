@@ -26,7 +26,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
 import { useTimeClockSettings } from "@/hooks/useTimeClockSettings";
 import { useRosterSections } from "@/hooks/useRosterSections";
-import { useAllEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
+
 
 interface Employee {
   id: string;
@@ -309,9 +309,8 @@ const Roster = () => {
     earlyClockInAutoAction, lateClockInAutoAction, earlyClockOutAutoAction, lateClockOutAutoAction,
   } = useTimeClockSettings();
 
-  // Roster sections for grouping employees
-  const { sections: rosterSections, getSectionForEmployee } = useRosterSections(selectedRosterTemplate?.id);
-  const { data: allEmployeeJobRolesData } = useAllEmployeeJobRoles();
+  // Roster sections for grouping employees by shift job roles
+  const { sections: rosterSections, groupEmployeesByShiftRoles } = useRosterSections(selectedRosterTemplate?.id);
 
   // Auto-apply exceptions for discrepancies within threshold
   const autoApplyProcessedRef = useRef<Set<string>>(new Set());
@@ -1371,25 +1370,11 @@ const Roster = () => {
                             return employees.map((employee, idx) => renderEmployeeRow(employee, idx));
                           }
 
-                          // Group employees by section
-                          const sectionGroups: { sectionId: string | null; sectionName: string; employees: Employee[] }[] = [];
-                          const assignedToSection = new Set<string>();
-
-                          for (const section of rosterSections) {
-                            const sectionEmployees = employees.filter(emp => {
-                              const empJobRoleIds = (allEmployeeJobRolesData || [])
-                                .filter(ejr => ejr.employee_id === emp.id)
-                                .map(ejr => ejr.job_role_id);
-                              return getSectionForEmployee(empJobRoleIds) === section.id;
-                            });
-                            sectionEmployees.forEach(e => assignedToSection.add(e.id));
-                            sectionGroups.push({ sectionId: section.id, sectionName: section.name, employees: sectionEmployees });
-                          }
-
-                          const unsectioned = employees.filter(e => !assignedToSection.has(e.id));
-                          if (unsectioned.length > 0) {
-                            sectionGroups.push({ sectionId: null, sectionName: 'Other Staff', employees: unsectioned });
-                          }
+                          // Group employees by their shifts' job roles
+                          const sectionGroups = groupEmployeesByShiftRoles(
+                            employees,
+                            (shifts || []).map(s => ({ employee_id: s.employee_id, job_role_id: s.job_role_id }))
+                          );
 
                           let rowIdx = 0;
                           return sectionGroups.map((group) => (
@@ -1401,11 +1386,15 @@ const Roster = () => {
                                 >
                                   {group.sectionName}
                                   <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                    ({group.employees.length} staff)
+                                    ({group.employeeIds.length} staff)
                                   </span>
                                 </td>
                               </tr>
-                              {group.employees.map((employee) => renderEmployeeRow(employee, rowIdx++))}
+                              {group.employeeIds.map((empId) => {
+                                const employee = employees.find(e => e.id === empId);
+                                if (!employee) return null;
+                                return renderEmployeeRow(employee, rowIdx++);
+                              })}
                             </React.Fragment>
                           ));
                         })()}
