@@ -141,9 +141,31 @@ const StaffShifts = () => {
               <User className="w-3 h-3 md:w-4 md:h-4 lg:w-5 lg:h-5" />
               <span>Today's Shifts</span>
             </h2>
-            <Badge variant="outline" className="self-start sm:self-center text-xs">
-              {todayRecords?.length || 0} shifts
-            </Badge>
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              <Badge variant="outline" className="text-xs">
+                {todayRecords?.length || 0} shifts
+              </Badge>
+              {/* Only show ad-hoc button if not already clocked into an ad-hoc shift */}
+              {!todayRecords?.some(r => !r.shift_id && r.clock_in_time && !r.clock_out_time) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const needsCapture = requireGeoClockIn || requirePhotoClockIn;
+                    if (needsCapture) {
+                      setShowAdHocCapture(true);
+                    } else {
+                      adHocClockIn({});
+                    }
+                  }}
+                  disabled={isAdHocClockingIn}
+                  className="text-xs"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  {isAdHocClockingIn ? 'Clocking In...' : 'Ad-hoc Clock In'}
+                </Button>
+              )}
+            </div>
           </div>
 
           {todayRecords && todayRecords.length > 0 ? (
@@ -168,7 +190,7 @@ const StaffShifts = () => {
                   <Clock className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground" />
                   <h3 className="text-sm md:text-base lg:text-lg font-medium text-foreground">No shifts today</h3>
                   <p className="text-xs md:text-sm lg:text-base text-muted-foreground px-2 md:px-4">
-                    You don't have any shifts scheduled for today. Enjoy your day off!
+                    You don't have any shifts scheduled for today. Use the "Ad-hoc Clock In" button if you need to record unrostered work.
                   </p>
                 </div>
               </CardContent>
