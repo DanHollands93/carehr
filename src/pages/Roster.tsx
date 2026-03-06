@@ -309,6 +309,10 @@ const Roster = () => {
     earlyClockInAutoAction, lateClockInAutoAction, earlyClockOutAutoAction, lateClockOutAutoAction,
   } = useTimeClockSettings();
 
+  // Roster sections for grouping employees
+  const { sections: rosterSections, getSectionForEmployee } = useRosterSections(selectedRosterTemplate?.id);
+  const { data: allEmployeeJobRolesData } = useAllEmployeeJobRoles();
+
   // Auto-apply exceptions for discrepancies within threshold
   const autoApplyProcessedRef = useRef<Set<string>>(new Set());
 
