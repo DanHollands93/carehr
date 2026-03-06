@@ -11,11 +11,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
+import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Save, Users, Trash2, ArrowUpDown, Plus, UserPlus, Search, UserMinus } from "lucide-react";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import RoleSelectionDialog from "@/components/RoleSelectionDialog";
 import RosterSectionManager from "@/components/RosterSectionManager";
+import AllocationLocationManager from "@/components/AllocationLocationManager";
 import { useAllEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
 import { useRosterSections } from "@/hooks/useRosterSections";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -121,6 +123,34 @@ const TemplateRosterBuilder = ({
   
   const { data: allEmployeeJobRoles } = useAllEmployeeJobRoles();
   const { sections, groupEmployeesByShiftRoles } = useRosterSections(templateId);
+
+  // Fetch template's allow_allocations setting
+  const { data: templateSettings } = useQuery({
+    queryKey: ['roster-template-settings', templateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('roster_templates')
+        .select('allow_allocations')
+        .eq('id', templateId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!templateId
+  });
+
+  const toggleAllocationsMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase
+        .from('roster_templates')
+        .update({ allow_allocations: enabled })
+        .eq('id', templateId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roster-template-settings', templateId] });
+    }
+  });
 
   // Calculate period length in days
   const getPeriodDays = () => {
@@ -518,9 +548,9 @@ const TemplateRosterBuilder = ({
     return acc;
   }, {} as Record<string, ShiftTemplate[]>) || {};
 
-  const renderEmployeeRow = (employee: Employee) => {
+  const renderEmployeeRow = (employee: Employee, sectionJobRoleIds?: string[]) => {
     return (
-      <tr key={employee.id} className="border-b">
+      <tr key={`${employee.id}-${sectionJobRoleIds?.join(',') || 'all'}`} className="border-b">
         <td className="p-3 font-medium min-w-[160px]">
           <div>
             <div>{employee.first_name} {employee.last_name}</div>
@@ -540,6 +570,9 @@ const TemplateRosterBuilder = ({
         {weekDays.map((dayIndex) => {
           const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
           const template = shift ? shiftTemplates?.find(t => t.id === shift.shift_template_id) : null;
+          const isFaded = sectionJobRoleIds && shift?.job_role_id
+            ? !sectionJobRoleIds.includes(shift.job_role_id)
+            : false;
           
           return (
             <td
@@ -549,24 +582,27 @@ const TemplateRosterBuilder = ({
               onDragOver={!isMobile ? handleDragOver : undefined}
             >
               <div 
-                className="min-h-16 border-2 border-dashed border-border/40 rounded p-2 hover:border-border transition-colors cursor-pointer"
+                className={cn(
+                  "min-h-16 border-2 border-dashed border-border/40 rounded p-2 hover:border-border transition-colors",
+                  isFaded ? "opacity-40 pointer-events-none" : "cursor-pointer"
+                )}
                 style={{
-                  backgroundColor: (!isMobile && (draggedTemplate || draggedShift)) ? 'hsl(var(--primary) / 0.05)' : 'transparent'
+                  backgroundColor: (!isMobile && (draggedTemplate || draggedShift) && !isFaded) ? 'hsl(var(--primary) / 0.05)' : 'transparent'
                 }}
-                onClick={() => handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, dayIndex)}
+                onClick={() => !isFaded && handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, dayIndex)}
               >
                 {shift && template ? (
                   <div 
-                    draggable={!isMobile}
-                    onDragStart={!isMobile ? () => handleShiftDragStart(shift) : undefined}
+                    draggable={!isMobile && !isFaded}
+                    onDragStart={!isMobile && !isFaded ? () => handleShiftDragStart(shift) : undefined}
                     onDragEnd={!isMobile ? handleDragEnd : undefined}
                     className="p-2 rounded text-xs cursor-pointer hover:shadow-md transition-shadow"
                     style={{ 
                       backgroundColor: template.color + '20',
                       borderColor: template.color
                     }}
-                    onDoubleClick={!isMobile ? () => removeShift(shift) : undefined}
-                    title={isMobile ? "Tap to edit or remove" : "Drag to move or delete, double-click to remove"}
+                    onDoubleClick={!isMobile && !isFaded ? () => removeShift(shift) : undefined}
+                    title={isFaded ? "This shift belongs to another section" : (isMobile ? "Tap to edit or remove" : "Drag to move or delete, double-click to remove")}
                   >
                     <div className="font-medium">{template.position}</div>
                     <div>{template.start_time} - {template.end_time}</div>
@@ -985,7 +1021,7 @@ const TemplateRosterBuilder = ({
                           {group.employeeIds.map((empId) => {
                             const employee = employees.find(e => e.id === empId);
                             if (!employee) return null;
-                            return renderEmployeeRow(employee);
+                            return renderEmployeeRow(employee, group.sectionJobRoleIds);
                           })}
                         </React.Fragment>
                       ));
@@ -1004,6 +1040,20 @@ const TemplateRosterBuilder = ({
 
         {/* Roster Sections Manager */}
         <RosterSectionManager templateId={templateId} />
+
+        {/* Allocation Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Allocation Settings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AllocationLocationManager
+              templateId={templateId}
+              allowAllocations={templateSettings?.allow_allocations || false}
+              onToggleAllocations={(enabled) => toggleAllocationsMutation.mutate(enabled)}
+            />
+          </CardContent>
+        </Card>
 
         {/* Staff Management Section */}
         <Card>
