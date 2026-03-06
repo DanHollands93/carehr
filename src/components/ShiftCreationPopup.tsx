@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Clock, AlertTriangle, Check, RotateCcw } from "lucide-react";
+import { Trash2, Clock, AlertTriangle, Check, RotateCcw, Camera, Navigation, MapPin } from "lucide-react";
+import { useCompanyClockSettings } from "@/hooks/useCompanyClockSettings";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
