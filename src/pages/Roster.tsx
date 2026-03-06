@@ -27,6 +27,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
 import { useTimeClockSettings } from "@/hooks/useTimeClockSettings";
 import { useRosterSections } from "@/hooks/useRosterSections";
+import { useAllocationLocations } from "@/hooks/useAllocationLocations";
+import { useDailyAllocations } from "@/hooks/useDailyAllocations";
+import AllocationAssignmentDialog from "@/components/AllocationAssignmentDialog";
 
 
 interface Employee {
