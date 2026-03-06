@@ -228,7 +228,7 @@ export const useTimeClockRecords = () => {
   });
 
   const clockOutMutation = useMutation({
-    mutationFn: async (recordId: string) => {
+    mutationFn: async ({ recordId, captureData }: { recordId: string; captureData?: { latitude?: number; longitude?: number; accuracy?: number; photoUrl?: string } }) => {
       const now = new Date();
       const clockTime = now.toISOString();
       
@@ -244,7 +244,7 @@ export const useTimeClockRecords = () => {
       let status: 'completed' | 'discrepancy' = 'completed';
       let discrepancyType: string | null = record.discrepancy_type;
       
-      if (Math.abs(minutesDiff) > 15) { // Using 15 minutes as tolerance
+      if (Math.abs(minutesDiff) > 15) {
         status = 'discrepancy';
         if (minutesDiff < -15) {
           discrepancyType = discrepancyType ? `${discrepancyType},early_clock_out` : 'early_clock_out';
@@ -253,14 +253,21 @@ export const useTimeClockRecords = () => {
         }
       }
       
+      const updateData: Record<string, any> = {
+        clock_out_time: clockTime,
+        status: status,
+        discrepancy_type: discrepancyType,
+        updated_at: now.toISOString(),
+      };
+
+      if (captureData?.latitude != null) updateData.clock_out_latitude = captureData.latitude;
+      if (captureData?.longitude != null) updateData.clock_out_longitude = captureData.longitude;
+      if (captureData?.accuracy != null) updateData.clock_out_accuracy = captureData.accuracy;
+      if (captureData?.photoUrl) updateData.clock_out_photo_url = captureData.photoUrl;
+
       const { error } = await supabase
         .from('time_clock_records')
-        .update({
-          clock_out_time: clockTime,
-          status: status,
-          discrepancy_type: discrepancyType,
-          updated_at: now.toISOString()
-        })
+        .update(updateData)
         .eq('id', recordId);
       
       if (error) throw error;
