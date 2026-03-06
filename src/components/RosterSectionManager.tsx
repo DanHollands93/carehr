@@ -30,6 +30,7 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
   } = useRosterSections(templateId);
 
   const { companyId } = useUserCompanyId();
+  const queryClient = useQueryClient();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<string | null>(null);
@@ -38,49 +39,56 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
   const [addingRuleToSection, setAddingRuleToSection] = useState<string | null>(null);
   const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
 
-  // Fetch job roles matching lookup list positions for this company
-  const { data: jobRoles } = useQuery({
-    queryKey: ['job-roles-for-sections', companyId],
+  // Fetch positions from lookup lists (single source of truth)
+  const { data: lookupPositions } = useQuery({
+    queryKey: ['lookup-positions-for-sections', companyId],
     queryFn: async () => {
-      // Fetch lookup list positions for this company
-      let lookupQuery = supabase
+      let query = supabase
         .from('lookup_lists')
         .select('value')
         .eq('category', 'positions')
         .eq('is_active', true);
       
       if (companyId) {
-        lookupQuery = lookupQuery.eq('company_id', companyId);
+        query = query.eq('company_id', companyId);
       }
 
-      const { data: lookupData, error: lookupError } = await lookupQuery;
-      if (lookupError) throw lookupError;
+      const { data, error } = await query;
+      if (error) throw error;
+      // Deduplicate and sort
+      return [...new Set((data || []).map(l => l.value))].sort();
+    },
+    enabled: !!companyId,
+  });
 
-      const positionNames = [...new Set((lookupData || []).map(l => l.value))];
-
-      // Fetch job_roles for matching
-      let rolesQuery = supabase
+  // Fetch job_roles to map position names to IDs (and for displaying existing rules)
+  const { data: jobRoles } = useQuery({
+    queryKey: ['job-roles-map', companyId],
+    queryFn: async () => {
+      let query = supabase
         .from('job_roles')
         .select('id, title, department')
         .order('title');
       
       if (companyId) {
-        rolesQuery = rolesQuery.eq('company_id', companyId);
+        query = query.eq('company_id', companyId);
       }
 
-      const { data: rolesData, error: rolesError } = await rolesQuery;
-      if (rolesError) throw rolesError;
-
-      // If no lookup positions defined, show all job roles
-      if (positionNames.length === 0) return rolesData;
-
-      // Filter job_roles to those matching lookup list values (case-insensitive)
-      return (rolesData || []).filter(r => 
-        positionNames.some(p => p.toLowerCase() === r.title.toLowerCase())
-      );
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
     },
     enabled: !!companyId,
   });
+
+  // Get assigned role names for filtering the dropdown
+  const assignedRoleIds = new Set(roleRules.map(r => r.job_role_id));
+  const assignedRoleNames = new Set(
+    roleRules.map(r => {
+      const role = jobRoles?.find(jr => jr.id === r.job_role_id);
+      return role?.title?.toLowerCase() || '';
+    }).filter(Boolean)
+  );
 
   const handleCreateSection = () => {
     if (!sectionName.trim()) return;
@@ -99,9 +107,30 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
     setEditingSection(null);
   };
 
-  const handleAddRoleRule = (sectionId: string) => {
+  const handleAddRoleRule = async (sectionId: string) => {
     if (!selectedRoleId) return;
-    addRoleRule.mutate({ sectionId, jobRoleId: selectedRoleId });
+    
+    // selectedRoleId is the position name from lookup lists
+    const positionName = selectedRoleId;
+    let jobRole = jobRoles?.find(r => r.title.toLowerCase() === positionName.toLowerCase());
+
+    // If no matching job_role exists, create one automatically
+    if (!jobRole) {
+      const { data: newRole, error } = await supabase
+        .from('job_roles')
+        .insert([{ title: positionName, company_id: companyId }])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Failed to create job role:', error);
+        return;
+      }
+      jobRole = newRole;
+      queryClient.invalidateQueries({ queryKey: ['job-roles-map', companyId] });
+    }
+
+    addRoleRule.mutate({ sectionId, jobRoleId: jobRole.id });
     setSelectedRoleId("");
     setAddingRuleToSection(null);
   };
@@ -129,9 +158,6 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
     setDraggedSectionId(null);
   };
 
-  // Get role IDs already assigned to any section in this template
-  const assignedRoleIds = new Set(roleRules.map(r => r.job_role_id));
-
   return (
     <Card>
       <CardHeader>
@@ -143,7 +169,7 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Create sections to group staff. Assign job roles so staff auto-sort into the right section.
+          Create sections to group staff. Assign positions from your lookup lists so staff auto-sort into the right section.
         </p>
       </CardHeader>
       <CardContent>
@@ -290,22 +316,22 @@ const RosterSectionManager = ({ templateId }: RosterSectionManagerProps) => {
           <DialogHeader>
             <DialogTitle>Add Auto-Assign Rule</DialogTitle>
             <DialogDescription>
-              Staff with this job role will automatically appear in this section.
+              Select a position from your lookup lists. Staff with shifts assigned to this role will appear in this section.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Job Role</Label>
+              <Label>Position</Label>
               <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a job role..." />
+                  <SelectValue placeholder="Select a position..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {jobRoles
-                    ?.filter(r => !assignedRoleIds.has(r.id))
-                    .map((role) => (
-                      <SelectItem key={role.id} value={role.id}>
-                        {role.title} {role.department ? `(${role.department})` : ''}
+                  {lookupPositions
+                    ?.filter(name => !assignedRoleNames.has(name.toLowerCase()))
+                    .map((positionName) => (
+                      <SelectItem key={positionName} value={positionName}>
+                        {positionName}
                       </SelectItem>
                     ))}
                 </SelectContent>
