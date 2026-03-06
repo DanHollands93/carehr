@@ -264,12 +264,17 @@ const TemplateRosterBuilder = ({
       if (deleteError) throw deleteError;
 
       // Insert new assignments
-      if (templateShifts.length > 0) {
-        const assignments = templateShifts.map(shift => ({
+      // Filter out invalid entries (no shift template or placeholder rows)
+      const validShifts = templateShifts.filter(shift => 
+        shift.shift_template_id && shift.shift_template_id.trim() !== '' && shift.day_index >= 0
+      );
+
+      if (validShifts.length > 0) {
+        const assignments = validShifts.map(shift => ({
           roster_template_id: templateId,
           employee_id: shift.employee_id,
           day_of_period: shift.day_index,
-          shift_template_id: shift.shift_template_id
+          shift_template_id: shift.shift_template_id || null
         }));
 
         const { error: insertError } = await supabase
