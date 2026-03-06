@@ -281,10 +281,6 @@ const ShiftCreationPopup = ({
     
     try {
       onCreateShift(shiftData);
-      toast({
-        title: "Success",
-        description: "Shift created successfully"
-      });
     } catch (error) {
       console.error('Error creating shift:', error);
       toast({
