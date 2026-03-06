@@ -283,125 +283,175 @@ const ShiftCreationPopup = ({
   const selectedCareerEntry = careerHistory?.find(entry => entry.id === selectedCareerHistoryId);
   const isLoading = careerLoading || jobRolesLoading;
 
+  const hasTimeRecord = existingShift?.time_record && (existingShift.time_record.clock_in_time || existingShift.time_record.clock_out_time);
+  const [activeTab, setActiveTab] = useState<'shift' | 'timeclock'>('shift');
+
+  // Reset tab when dialog opens
+  useEffect(() => {
+    if (isOpen) setActiveTab('shift');
+  }, [isOpen]);
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {existingShift ? 'Edit Shift' : 'Create Shift'} - {employeeName}
           </DialogTitle>
+          <div className="text-sm text-muted-foreground">Date: {date}</div>
         </DialogHeader>
+
+        {/* Tabs - only show when there's time clock data */}
+        {hasTimeRecord && (
+          <div className="flex border-b border-border">
+            <button
+              className={cn(
+                "flex-1 py-2 text-sm font-medium border-b-2 transition-colors",
+                activeTab === 'shift'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => setActiveTab('shift')}
+            >
+              Shift Details
+            </button>
+            <button
+              className={cn(
+                "flex-1 py-2 text-sm font-medium border-b-2 transition-colors",
+                activeTab === 'timeclock'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => setActiveTab('timeclock')}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                Time Clock
+                {existingShift?.time_record?.status === 'discrepancy' && existingShift?.time_record?.approval_status !== 'reviewed' && (
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                )}
+                {existingShift?.time_record?.approval_status === 'reviewed' && (
+                  <Check className="w-3 h-3 text-emerald-600" />
+                )}
+              </span>
+            </button>
+          </div>
+        )}
         
-        <div className="space-y-4">
-          <div className="text-sm text-gray-600">
-            Date: {date}
-          </div>
+        <div className="overflow-y-auto flex-1">
+          {/* SHIFT DETAILS TAB */}
+          {(activeTab === 'shift' || !hasTimeRecord) && (
+            <div className="space-y-4 py-1">
+              {/* Template Selection */}
+              <div className="space-y-2">
+                <Label>Shift Template (Optional)</Label>
+                <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a template or create custom" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {shiftTemplates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name} ({template.start_time} - {template.end_time})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* Template Selection */}
-          <div className="space-y-2">
-            <Label>Shift Template (Optional)</Label>
-            <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a template or create custom" />
-              </SelectTrigger>
-              <SelectContent>
-                {shiftTemplates.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name} ({template.start_time} - {template.end_time})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              {isLoading && (
+                <div className="text-sm text-muted-foreground bg-muted p-3 rounded">
+                  Loading employee career history and job roles...
+                </div>
+              )}
 
-          {/* Loading State */}
-          {isLoading && (
-            <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
-              Loading employee career history and job roles...
-            </div>
-          )}
+              {careerError && (
+                <div className="text-sm text-destructive bg-destructive/10 p-3 rounded">
+                  Error loading career history: {careerError.message}
+                </div>
+              )}
 
-          {/* Error State */}
-          {careerError && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-              Error loading career history: {careerError.message}
-            </div>
-          )}
-
-          {/* Career History Selection */}
-          {!isLoading && careerHistory && careerHistory.length > 0 && (
-            <div className="space-y-2">
-              <Label>Job Position * (From Career History)</Label>
-              <Select value={selectedCareerHistoryId} onValueChange={setSelectedCareerHistoryId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select job position" />
-                </SelectTrigger>
-                <SelectContent>
-                  {careerHistory.map((entry) => (
-                    <SelectItem key={entry.id} value={entry.id}>
-                      {entry.job_title} - {entry.location} - £{entry.pay_rate.toFixed(2)}/hr
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedCareerEntry && (
-                <div className="text-sm text-gray-600 bg-blue-50 p-2 rounded">
-                  <strong>Position:</strong> {selectedCareerEntry.job_title}
-                  <br />
-                  <strong>Location:</strong> {selectedCareerEntry.location}
-                  <br />
-                  <strong>Pay Rate:</strong> £{selectedCareerEntry.pay_rate.toFixed(2)}/hr ({selectedCareerEntry.currency})
-                  <br />
-                  <strong>Employment Type:</strong> {selectedCareerEntry.employment_type}
-                  <br />
-                  <strong>Contract Type:</strong> {selectedCareerEntry.contract_type}
-                  {selectedCareerEntry.job_role_id ? (
-                    <><br /><strong>Status:</strong> <span className="text-green-600">Linked to job role</span></>
-                  ) : (
-                    <><br /><strong>Status:</strong> <span className="text-orange-600">Will auto-match to job role by title</span></>
+              {!isLoading && careerHistory && careerHistory.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Job Position * (From Career History)</Label>
+                  <Select value={selectedCareerHistoryId} onValueChange={setSelectedCareerHistoryId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select job position" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {careerHistory.map((entry) => (
+                        <SelectItem key={entry.id} value={entry.id}>
+                          {entry.job_title} - {entry.location} - £{entry.pay_rate.toFixed(2)}/hr
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedCareerEntry && (
+                    <div className="text-sm text-muted-foreground bg-accent/50 p-2 rounded">
+                      <strong>Position:</strong> {selectedCareerEntry.job_title}
+                      <br />
+                      <strong>Location:</strong> {selectedCareerEntry.location}
+                      <br />
+                      <strong>Pay Rate:</strong> £{selectedCareerEntry.pay_rate.toFixed(2)}/hr ({selectedCareerEntry.currency})
+                      <br />
+                      <strong>Employment Type:</strong> {selectedCareerEntry.employment_type}
+                      <br />
+                      <strong>Contract Type:</strong> {selectedCareerEntry.contract_type}
+                      {selectedCareerEntry.job_role_id ? (
+                        <><br /><strong>Status:</strong> <span className="text-emerald-600">Linked to job role</span></>
+                      ) : (
+                        <><br /><strong>Status:</strong> <span className="text-amber-600">Will auto-match to job role by title</span></>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
+
+              {!isLoading && (!careerHistory || careerHistory.length === 0) && employeeId && (
+                <div className="text-sm text-destructive bg-destructive/10 p-3 rounded">
+                  This employee has no active career history entries. Please add a career history entry before creating shifts.
+                </div>
+              )}
+
+              {!employeeId && (
+                <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20 p-3 rounded">
+                  Employee ID not provided. Career history selection unavailable.
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Time</Label>
+                  <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Time</Label>
+                  <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-4">
+                <div>
+                  {existingShift && onDeleteShift && (
+                    <Button variant="destructive" onClick={onDeleteShift} size="sm">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleClose}>Cancel</Button>
+                  <Button onClick={handleSubmit} disabled={!startTime || !endTime || !selectedCareerHistoryId || isLoading}>
+                    {existingShift ? 'Update' : 'Create'} Shift
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* No Career History Warning */}
-          {!isLoading && (!careerHistory || careerHistory.length === 0) && employeeId && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-              This employee has no active career history entries. Please add a career history entry for this employee before creating shifts.
-            </div>
-          )}
-
-          {/* No Employee ID Warning */}
-          {!employeeId && (
-            <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded">
-              Employee ID not provided. Career history selection unavailable.
-            </div>
-          )}
-
-          {/* Time Fields */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Start Time</Label>
-              <Input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>End Time</Label>
-              <Input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Time Clock & Discrepancy Review Section */}
-          {existingShift?.time_record && (existingShift.time_record.clock_in_time || existingShift.time_record.clock_out_time) && (() => {
-            const tr = existingShift.time_record!;
+          {/* TIME CLOCK TAB */}
+          {activeTab === 'timeclock' && hasTimeRecord && (() => {
+            const tr = existingShift!.time_record!;
             const isDiscrepancy = tr.status === 'discrepancy' || (tr.status === 'completed' && tr.discrepancy_type);
             const isCompleted = tr.status === 'completed' && !tr.discrepancy_type;
             const isClockedIn = tr.status === 'clocked_in';
@@ -417,8 +467,8 @@ const ShiftCreationPopup = ({
             const mToTime = (mins: number): string => `${Math.floor(mins / 60).toString().padStart(2, '0')}:${(mins % 60).toString().padStart(2, '0')}`;
             const fmtDur = (mins: number) => { const h = Math.floor(mins / 60); const m = mins % 60; return h > 0 && m > 0 ? `${h}h ${m}m` : h > 0 ? `${h}h` : `${m}m`; };
 
-            const sStart = toMins(existingShift.start_time);
-            const sEnd = toMins(existingShift.end_time);
+            const sStart = toMins(existingShift!.start_time);
+            const sEnd = toMins(existingShift!.end_time);
             const aStart = tr.clock_in_time ? isoMins(tr.clock_in_time) : sStart;
             const aEnd = tr.clock_out_time ? isoMins(tr.clock_out_time) : sEnd;
             const wStart = Math.min(sStart, aStart);
@@ -453,20 +503,12 @@ const ShiftCreationPopup = ({
             const segColor = (t: Seg['type']) => (t === 'early_start' || t === 'late_end') ? 'text-amber-600' : 'text-destructive';
 
             return (
-              <div className={cn(
-                "rounded-lg border p-3 space-y-3",
-                isDiscrepancy && !isReviewed && "border-amber-300 bg-amber-50/50 dark:bg-amber-950/10",
-                isDiscrepancy && isReviewed && "border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/10",
-                isCompleted && "border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/10",
-                isClockedIn && "border-amber-300 bg-amber-50/50 dark:bg-amber-950/10"
-              )}>
+              <div className="space-y-4 py-1">
+                {/* Status badge */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Time Clock Data</span>
-                  </div>
+                  <span className="text-sm font-medium text-foreground">Status</span>
                   <Badge variant="outline" className={cn(
-                    "text-[10px]",
+                    "text-xs",
                     isDiscrepancy && !isReviewed && "border-amber-300 text-amber-700",
                     isDiscrepancy && isReviewed && "border-emerald-300 text-emerald-700",
                     isCompleted && "border-emerald-300 text-emerald-700",
@@ -476,15 +518,22 @@ const ShiftCreationPopup = ({
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
+                {/* Clock times */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg bg-muted/50 p-3">
                     <span className="text-muted-foreground text-xs">Clock In</span>
-                    <p className="font-mono font-medium text-foreground">{tr.clock_in_time ? fmtClock(tr.clock_in_time) : '—'}</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">{tr.clock_in_time ? fmtClock(tr.clock_in_time) : '—'}</p>
                   </div>
-                  <div>
+                  <div className="rounded-lg bg-muted/50 p-3">
                     <span className="text-muted-foreground text-xs">Clock Out</span>
-                    <p className="font-mono font-medium text-foreground">{tr.clock_out_time ? fmtClock(tr.clock_out_time) : isClockedIn ? 'Active' : '—'}</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">{tr.clock_out_time ? fmtClock(tr.clock_out_time) : isClockedIn ? 'Active' : '—'}</p>
                   </div>
+                </div>
+
+                {/* Scheduled reference */}
+                <div className="flex items-center justify-between text-sm bg-muted/30 rounded-lg p-2">
+                  <span className="text-muted-foreground">Scheduled</span>
+                  <span className="font-mono font-medium text-foreground">{existingShift!.start_time} – {existingShift!.end_time}</span>
                 </div>
 
                 {/* Visual Timeline */}
@@ -539,17 +588,17 @@ const ShiftCreationPopup = ({
 
                 {/* Review notes */}
                 {isReviewed && tr.notes && (
-                  <div className="pt-1 border-t border-border/50">
+                  <div className="rounded-lg bg-muted/30 p-3">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Review Notes</p>
-                    <p className="text-xs text-muted-foreground italic">{tr.notes}</p>
+                    <p className="text-sm text-foreground">{tr.notes}</p>
                   </div>
                 )}
 
                 {/* Action buttons */}
                 {isDiscrepancy && (
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex gap-2 pt-2">
                     {onReviewDiscrepancy && (
-                      <Button variant="outline" size="sm" className={cn("flex-1", isReviewed ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50" : "border-amber-300 text-amber-700 hover:bg-amber-50")} onClick={() => onReviewDiscrepancy(existingShift)}>
+                      <Button variant="outline" size="sm" className={cn("flex-1", isReviewed ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50" : "border-amber-300 text-amber-700 hover:bg-amber-50")} onClick={() => onReviewDiscrepancy(existingShift!)}>
                         <AlertTriangle className="w-3.5 h-3.5 mr-2" />
                         {isReviewed ? 'Amend Review' : 'Review Discrepancy'}
                       </Button>
@@ -565,32 +614,6 @@ const ShiftCreationPopup = ({
               </div>
             );
           })()}
-
-          <div className="flex justify-between pt-4">
-            <div>
-              {existingShift && onDeleteShift && (
-                <Button
-                  variant="destructive"
-                  onClick={onDeleteShift}
-                  size="sm"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSubmit}
-                disabled={!startTime || !endTime || !selectedCareerHistoryId || isLoading}
-              >
-                {existingShift ? 'Update' : 'Create'} Shift
-              </Button>
-            </div>
-          </div>
         </div>
       </DialogContent>
     </Dialog>
