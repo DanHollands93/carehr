@@ -951,6 +951,9 @@ const TemplateRosterBuilder = ({
           </CardContent>
         </Card>
 
+        {/* Roster Sections Manager */}
+        <RosterSectionManager templateId={templateId} />
+
         {/* Staff Management Section */}
         <Card>
           <CardHeader>
@@ -962,7 +965,7 @@ const TemplateRosterBuilder = ({
           <CardContent>
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   {employees.length} staff member{employees.length !== 1 ? 's' : ''} in this roster template
                 </p>
               </div>
