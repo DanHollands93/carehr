@@ -1331,17 +1331,6 @@ const Roster = () => {
         </div>
         
         <div className="flex space-x-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowTemplates(!showTemplates)}
-          >
-            <CalendarIcon className="w-4 h-4 mr-2" />
-            Shift Templates
-          </Button>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Shift
-          </Button>
         </div>
       </div>
 
