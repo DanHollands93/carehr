@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserCompanyId } from "@/hooks/useUserCompanyId";
-import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDown, UserPlus, UserMinus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, Users, Trash2, Plus, ArrowUpDown, UserPlus, UserMinus, Search, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
 import { useTimeClockSettings } from "@/hooks/useTimeClockSettings";
 import { useRosterSections } from "@/hooks/useRosterSections";
+import { useAllocationLocations } from "@/hooks/useAllocationLocations";
+import { useDailyAllocations } from "@/hooks/useDailyAllocations";
+import AllocationAssignmentDialog from "@/components/AllocationAssignmentDialog";
 
 
 interface Employee {
@@ -80,6 +83,7 @@ interface RosterTemplate {
   end_date: string | null;
   is_active: boolean;
   category_id?: string;
+  allow_allocations?: boolean;
 }
 
 const Roster = () => {
@@ -120,6 +124,11 @@ const Roster = () => {
     shift: ShiftWithTimeRecord | null;
     employeeName: string;
   }>({ isOpen: false, shift: null, employeeName: '' });
+  const [allocationDialog, setAllocationDialog] = useState<{
+    isOpen: boolean;
+    date: string;
+    dateLabel: string;
+  }>({ isOpen: false, date: '', dateLabel: '' });
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun (7 days)
 
@@ -366,6 +375,24 @@ const Roster = () => {
 
   // Roster sections for grouping employees by shift job roles
   const { sections: rosterSections, groupEmployeesByShiftRoles } = useRosterSections(selectedRosterTemplate?.id);
+
+  // Allocation locations & daily allocations
+  const { locations: allocationLocations } = useAllocationLocations(selectedRosterTemplate?.id);
+  const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+  const weekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+  const { bulkSetAllocations, getAllocationsForDate } = useDailyAllocations(
+    selectedRosterTemplate?.id, weekStartStr, weekEndStr
+  );
+
+  // Fetch job roles for allocation dialog
+  const { data: jobRolesData } = useQuery({
+    queryKey: ['job-roles-for-allocations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('job_roles').select('id, title');
+      if (error) throw error;
+      return data as { id: string; title: string }[];
+    }
+  });
 
   // Auto-apply exceptions for discrepancies within threshold
   const autoApplyProcessedRef = useRef<Set<string>>(new Set());
@@ -1435,6 +1462,21 @@ const Roster = () => {
                                     {staffCount} shift{staffCount !== 1 ? 's' : ''}
                                   </div>
                                 )}
+                                {selectedRosterTemplate?.allow_allocations && allocationLocations.length > 0 && canEditRoster && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 mt-1 text-[10px] px-1.5 py-0"
+                                    onClick={() => setAllocationDialog({
+                                      isOpen: true,
+                                      date: format(day, 'yyyy-MM-dd'),
+                                      dateLabel: format(day, 'EEE dd MMM')
+                                    })}
+                                  >
+                                    <MapPin className="w-3 h-3 mr-0.5" />
+                                    Allocate
+                                  </Button>
+                                )}
                               </th>
                             );
                           })}
@@ -1734,6 +1776,40 @@ const Roster = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Allocation Assignment Dialog */}
+      {selectedRosterTemplate?.allow_allocations && (
+        <AllocationAssignmentDialog
+          isOpen={allocationDialog.isOpen}
+          onClose={() => setAllocationDialog({ isOpen: false, date: '', dateLabel: '' })}
+          date={allocationDialog.date}
+          dateLabel={allocationDialog.dateLabel}
+          locations={allocationLocations}
+          employees={employees}
+          shiftsForDay={
+            (shifts || [])
+              .filter(s => s.date === allocationDialog.date)
+              .map(s => ({
+                employee_id: s.employee_id,
+                job_role_id: s.job_role_id,
+                position: s.position,
+                start_time: s.start_time,
+                end_time: s.end_time
+              }))
+          }
+          existingAllocations={getAllocationsForDate(allocationDialog.date)}
+          jobRoles={jobRolesData || []}
+          onSave={(assignments) => {
+            bulkSetAllocations.mutate(
+              assignments.map(a => ({
+                employeeId: a.employeeId,
+                date: allocationDialog.date,
+                locationId: a.locationId
+              }))
+            );
+          }}
+        />
+      )}
     </div>
   );
 };

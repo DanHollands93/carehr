@@ -16,6 +16,7 @@ import { Plus, Edit, Trash2, Calendar, Play, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TemplateRosterBuilder from "@/components/TemplateRosterBuilder";
 import TemplateDeployment from "@/components/TemplateDeployment";
+import AllocationLocationManager from "@/components/AllocationLocationManager";
 
 type RepeatType = 'weekly' | 'bi_weekly' | 'monthly' | 'custom';
 
@@ -28,6 +29,7 @@ interface RosterTemplate {
   is_active: boolean;
   created_at: string;
   end_date: string | null;
+  allow_allocations: boolean;
 }
 
 const RosterTemplates = () => {
@@ -45,7 +47,8 @@ const RosterTemplates = () => {
     description: "",
     repeat_type: "weekly" as RepeatType,
     repeat_interval: 1,
-    end_date: ""
+    end_date: "",
+    allow_allocations: false
   });
 
   const { data: rosterTemplates, isLoading } = useQuery({
@@ -154,7 +157,8 @@ const RosterTemplates = () => {
       description: "",
       repeat_type: "weekly",
       repeat_interval: 1,
-      end_date: ""
+      end_date: "",
+      allow_allocations: false
     });
     setEditingTemplate(null);
   };
@@ -181,7 +185,8 @@ const RosterTemplates = () => {
       description: template.description || "",
       repeat_type: template.repeat_type,
       repeat_interval: template.repeat_interval,
-      end_date: template.end_date || ""
+      end_date: template.end_date || "",
+      allow_allocations: template.allow_allocations || false
     });
     setIsDialogOpen(true);
   };
@@ -320,6 +325,18 @@ const RosterTemplates = () => {
                   onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                 />
               </div>
+
+              {editingTemplate && (
+                <AllocationLocationManager
+                  templateId={editingTemplate.id}
+                  allowAllocations={formData.allow_allocations}
+                  onToggleAllocations={(enabled) => {
+                    setFormData({ ...formData, allow_allocations: enabled });
+                    // Persist immediately for existing templates
+                    updateMutation.mutate({ id: editingTemplate.id, allow_allocations: enabled } as any);
+                  }}
+                />
+              )}
               
               <div className="flex justify-end space-x-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
