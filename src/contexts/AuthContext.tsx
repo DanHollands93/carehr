@@ -75,6 +75,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     secureLog('Setting up auth state listener');
     
+    // Safety timeout - if auth never resolves, stop loading anyway
+    const timeout = setTimeout(() => {
+      setLoading(prev => {
+        if (prev) {
+          secureLog('Auth loading timed out, forcing loading=false');
+          return false;
+        }
+        return prev;
+      });
+    }, 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         secureLog('Auth state changed:', event, session?.user?.email);
@@ -128,7 +139,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
