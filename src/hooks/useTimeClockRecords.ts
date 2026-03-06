@@ -126,6 +126,27 @@ export const useTimeClockRecords = () => {
         
         records.push(recordWithShiftInfo);
       }
+
+      // Also fetch ad-hoc records (no shift linked) for today
+      const { data: adHocRecords, error: adHocError } = await supabase
+        .from('time_clock_records')
+        .select('*')
+        .eq('employee_id', employeeProfile.employee_id)
+        .is('shift_id', null)
+        .eq('shift_date', today);
+
+      if (adHocError) {
+        console.error('Error fetching ad-hoc records:', adHocError);
+      } else if (adHocRecords) {
+        for (const rec of adHocRecords) {
+          records.push({
+            ...rec,
+            shift_date: rec.shift_date || today,
+            shift_start_time: rec.shift_start_time || '',
+            shift_end_time: rec.shift_end_time || '',
+          } as TimeClockRecord);
+        }
+      }
       
       console.log('Final records for today:', records);
       return records;
