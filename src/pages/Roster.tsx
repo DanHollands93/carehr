@@ -1067,9 +1067,11 @@ const Roster = () => {
   };
 
   const getShiftsForEmployeeAndDate = (employeeId: string, date: string) => {
+    // date is already in 'yyyy-MM-dd' format — don't re-parse through new Date() to avoid timezone shifts
+    const normalizedDate = date.length === 10 ? date : format(new Date(date), 'yyyy-MM-dd');
     return shifts?.filter(shift => 
       shift.employee_id === employeeId && 
-      shift.date === format(new Date(date), 'yyyy-MM-dd')
+      shift.date === normalizedDate
     ) || [];
   };
 
