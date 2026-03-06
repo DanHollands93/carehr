@@ -224,6 +224,8 @@ export const useRosterSections = (templateId: string | undefined) => {
     addRoleRule,
     removeRoleRule,
     getSectionForEmployee,
+    getSectionForJobRole,
+    groupEmployeesByShiftRoles,
     getRulesForSection
   };
 };
