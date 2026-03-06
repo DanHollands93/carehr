@@ -124,6 +124,11 @@ const Roster = () => {
     shift: ShiftWithTimeRecord | null;
     employeeName: string;
   }>({ isOpen: false, shift: null, employeeName: '' });
+  const [allocationDialog, setAllocationDialog] = useState<{
+    isOpen: boolean;
+    date: string;
+    dateLabel: string;
+  }>({ isOpen: false, date: '', dateLabel: '' });
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun (7 days)
 
