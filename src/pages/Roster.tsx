@@ -509,6 +509,27 @@ const Roster = () => {
         pay_rate: number;
       };
     }) => {
+      // Fresh DB check for overlapping shifts
+      const { data: existingDbShifts, error: checkErr } = await supabase
+        .from('shifts')
+        .select('id, start_time, end_time')
+        .eq('employee_id', employeeId)
+        .eq('date', date);
+      
+      if (checkErr) throw checkErr;
+      
+      const newStart = parseInt(shiftData.start_time.replace(':', ''));
+      const newEnd = parseInt(shiftData.end_time.replace(':', ''));
+      const overlap = (existingDbShifts || []).some(s => {
+        const sStart = parseInt(s.start_time.replace(':', ''));
+        const sEnd = parseInt(s.end_time.replace(':', ''));
+        return newStart < sEnd && newEnd > sStart;
+      });
+      
+      if (overlap) {
+        throw new Error('This shift overlaps with an existing shift. Please choose different times.');
+      }
+
       const { data: newShift, error } = await supabase
         .from('shifts')
         .insert([{
