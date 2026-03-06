@@ -519,9 +519,9 @@ const TemplateRosterBuilder = ({
     return acc;
   }, {} as Record<string, ShiftTemplate[]>) || {};
 
-  const renderEmployeeRow = (employee: Employee) => {
+  const renderEmployeeRow = (employee: Employee, sectionJobRoleIds?: string[]) => {
     return (
-      <tr key={employee.id} className="border-b">
+      <tr key={`${employee.id}-${sectionJobRoleIds?.join(',') || 'all'}`} className="border-b">
         <td className="p-3 font-medium min-w-[160px]">
           <div>
             <div>{employee.first_name} {employee.last_name}</div>
@@ -541,6 +541,9 @@ const TemplateRosterBuilder = ({
         {weekDays.map((dayIndex) => {
           const shift = getShiftForEmployeeAndDay(employee.id, dayIndex);
           const template = shift ? shiftTemplates?.find(t => t.id === shift.shift_template_id) : null;
+          const isFaded = sectionJobRoleIds && shift?.job_role_id
+            ? !sectionJobRoleIds.includes(shift.job_role_id)
+            : false;
           
           return (
             <td
@@ -550,24 +553,27 @@ const TemplateRosterBuilder = ({
               onDragOver={!isMobile ? handleDragOver : undefined}
             >
               <div 
-                className="min-h-16 border-2 border-dashed border-border/40 rounded p-2 hover:border-border transition-colors cursor-pointer"
+                className={cn(
+                  "min-h-16 border-2 border-dashed border-border/40 rounded p-2 hover:border-border transition-colors",
+                  isFaded ? "opacity-40 pointer-events-none" : "cursor-pointer"
+                )}
                 style={{
-                  backgroundColor: (!isMobile && (draggedTemplate || draggedShift)) ? 'hsl(var(--primary) / 0.05)' : 'transparent'
+                  backgroundColor: (!isMobile && (draggedTemplate || draggedShift) && !isFaded) ? 'hsl(var(--primary) / 0.05)' : 'transparent'
                 }}
-                onClick={() => handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, dayIndex)}
+                onClick={() => !isFaded && handleCellClick(employee.id, `${employee.first_name} ${employee.last_name}`, dayIndex)}
               >
                 {shift && template ? (
                   <div 
-                    draggable={!isMobile}
-                    onDragStart={!isMobile ? () => handleShiftDragStart(shift) : undefined}
+                    draggable={!isMobile && !isFaded}
+                    onDragStart={!isMobile && !isFaded ? () => handleShiftDragStart(shift) : undefined}
                     onDragEnd={!isMobile ? handleDragEnd : undefined}
                     className="p-2 rounded text-xs cursor-pointer hover:shadow-md transition-shadow"
                     style={{ 
                       backgroundColor: template.color + '20',
                       borderColor: template.color
                     }}
-                    onDoubleClick={!isMobile ? () => removeShift(shift) : undefined}
-                    title={isMobile ? "Tap to edit or remove" : "Drag to move or delete, double-click to remove"}
+                    onDoubleClick={!isMobile && !isFaded ? () => removeShift(shift) : undefined}
+                    title={isFaded ? "This shift belongs to another section" : (isMobile ? "Tap to edit or remove" : "Drag to move or delete, double-click to remove")}
                   >
                     <div className="font-medium">{template.position}</div>
                     <div>{template.start_time} - {template.end_time}</div>
