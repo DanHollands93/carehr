@@ -358,7 +358,7 @@ export const useTimeClockRecords = () => {
 
       const { error } = await supabase
         .from('time_clock_records')
-        .insert(insertData);
+        .insert(insertData as any);
       if (error) throw error;
     },
     onSuccess: () => {
