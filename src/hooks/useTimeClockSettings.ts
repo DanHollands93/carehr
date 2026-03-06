@@ -19,7 +19,11 @@ export const useTimeClockSettings = () => {
           'early_clock_in_minutes',
           'late_clock_in_minutes', 
           'early_clock_out_minutes',
-          'late_clock_out_minutes'
+          'late_clock_out_minutes',
+          'early_clock_in_auto_action',
+          'late_clock_in_auto_action',
+          'early_clock_out_auto_action',
+          'late_clock_out_auto_action'
         ]);
       
       if (error) throw error;
@@ -32,12 +36,21 @@ export const useTimeClockSettings = () => {
     return setting ? parseInt(setting.setting_value) : defaultValue;
   };
 
+  const getSettingString = (key: string, defaultValue: string = 'unpaid'): string => {
+    const setting = settings?.find(s => s.setting_key === key);
+    return setting?.setting_value || defaultValue;
+  };
+
   return {
     settings,
     isLoading,
     earlyClockInMinutes: getSettingValue('early_clock_in_minutes'),
     lateClockInMinutes: getSettingValue('late_clock_in_minutes'),
     earlyClockOutMinutes: getSettingValue('early_clock_out_minutes'),
-    lateClockOutMinutes: getSettingValue('late_clock_out_minutes')
+    lateClockOutMinutes: getSettingValue('late_clock_out_minutes'),
+    earlyClockInAutoAction: getSettingString('early_clock_in_auto_action', 'unpaid') as 'paid' | 'unpaid',
+    lateClockInAutoAction: getSettingString('late_clock_in_auto_action', 'unpaid') as 'paid' | 'unpaid',
+    earlyClockOutAutoAction: getSettingString('early_clock_out_auto_action', 'unpaid') as 'paid' | 'unpaid',
+    lateClockOutAutoAction: getSettingString('late_clock_out_auto_action', 'unpaid') as 'paid' | 'unpaid',
   };
 };

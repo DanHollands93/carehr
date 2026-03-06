@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import LookupListsManager from "@/components/LookupListsManager";
 import EnhancedPermissionsManager from "@/components/EnhancedPermissionsManager";
 import CompanySettingsManager from "@/components/CompanySettingsManager";
+import AutoExceptionsSettings from "@/components/AutoExceptionsSettings";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -33,6 +34,7 @@ const Settings = () => {
         <TabsList className="mb-6 flex-wrap">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="timeclock">Time Clock</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="integration">Integration</TabsTrigger>
@@ -88,6 +90,10 @@ const Settings = () => {
 
         <TabsContent value="company">
           <CompanySettingsManager />
+        </TabsContent>
+
+        <TabsContent value="timeclock">
+          <AutoExceptionsSettings />
         </TabsContent>
 
         <TabsContent value="appearance">
