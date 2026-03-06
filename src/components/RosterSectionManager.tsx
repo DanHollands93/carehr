@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, GripVertical, Trash2, Edit, Tag, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRosterSections } from "@/hooks/useRosterSections";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
+import { useRosterSections } from "@/hooks/useRosterSections";
 
 interface RosterSectionManagerProps {
   templateId: string;
