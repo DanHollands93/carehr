@@ -31,7 +31,9 @@ const LOOKUP_CATEGORIES = [
   { key: 'positions', label: 'Positions', description: 'Job positions for shifts and roles' }
 ];
 
-const LookupListsManager = ({ companyId }: { companyId?: string } = {}) => {
+const LookupListsManager = ({ companyId: propCompanyId }: { companyId?: string } = {}) => {
+  const { companyId: activeCompanyId } = useUserCompanyId();
+  const companyId = propCompanyId || activeCompanyId;
   const [selectedCategory, setSelectedCategory] = useState(LOOKUP_CATEGORIES[0].key);
   const [newValue, setNewValue] = useState("");
   const { toast } = useToast();
