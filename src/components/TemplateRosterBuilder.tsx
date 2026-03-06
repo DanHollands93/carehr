@@ -124,6 +124,34 @@ const TemplateRosterBuilder = ({
   const { data: allEmployeeJobRoles } = useAllEmployeeJobRoles();
   const { sections, groupEmployeesByShiftRoles } = useRosterSections(templateId);
 
+  // Fetch template's allow_allocations setting
+  const { data: templateSettings } = useQuery({
+    queryKey: ['roster-template-settings', templateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('roster_templates')
+        .select('allow_allocations')
+        .eq('id', templateId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!templateId
+  });
+
+  const toggleAllocationsMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase
+        .from('roster_templates')
+        .update({ allow_allocations: enabled })
+        .eq('id', templateId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roster-template-settings', templateId] });
+    }
+  });
+
   // Calculate period length in days
   const getPeriodDays = () => {
     switch (repeatType) {
