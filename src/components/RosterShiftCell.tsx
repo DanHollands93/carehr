@@ -36,6 +36,7 @@ interface RosterShiftCellProps {
   canEdit: boolean;
   onDragStart?: (e: React.DragEvent) => void;
   shiftTemplateName?: string;
+  faded?: boolean;
 }
 
 const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
@@ -45,6 +46,7 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   canEdit,
   onDragStart,
   shiftTemplateName,
+  faded = false,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
