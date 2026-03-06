@@ -615,6 +615,20 @@ const ShiftCreationPopup = ({
                     {tr.notes?.includes('Manual clock in') && (
                       <span className="text-[10px] text-amber-600 font-medium">✎ Manually entered</span>
                     )}
+                    {tr.clock_in_time && (
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {showPhotoButtons && tr.clock_in_photo_url && (
+                          <Button variant="outline" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => handleViewPhoto('clock_in')}>
+                            <Camera className="w-3 h-3 mr-0.5" /> Photo
+                          </Button>
+                        )}
+                        {showGeoButtons && tr.clock_in_latitude != null && (
+                          <Button variant="outline" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setShowGeoDialog('clock_in')}>
+                            <Navigation className="w-3 h-3 mr-0.5" /> Location
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className={cn("rounded-lg p-3", isNoShow ? "bg-destructive/10" : "bg-muted/50")}>
                     <span className="text-muted-foreground text-xs">Clock Out</span>
@@ -623,6 +637,20 @@ const ShiftCreationPopup = ({
                     </p>
                     {tr.notes?.includes('Manual clock out') && (
                       <span className="text-[10px] text-amber-600 font-medium">✎ Manually entered</span>
+                    )}
+                    {tr.clock_out_time && (
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {showPhotoButtons && tr.clock_out_photo_url && (
+                          <Button variant="outline" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => handleViewPhoto('clock_out')}>
+                            <Camera className="w-3 h-3 mr-0.5" /> Photo
+                          </Button>
+                        )}
+                        {showGeoButtons && tr.clock_out_latitude != null && (
+                          <Button variant="outline" size="sm" className="h-6 text-[10px] px-1.5" onClick={() => setShowGeoDialog('clock_out')}>
+                            <Navigation className="w-3 h-3 mr-0.5" /> Location
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
