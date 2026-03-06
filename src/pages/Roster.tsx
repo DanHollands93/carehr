@@ -586,6 +586,31 @@ const Roster = () => {
 
   const deleteShiftMutation = useMutation({
     mutationFn: async (shiftId: string) => {
+      // Check if this shift has any time_clock_records with actual clock data
+      const { data: clockRecords, error: clockErr } = await supabase
+        .from('time_clock_records')
+        .select('id, clock_in_time, clock_out_time')
+        .eq('shift_id', shiftId);
+      
+      if (clockErr) throw clockErr;
+
+      const hasClockData = (clockRecords || []).some(
+        r => r.clock_in_time || r.clock_out_time
+      );
+
+      if (hasClockData) {
+        throw new Error('This shift has clock-in/out records and cannot be deleted. Move it instead to detach the time records.');
+      }
+
+      // Safe to delete — also clean up any empty clock records (no clock data)
+      if (clockRecords && clockRecords.length > 0) {
+        const { error: delClockErr } = await supabase
+          .from('time_clock_records')
+          .delete()
+          .eq('shift_id', shiftId);
+        if (delClockErr) throw delClockErr;
+      }
+
       const { error } = await supabase
         .from('shifts')
         .delete()
