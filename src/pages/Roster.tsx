@@ -1386,46 +1386,27 @@ const Roster = () => {
                             (shifts || []).map(s => ({ employee_id: s.employee_id, job_role_id: s.job_role_id }))
                           );
 
-                          // Build a lookup of section -> job_role_ids for fading logic
-                          const sectionRoleMap = new Map<string | null, string[]>();
-                          sectionGroups.forEach(group => {
-                            const ruleRoleIds = (rosterSections || [])
-                              .filter(s => s.id === group.sectionId)
-                              .length > 0
-                              ? groupEmployeesByShiftRoles.length // placeholder
-                              : [];
-                            sectionRoleMap.set(group.sectionId, []);
-                          });
-
                           let rowIdx = 0;
-                          return sectionGroups.map((group) => {
-                            // Get the job role IDs that belong to this section from roster_section_role_rules
-                            const sectionRoleIds = group.sectionId 
-                              ? (rosterSections || [])
-                                  .filter(() => true) // we need the role rules
-                              : undefined;
-
-                            return (
-                              <React.Fragment key={`section-${group.sectionId || 'other'}`}>
-                                <tr className="bg-muted/50">
-                                  <td
-                                    colSpan={weekDays.length + 1}
-                                    className="px-3 py-2 font-semibold text-sm text-foreground border-b border-t sticky left-0"
-                                  >
-                                    {group.sectionName}
-                                    <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                      ({group.employeeIds.length} staff)
-                                    </span>
-                                  </td>
-                                </tr>
-                                {group.employeeIds.map((empId) => {
-                                  const employee = employees.find(e => e.id === empId);
-                                  if (!employee) return null;
-                                  return renderEmployeeRow(employee, rowIdx++, group.sectionJobRoleIds);
-                                })}
-                              </React.Fragment>
-                            );
-                          });
+                          return sectionGroups.map((group) => (
+                            <React.Fragment key={`section-${group.sectionId || 'other'}`}>
+                              <tr className="bg-muted/50">
+                                <td
+                                  colSpan={weekDays.length + 1}
+                                  className="px-3 py-2 font-semibold text-sm text-foreground border-b border-t sticky left-0"
+                                >
+                                  {group.sectionName}
+                                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                    ({group.employeeIds.length} staff)
+                                  </span>
+                                </td>
+                              </tr>
+                              {group.employeeIds.map((empId) => {
+                                const employee = employees.find(e => e.id === empId);
+                                if (!employee) return null;
+                                return renderEmployeeRow(employee, rowIdx++, group.sectionJobRoleIds);
+                              })}
+                            </React.Fragment>
+                          ));
 
                         })()}
                       </tbody>
