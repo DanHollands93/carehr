@@ -325,6 +325,18 @@ const RosterTemplates = () => {
                   onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                 />
               </div>
+
+              {editingTemplate && (
+                <AllocationLocationManager
+                  templateId={editingTemplate.id}
+                  allowAllocations={formData.allow_allocations}
+                  onToggleAllocations={(enabled) => {
+                    setFormData({ ...formData, allow_allocations: enabled });
+                    // Persist immediately for existing templates
+                    updateMutation.mutate({ id: editingTemplate.id, allow_allocations: enabled } as any);
+                  }}
+                />
+              )}
               
               <div className="flex justify-end space-x-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
