@@ -488,21 +488,33 @@ const ShiftCreationPopup = ({
               const d = sEnd - sStart;
               segs.push({ type: 'no_show', label: 'Did Not Clock In', desc: `Employee did not clock in for the entire shift`, range: `${mToTime(sStart)} → ${mToTime(sEnd)}`, dur: d, paid: false });
             } else if (hasClockedData) {
+              // Track consumed paid minutes for multi-segment accuracy
+              let earlyRemain = earlyPaid;
+              let lateRemain = latePaid;
+
               if (tr.clock_in_time && aStart < sStart) {
                 const d = sStart - aStart;
-                segs.push({ type: 'early_start', label: 'Early Clock In', desc: `Clocked in ${fmtDur(d)} before shift`, range: `${mToTime(aStart)} → ${mToTime(sStart)}`, dur: d, paid: isReviewed ? earlyPaid >= d : false });
+                const p = isReviewed && earlyRemain >= d;
+                if (p) earlyRemain -= d;
+                segs.push({ type: 'early_start', label: 'Early Clock In', desc: `Clocked in ${fmtDur(d)} before shift`, range: `${mToTime(aStart)} → ${mToTime(sStart)}`, dur: d, paid: p });
               }
               if (tr.clock_in_time && aStart > sStart + 5) {
                 const d = aStart - sStart;
-                segs.push({ type: 'late_start', label: 'Late Clock In', desc: `Clocked in ${fmtDur(d)} after shift started`, range: `${mToTime(sStart)} → ${mToTime(aStart)}`, dur: d, paid: isReviewed ? latePaid >= d : false });
+                const p = isReviewed && lateRemain >= d;
+                if (p) lateRemain -= d;
+                segs.push({ type: 'late_start', label: 'Late Clock In', desc: `Clocked in ${fmtDur(d)} after shift started`, range: `${mToTime(sStart)} → ${mToTime(aStart)}`, dur: d, paid: p });
               }
               if (tr.clock_out_time && aEnd < sEnd - 5) {
                 const d = sEnd - aEnd;
-                segs.push({ type: 'early_end', label: 'Early Clock Out', desc: `Clocked out ${fmtDur(d)} before shift ended`, range: `${mToTime(aEnd)} → ${mToTime(sEnd)}`, dur: d, paid: isReviewed ? latePaid >= d : false });
+                const p = isReviewed && lateRemain >= d;
+                if (p) lateRemain -= d;
+                segs.push({ type: 'early_end', label: 'Early Clock Out', desc: `Clocked out ${fmtDur(d)} before shift ended`, range: `${mToTime(aEnd)} → ${mToTime(sEnd)}`, dur: d, paid: p });
               }
               if (tr.clock_out_time && aEnd > sEnd) {
                 const d = aEnd - sEnd;
-                segs.push({ type: 'late_end', label: 'Late Clock Out', desc: `Clocked out ${fmtDur(d)} after shift ended`, range: `${mToTime(sEnd)} → ${mToTime(aEnd)}`, dur: d, paid: isReviewed ? earlyPaid >= d : false });
+                const p = isReviewed && earlyRemain >= d;
+                if (p) earlyRemain -= d;
+                segs.push({ type: 'late_end', label: 'Late Clock Out', desc: `Clocked out ${fmtDur(d)} after shift ended`, range: `${mToTime(sEnd)} → ${mToTime(aEnd)}`, dur: d, paid: p });
               }
             }
 
@@ -528,7 +540,7 @@ const ShiftCreationPopup = ({
                     isCompleted && "border-emerald-300 text-emerald-700",
                     isClockedIn && "border-amber-300 text-amber-700"
                   )}>
-                    {isNoShow ? 'No Show' : isDiscrepancy && isReviewed ? 'Reviewed' : isDiscrepancy ? 'Discrepancy' : isCompleted ? 'Completed' : 'Clocked In'}
+                    {isNoShow ? 'No Show' : isDiscrepancy && isReviewed ? (tr.notes?.includes('Auto-approved') ? 'Auto Reviewed' : 'Reviewed') : isDiscrepancy ? 'Discrepancy' : isCompleted ? 'Completed' : 'Clocked In'}
                   </Badge>
                 </div>
 

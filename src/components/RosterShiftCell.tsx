@@ -305,12 +305,16 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
                 }}
               >
                 <AlertTriangle className="w-2.5 h-2.5 mr-1" />
-                {tr?.approval_status === 'reviewed' ? 'Reviewed ✓' : 'Review'}
+                {tr?.approval_status === 'reviewed' 
+                  ? (tr?.notes?.includes('Auto-approved') ? 'Auto ✓' : 'Reviewed ✓')
+                  : 'Review'}
               </Button>
             )}
             {/* Show reviewed badge for completed discrepancies without edit permission */}
             {(isDiscrepancy || hasDiscrepancyType) && !canEdit && tr?.approval_status === 'reviewed' && (
-              <div className="text-[9px] text-emerald-600 font-medium mt-1 text-center">Reviewed ✓</div>
+              <div className="text-[9px] text-emerald-600 font-medium mt-1 text-center">
+                {tr?.notes?.includes('Auto-approved') ? 'Auto ✓' : 'Reviewed ✓'}
+              </div>
             )}
           </div>
         </TooltipTrigger>

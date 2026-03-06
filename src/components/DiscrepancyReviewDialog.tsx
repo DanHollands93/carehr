@@ -119,55 +119,67 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
     const actualStart = isoToMinutes(tr.clock_in_time);
     const actualEnd = tr.clock_out_time ? isoToMinutes(tr.clock_out_time) : scheduledEnd;
 
-    // Clocked in early (before scheduled start)
+    // Track consumed paid minutes to handle multi-segment scenarios
+    let earlyPaidRemaining = earlyPaid;
+    let latePaidRemaining = latePaid;
+
+    // Clocked in early (before scheduled start) → uses earlyPaid bucket
     if (actualStart < scheduledStart) {
       const duration = scheduledStart - actualStart;
+      const segPaid = isReviewed && earlyPaidRemaining >= duration;
+      if (segPaid) earlyPaidRemaining -= duration;
       segments.push({
         type: 'early_start',
         label: 'Early Clock In',
         description: `Clocked in ${formatDuration(duration)} before shift started`,
         timeRange: `${minutesToTime(actualStart)} → ${minutesToTime(scheduledStart)}`,
         durationMinutes: duration,
-        paid: isReviewed ? earlyPaid >= duration : false,
+        paid: segPaid,
       });
     }
 
-    // Clocked in late (after scheduled start)
+    // Clocked in late (after scheduled start) → uses latePaid bucket
     if (actualStart > scheduledStart + 5) {
       const duration = actualStart - scheduledStart;
+      const segPaid = isReviewed && latePaidRemaining >= duration;
+      if (segPaid) latePaidRemaining -= duration;
       segments.push({
         type: 'late_start',
         label: 'Late Clock In',
         description: `Clocked in ${formatDuration(duration)} after shift started`,
         timeRange: `${minutesToTime(scheduledStart)} → ${minutesToTime(actualStart)}`,
         durationMinutes: duration,
-        paid: isReviewed ? latePaid >= duration : false,
+        paid: segPaid,
       });
     }
 
-    // Clocked out early (before scheduled end)
+    // Clocked out early (before scheduled end) → uses latePaid bucket
     if (actualEnd < scheduledEnd - 5) {
       const duration = scheduledEnd - actualEnd;
+      const segPaid = isReviewed && latePaidRemaining >= duration;
+      if (segPaid) latePaidRemaining -= duration;
       segments.push({
         type: 'early_end',
         label: 'Early Clock Out',
         description: `Clocked out ${formatDuration(duration)} before shift ended`,
         timeRange: `${minutesToTime(actualEnd)} → ${minutesToTime(scheduledEnd)}`,
         durationMinutes: duration,
-        paid: isReviewed ? latePaid >= duration : false,
+        paid: segPaid,
       });
     }
 
-    // Clocked out late (after scheduled end)
+    // Clocked out late (after scheduled end) → uses earlyPaid bucket
     if (actualEnd > scheduledEnd) {
       const duration = actualEnd - scheduledEnd;
+      const segPaid = isReviewed && earlyPaidRemaining >= duration;
+      if (segPaid) earlyPaidRemaining -= duration;
       segments.push({
         type: 'late_end',
         label: 'Late Clock Out',
         description: `Clocked out ${formatDuration(duration)} after shift ended`,
         timeRange: `${minutesToTime(scheduledEnd)} → ${minutesToTime(actualEnd)}`,
         durationMinutes: duration,
-        paid: isReviewed ? earlyPaid >= duration : false,
+        paid: segPaid,
       });
     }
 
