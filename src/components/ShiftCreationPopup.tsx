@@ -887,6 +887,66 @@ const ShiftCreationPopup = ({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Photo Viewer Dialog */}
+    <Dialog open={showPhotoDialog !== null} onOpenChange={(open) => !open && setShowPhotoDialog(null)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {showPhotoDialog === 'clock_in' ? 'Clock In' : 'Clock Out'} Photo
+          </DialogTitle>
+        </DialogHeader>
+        {signedPhotoUrl ? (
+          <img src={signedPhotoUrl} alt="Clock photo" className="w-full rounded-md" />
+        ) : (
+          <p className="text-sm text-muted-foreground">Unable to load photo.</p>
+        )}
+      </DialogContent>
+    </Dialog>
+
+    {/* Geo Viewer Dialog */}
+    <Dialog open={showGeoDialog !== null} onOpenChange={(open) => !open && setShowGeoDialog(null)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {showGeoDialog === 'clock_in' ? 'Clock In' : 'Clock Out'} Location
+          </DialogTitle>
+        </DialogHeader>
+        {showGeoDialog && (() => {
+          const tr = existingShift?.time_record;
+          if (!tr) return <p className="text-sm text-muted-foreground">No data.</p>;
+          const lat = showGeoDialog === 'clock_in' ? tr.clock_in_latitude : tr.clock_out_latitude;
+          const lng = showGeoDialog === 'clock_in' ? tr.clock_in_longitude : tr.clock_out_longitude;
+          const acc = showGeoDialog === 'clock_in' ? tr.clock_in_accuracy : tr.clock_out_accuracy;
+          if (lat == null || lng == null) return <p className="text-sm text-muted-foreground">No location data.</p>;
+          const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+          return (
+            <div className="space-y-3">
+              <div className="rounded-lg border p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Navigation className="w-4 h-4 text-primary" />
+                  <span className="font-medium">Coordinates</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {lat.toFixed(6)}, {lng.toFixed(6)}
+                </p>
+                {acc != null && (
+                  <p className="text-xs text-muted-foreground">
+                    Accuracy: ±{Math.round(acc)}m
+                  </p>
+                )}
+              </div>
+              <Button variant="outline" className="w-full" asChild>
+                <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                  <MapPin className="w-4 h-4 mr-2" /> Open in Google Maps
+                </a>
+              </Button>
+            </div>
+          );
+        })()}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
