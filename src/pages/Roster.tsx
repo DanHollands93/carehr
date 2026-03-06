@@ -1067,16 +1067,19 @@ const Roster = () => {
   };
 
   const getShiftsForEmployeeAndDate = (employeeId: string, date: string) => {
+    // date is already in 'yyyy-MM-dd' format — don't re-parse through new Date() to avoid timezone shifts
+    const normalizedDate = date.length === 10 ? date : format(new Date(date), 'yyyy-MM-dd');
     return shifts?.filter(shift => 
       shift.employee_id === employeeId && 
-      shift.date === format(new Date(date), 'yyyy-MM-dd')
+      shift.date === normalizedDate
     ) || [];
   };
 
   const getShiftForEmployeeAndDate = (employeeId: string, date: string) => {
+    const normalizedDate = date.length === 10 ? date : format(new Date(date), 'yyyy-MM-dd');
     return shifts?.find(shift => 
       shift.employee_id === employeeId && 
-      shift.date === format(new Date(date), 'yyyy-MM-dd')
+      shift.date === normalizedDate
     );
   };
 
@@ -1120,7 +1123,7 @@ const Roster = () => {
     pay_rate: number;
   }) => {
     if (!canEditRoster) return;
-    const formattedDate = format(new Date(shiftPopup.date), 'yyyy-MM-dd');
+    const formattedDate = shiftPopup.date;
     const existingShifts = getShiftsForEmployeeAndDate(shiftPopup.employeeId, formattedDate);
     if (hasTimeOverlap(shiftData.start_time, shiftData.end_time, existingShifts)) {
       toast({
