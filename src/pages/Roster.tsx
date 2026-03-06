@@ -585,6 +585,33 @@ const Roster = () => {
     }
   });
 
+  // Remove a discrepancy review, resetting back to discrepancy/pending
+  const removeReviewMutation = useMutation({
+    mutationFn: async (recordId: string) => {
+      const { error } = await supabase
+        .from('time_clock_records')
+        .update({
+          approval_status: 'pending',
+          status: 'discrepancy',
+          approved_by: null,
+          early_minutes_paid: 0,
+          late_minutes_paid: 0,
+          notes: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', recordId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      setShiftPopup(prev => ({ ...prev, isOpen: false }));
+      toast({ title: "Review removed — discrepancy needs re-review" });
+    },
+    onError: (error) => {
+      toast({ title: "Error removing review", description: error.message, variant: "destructive" });
+    }
+  });
+
   const handleDragStart = (template: ShiftTemplate) => {
     if (!canEditRoster || isMobile) return;
     setDraggedTemplate(template);
@@ -869,6 +896,9 @@ const Roster = () => {
               shift: shift as ShiftWithTimeRecord,
               employeeName: emp ? `${emp.first_name} ${emp.last_name}` : shiftPopup.employeeName,
             });
+          }}
+          onRemoveReview={(recordId) => {
+            removeReviewMutation.mutate(recordId);
           }}
           shiftTemplates={shiftTemplates || []}
           employeeName={shiftPopup.employeeName}

@@ -1,12 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Clock, AlertTriangle, Check } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Trash2, Clock, AlertTriangle, Check, RotateCcw } from "lucide-react";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,6 +67,7 @@ interface ShiftCreationPopupProps {
   }) => void;
   onDeleteShift?: () => void;
   onReviewDiscrepancy?: (shift: Shift) => void;
+  onRemoveReview?: (recordId: string) => void;
   shiftTemplates: ShiftTemplate[];
   employeeName: string;
   employeeId?: string;
@@ -78,6 +81,7 @@ const ShiftCreationPopup = ({
   onCreateShift,
   onDeleteShift,
   onReviewDiscrepancy,
+  onRemoveReview,
   shiftTemplates,
   employeeName,
   employeeId,
@@ -395,30 +399,62 @@ const ShiftCreationPopup = ({
             </div>
           </div>
 
-          {/* Time Clock Data */}
+          {/* Time Clock & Discrepancy Review Section */}
           {existingShift?.time_record && (existingShift.time_record.clock_in_time || existingShift.time_record.clock_out_time) && (() => {
             const tr = existingShift.time_record!;
-            const isDiscrepancy = tr.status === 'discrepancy';
-            const isCompleted = tr.status === 'completed';
+            const isDiscrepancy = tr.status === 'discrepancy' || (tr.status === 'completed' && tr.discrepancy_type);
+            const isCompleted = tr.status === 'completed' && !tr.discrepancy_type;
             const isClockedIn = tr.status === 'clocked_in';
             const isReviewed = tr.approval_status === 'reviewed';
             
-            const formatClockTime = (iso: string) => {
+            const fmtClock = (iso: string) => {
               const d = new Date(iso);
               return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
             };
 
-            const formatDuration = (mins: number) => {
-              const h = Math.floor(mins / 60);
-              const m = mins % 60;
-              if (h > 0 && m > 0) return `${h}h ${m}m`;
-              if (h > 0) return `${h}h`;
-              return `${m}m`;
-            };
-            
+            const toMins = (t: string): number => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+            const isoMins = (iso: string): number => { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); };
+            const mToTime = (mins: number): string => `${Math.floor(mins / 60).toString().padStart(2, '0')}:${(mins % 60).toString().padStart(2, '0')}`;
+            const fmtDur = (mins: number) => { const h = Math.floor(mins / 60); const m = mins % 60; return h > 0 && m > 0 ? `${h}h ${m}m` : h > 0 ? `${h}h` : `${m}m`; };
+
+            const sStart = toMins(existingShift.start_time);
+            const sEnd = toMins(existingShift.end_time);
+            const aStart = tr.clock_in_time ? isoMins(tr.clock_in_time) : sStart;
+            const aEnd = tr.clock_out_time ? isoMins(tr.clock_out_time) : sEnd;
+            const wStart = Math.min(sStart, aStart);
+            const wEnd = Math.max(sEnd, aEnd);
+            const wDur = wEnd - wStart || 1;
+            const pct = (m: number) => ((m - wStart) / wDur) * 100;
+
+            const earlyPaid = tr.early_minutes_paid || 0;
+            const latePaid = tr.late_minutes_paid || 0;
+
+            interface Seg { type: 'early_start' | 'late_start' | 'early_end' | 'late_end'; label: string; desc: string; range: string; dur: number; paid: boolean; }
+            const segs: Seg[] = [];
+
+            if (tr.clock_in_time && aStart < sStart) {
+              const d = sStart - aStart;
+              segs.push({ type: 'early_start', label: 'Early Clock In', desc: `Clocked in ${fmtDur(d)} before shift`, range: `${mToTime(aStart)} → ${mToTime(sStart)}`, dur: d, paid: isReviewed ? earlyPaid >= d : false });
+            }
+            if (tr.clock_in_time && aStart > sStart + 5) {
+              const d = aStart - sStart;
+              segs.push({ type: 'late_start', label: 'Late Clock In', desc: `Clocked in ${fmtDur(d)} after shift started`, range: `${mToTime(sStart)} → ${mToTime(aStart)}`, dur: d, paid: isReviewed ? latePaid >= d : false });
+            }
+            if (tr.clock_out_time && aEnd < sEnd - 5) {
+              const d = sEnd - aEnd;
+              segs.push({ type: 'early_end', label: 'Early Clock Out', desc: `Clocked out ${fmtDur(d)} before shift ended`, range: `${mToTime(aEnd)} → ${mToTime(sEnd)}`, dur: d, paid: isReviewed ? latePaid >= d : false });
+            }
+            if (tr.clock_out_time && aEnd > sEnd) {
+              const d = aEnd - sEnd;
+              segs.push({ type: 'late_end', label: 'Late Clock Out', desc: `Clocked out ${fmtDur(d)} after shift ended`, range: `${mToTime(sEnd)} → ${mToTime(aEnd)}`, dur: d, paid: isReviewed ? earlyPaid >= d : false });
+            }
+
+            const segIcon = (t: Seg['type']) => (t === 'early_start' || t === 'late_end') ? <Clock className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />;
+            const segColor = (t: Seg['type']) => (t === 'early_start' || t === 'late_end') ? 'text-amber-600' : 'text-destructive';
+
             return (
               <div className={cn(
-                "rounded-lg border p-3 space-y-2",
+                "rounded-lg border p-3 space-y-3",
                 isDiscrepancy && !isReviewed && "border-amber-300 bg-amber-50/50 dark:bg-amber-950/10",
                 isDiscrepancy && isReviewed && "border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/10",
                 isCompleted && "border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/10",
@@ -443,76 +479,88 @@ const ShiftCreationPopup = ({
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
                     <span className="text-muted-foreground text-xs">Clock In</span>
-                    <p className="font-mono font-medium text-foreground">
-                      {tr.clock_in_time ? formatClockTime(tr.clock_in_time) : '—'}
-                    </p>
+                    <p className="font-mono font-medium text-foreground">{tr.clock_in_time ? fmtClock(tr.clock_in_time) : '—'}</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground text-xs">Clock Out</span>
-                    <p className="font-mono font-medium text-foreground">
-                      {tr.clock_out_time ? formatClockTime(tr.clock_out_time) : isClockedIn ? 'Active' : '—'}
-                    </p>
+                    <p className="font-mono font-medium text-foreground">{tr.clock_out_time ? fmtClock(tr.clock_out_time) : isClockedIn ? 'Active' : '—'}</p>
                   </div>
                 </div>
 
-                {/* Show reviewed discrepancy decisions */}
-                {isDiscrepancy && isReviewed && (
-                  <div className="space-y-1.5 pt-1 border-t border-border/50">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Review Decisions</span>
-                    {(tr.early_minutes_paid != null && tr.early_minutes_paid > 0) && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-foreground">Extra time (early/overtime) paid</span>
-                        <Badge variant="outline" className="border-emerald-300 text-emerald-700 text-[10px]">
-                          <Check className="w-3 h-3 mr-1" />
-                          {formatDuration(tr.early_minutes_paid)}
-                        </Badge>
-                      </div>
-                    )}
-                    {(tr.early_minutes_paid != null && tr.early_minutes_paid === 0) && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-foreground">Extra time (early/overtime)</span>
-                        <Badge variant="outline" className="border-muted text-muted-foreground text-[10px]">Unpaid</Badge>
-                      </div>
-                    )}
-                    {(tr.late_minutes_paid != null && tr.late_minutes_paid > 0) && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-foreground">Missing time paid</span>
-                        <Badge variant="outline" className="border-emerald-300 text-emerald-700 text-[10px]">
-                          <Check className="w-3 h-3 mr-1" />
-                          {formatDuration(tr.late_minutes_paid)}
-                        </Badge>
-                      </div>
-                    )}
-                    {(tr.late_minutes_paid != null && tr.late_minutes_paid === 0) && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-foreground">Missing time</span>
-                        <Badge variant="outline" className="border-muted text-muted-foreground text-[10px]">Unpaid</Badge>
-                      </div>
-                    )}
-                    {tr.notes && (
-                      <div className="text-xs text-muted-foreground italic mt-1">
-                        Note: {tr.notes}
-                      </div>
-                    )}
+                {/* Visual Timeline */}
+                {(isDiscrepancy || segs.length > 0) && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Timeline</p>
+                    <div className="relative h-10 bg-muted rounded-lg overflow-hidden">
+                      <div className="absolute top-1 h-3.5 bg-primary/25 rounded border border-primary/30" style={{ left: `${pct(sStart)}%`, width: `${pct(sEnd) - pct(sStart)}%` }} />
+                      <div className="absolute top-5.5 h-3.5 bg-emerald-500/80 rounded" style={{ left: `${pct(Math.max(aStart, sStart))}%`, width: `${pct(Math.min(aEnd, sEnd)) - pct(Math.max(aStart, sStart))}%` }} />
+                      {aStart < sStart && <div className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-l" style={{ left: `${pct(aStart)}%`, width: `${pct(sStart) - pct(aStart)}%` }} />}
+                      {aEnd > sEnd && <div className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-r" style={{ left: `${pct(sEnd)}%`, width: `${pct(aEnd) - pct(sEnd)}%` }} />}
+                      {aStart > sStart && <div className="absolute top-5.5 h-3.5 bg-destructive/40 rounded-l border border-dashed border-destructive/60" style={{ left: `${pct(sStart)}%`, width: `${pct(aStart) - pct(sStart)}%` }} />}
+                      {aEnd < sEnd && <div className="absolute top-5.5 h-3.5 bg-destructive/40 rounded-r border border-dashed border-destructive/60" style={{ left: `${pct(aEnd)}%`, width: `${pct(sEnd) - pct(aEnd)}%` }} />}
+                      <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(aStart)}%` }}>{mToTime(aStart)}</span>
+                      <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(aEnd)}%`, transform: 'translateX(-100%)' }}>{mToTime(aEnd)}</span>
+                    </div>
+                    <div className="flex gap-3 mt-5 text-[10px] text-muted-foreground">
+                      <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-primary/25 border border-primary/30" /> Scheduled</div>
+                      <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-emerald-500/80" /> On Time</div>
+                      <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-amber-400/80" /> Extra</div>
+                      <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-destructive/40 border border-dashed border-destructive/60" /> Missing</div>
+                    </div>
                   </div>
                 )}
 
-                {/* Review/Amend button */}
-                {isDiscrepancy && onReviewDiscrepancy && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "w-full mt-1",
-                      isReviewed
-                        ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                        : "border-amber-300 text-amber-700 hover:bg-amber-50"
+                {/* Discrepancy Segments */}
+                {segs.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Discrepancy Segments</p>
+                    <div className="space-y-2">
+                      {segs.map((seg, i) => (
+                        <div key={i} className={cn(
+                          "flex items-center justify-between rounded-lg border p-3 transition-colors",
+                          seg.paid ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800" : "bg-card border-border"
+                        )}>
+                          <div className="flex items-center gap-3">
+                            <div className={cn("p-1.5 rounded-md bg-muted", segColor(seg.type))}>{segIcon(seg.type)}</div>
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{seg.label}</p>
+                              <p className="text-xs text-muted-foreground">{seg.desc}</p>
+                              <p className="text-xs font-mono text-muted-foreground mt-0.5">{seg.range} ({fmtDur(seg.dur)})</p>
+                            </div>
+                          </div>
+                          <span className={cn("text-xs font-medium shrink-0", seg.paid ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>
+                            {seg.paid ? 'Paid' : 'Unpaid'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Review notes */}
+                {isReviewed && tr.notes && (
+                  <div className="pt-1 border-t border-border/50">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Review Notes</p>
+                    <p className="text-xs text-muted-foreground italic">{tr.notes}</p>
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                {isDiscrepancy && (
+                  <div className="flex gap-2 pt-1">
+                    {onReviewDiscrepancy && (
+                      <Button variant="outline" size="sm" className={cn("flex-1", isReviewed ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50" : "border-amber-300 text-amber-700 hover:bg-amber-50")} onClick={() => onReviewDiscrepancy(existingShift)}>
+                        <AlertTriangle className="w-3.5 h-3.5 mr-2" />
+                        {isReviewed ? 'Amend Review' : 'Review Discrepancy'}
+                      </Button>
                     )}
-                    onClick={() => onReviewDiscrepancy(existingShift)}
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5 mr-2" />
-                    {isReviewed ? 'Amend Review' : 'Review Discrepancy'}
-                  </Button>
+                    {isReviewed && onRemoveReview && (
+                      <Button variant="outline" size="sm" className="border-destructive/50 text-destructive hover:bg-destructive/10" onClick={() => onRemoveReview(tr.id)}>
+                        <RotateCcw className="w-3.5 h-3.5 mr-2" />
+                        Remove Review
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             );
