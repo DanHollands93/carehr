@@ -304,6 +304,60 @@ const Roster = () => {
     enabled: !!selectedRosterTemplate?.id
   });
 
+  // Query orphaned time_clock_records (shift_id IS NULL, have clock data) for this week
+  const { data: orphanedRecords } = useQuery({
+    queryKey: ['orphaned-clock-records', format(weekStart, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      const startDate = format(weekStart, 'yyyy-MM-dd');
+      const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+      
+      const { data, error } = await supabase
+        .from('time_clock_records')
+        .select('*')
+        .is('shift_id', null)
+        .gte('shift_date', startDate)
+        .lte('shift_date', endDate)
+        .or('clock_in_time.not.is.null,clock_out_time.not.is.null');
+      
+      if (error) throw error;
+      return (data || []) as OrphanedRecord[];
+    },
+    enabled: !!selectedRosterTemplate?.id
+  });
+
+  const getOrphanedRecordsForEmployeeAndDate = (employeeId: string, date: string) => {
+    return orphanedRecords?.filter(r => 
+      r.employee_id === employeeId && r.shift_date === date
+    ) || [];
+  };
+
+  // Try to reattach orphaned clock records when a shift lands on the same employee+date
+  const tryReattachOrphanedRecords = async (shiftId: string, employeeId: string, date: string) => {
+    const orphaned = orphanedRecords?.filter(r => 
+      r.employee_id === employeeId && r.shift_date === date
+    ) || [];
+    
+    for (const record of orphaned) {
+      await supabase
+        .from('time_clock_records')
+        .update({
+          shift_id: shiftId,
+          status: 'discrepancy',
+          discrepancy_type: record.discrepancy_type || 'reattached',
+          approval_status: 'pending',
+          notes: `${record.notes ? record.notes + ', ' : ''}Reattached to shift after move`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', record.id);
+    }
+    
+    if (orphaned.length > 0) {
+      queryClient.invalidateQueries({ queryKey: ['orphaned-clock-records'] });
+    }
+    
+    return orphaned.length;
+  };
+
   // Auto-exception settings
   const {
     earlyClockInMinutes, lateClockInMinutes, earlyClockOutMinutes, lateClockOutMinutes,
