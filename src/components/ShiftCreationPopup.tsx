@@ -36,6 +36,14 @@ interface TimeRecord {
   early_minutes_paid?: number | null;
   late_minutes_paid?: number | null;
   notes?: string | null;
+  clock_in_photo_url?: string | null;
+  clock_out_photo_url?: string | null;
+  clock_in_latitude?: number | null;
+  clock_in_longitude?: number | null;
+  clock_in_accuracy?: number | null;
+  clock_out_latitude?: number | null;
+  clock_out_longitude?: number | null;
+  clock_out_accuracy?: number | null;
 }
 
 interface Shift {
