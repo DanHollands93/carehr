@@ -124,6 +124,10 @@ const StaffShiftCard = ({
   };
 
   const handleClockIn = () => {
+    if (isAdHoc) {
+      proceedWithAction('clock_in');
+      return;
+    }
     const validation = validateClockTime(record, true, {
       earlyClockInMinutes, lateClockInMinutes, earlyClockOutMinutes, lateClockOutMinutes
     });
@@ -136,6 +140,10 @@ const StaffShiftCard = ({
   };
 
   const handleClockOut = () => {
+    if (isAdHoc) {
+      proceedWithAction('clock_out');
+      return;
+    }
     const validation = validateClockTime(record, false, {
       earlyClockInMinutes, lateClockInMinutes, earlyClockOutMinutes, lateClockOutMinutes
     });
