@@ -1,0 +1,1 @@
+DELETE FROM time_clock_records WHERE id = '9646bf19-5003-43d8-a3ad-f9daf4a5dd2e';
