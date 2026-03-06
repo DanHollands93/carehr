@@ -2,12 +2,12 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { MapPin, Camera, CalendarCheck, ArrowLeftRight, Loader2 } from "lucide-react";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 
 interface CompanySetting {
   id: string;
