@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import RosterShiftCell from "@/components/RosterShiftCell";
+import OrphanedClockRecord, { OrphanedRecord } from "@/components/OrphanedClockRecord";
 import DiscrepancyReviewDialog, { DiscrepancyReviewResult } from "@/components/DiscrepancyReviewDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
@@ -303,6 +304,60 @@ const Roster = () => {
     enabled: !!selectedRosterTemplate?.id
   });
 
+  // Query orphaned time_clock_records (shift_id IS NULL, have clock data) for this week
+  const { data: orphanedRecords } = useQuery({
+    queryKey: ['orphaned-clock-records', format(weekStart, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      const startDate = format(weekStart, 'yyyy-MM-dd');
+      const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+      
+      const { data, error } = await supabase
+        .from('time_clock_records')
+        .select('*')
+        .is('shift_id', null)
+        .gte('shift_date', startDate)
+        .lte('shift_date', endDate)
+        .or('clock_in_time.not.is.null,clock_out_time.not.is.null');
+      
+      if (error) throw error;
+      return (data || []) as OrphanedRecord[];
+    },
+    enabled: !!selectedRosterTemplate?.id
+  });
+
+  const getOrphanedRecordsForEmployeeAndDate = (employeeId: string, date: string) => {
+    return orphanedRecords?.filter(r => 
+      r.employee_id === employeeId && r.shift_date === date
+    ) || [];
+  };
+
+  // Try to reattach orphaned clock records when a shift lands on the same employee+date
+  const tryReattachOrphanedRecords = async (shiftId: string, employeeId: string, date: string) => {
+    const orphaned = orphanedRecords?.filter(r => 
+      r.employee_id === employeeId && r.shift_date === date
+    ) || [];
+    
+    for (const record of orphaned) {
+      await supabase
+        .from('time_clock_records')
+        .update({
+          shift_id: shiftId,
+          status: 'discrepancy',
+          discrepancy_type: record.discrepancy_type || 'reattached',
+          approval_status: 'pending',
+          notes: `${record.notes ? record.notes + ', ' : ''}Reattached to shift after move`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', record.id);
+    }
+    
+    if (orphaned.length > 0) {
+      queryClient.invalidateQueries({ queryKey: ['orphaned-clock-records'] });
+    }
+    
+    return orphaned.length;
+  };
+
   // Auto-exception settings
   const {
     earlyClockInMinutes, lateClockInMinutes, earlyClockOutMinutes, lateClockOutMinutes,
@@ -454,7 +509,7 @@ const Roster = () => {
         pay_rate: number;
       };
     }) => {
-      const { error } = await supabase
+      const { data: newShift, error } = await supabase
         .from('shifts')
         .insert([{
           employee_id: employeeId,
@@ -466,13 +521,24 @@ const Roster = () => {
           actual_job_role_id: shiftData.job_role_id,
           pay_rate: shiftData.pay_rate,
           roster_template_id: selectedRosterTemplate?.id
-        }]);
+        }])
+        .select()
+        .single();
       
       if (error) throw error;
+
+      // Try to reattach any orphaned clock records for this employee+date
+      const reattachedCount = await tryReattachOrphanedRecords(newShift.id, employeeId, date);
+      return { reattachedCount };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast({ title: "Shift added successfully" });
+      queryClient.invalidateQueries({ queryKey: ['orphaned-clock-records'] });
+      if (result.reattachedCount > 0) {
+        toast({ title: `Shift added — ${result.reattachedCount} clock record(s) reattached for review` });
+      } else {
+        toast({ title: "Shift added successfully" });
+      }
     },
     onError: (error) => {
       toast({ 
@@ -531,10 +597,20 @@ const Roster = () => {
         .eq('id', shiftId);
       
       if (error) throw error;
+
+      // Try to reattach any orphaned clock records at the destination
+      const formattedDate = format(new Date(date), 'yyyy-MM-dd');
+      const reattachedCount = await tryReattachOrphanedRecords(shiftId, employeeId, formattedDate);
+      return { reattachedCount };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast({ title: "Shift moved successfully" });
+      queryClient.invalidateQueries({ queryKey: ['orphaned-clock-records'] });
+      if (result.reattachedCount > 0) {
+        toast({ title: `Shift moved — ${result.reattachedCount} clock record(s) reattached for review` });
+      } else {
+        toast({ title: "Shift moved successfully" });
+      }
     },
     onError: (error) => {
       toast({ 
@@ -1279,6 +1355,10 @@ const Roster = () => {
                   <div className="w-3 h-2 rounded-full bg-destructive/70" />
                   <span>Late</span>
                 </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-2 rounded-full border border-dashed border-amber-400 bg-amber-100" />
+                  <span>Unlinked Clock</span>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -1350,13 +1430,15 @@ const Roster = () => {
                                   )}
                                 </div>
                               </td>
-                              {weekDays.map((day) => {
+                               {weekDays.map((day) => {
                                 const dateStr = format(day, 'yyyy-MM-dd');
                                 const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
                                 const dayShifts = shifts?.filter(shift => 
                                   shift.employee_id === employee.id && 
                                   shift.date === dateStr
                                 ) || [];
+                                const dayOrphaned = getOrphanedRecordsForEmployeeAndDate(employee.id, dateStr);
+                                const hasContent = dayShifts.length > 0 || dayOrphaned.length > 0;
                                 return (
                                   <td
                                     key={day.toISOString()}
@@ -1369,7 +1451,7 @@ const Roster = () => {
                                       e.preventDefault();
                                       handleDrop(employee.id, dateStr);
                                     }}
-                                    onClick={() => canEditRoster && dayShifts.length === 0 && setShiftPopup({
+                                    onClick={() => canEditRoster && !hasContent && setShiftPopup({
                                       isOpen: true,
                                       employeeId: employee.id,
                                       employeeName: `${employee.first_name} ${employee.last_name}`,
@@ -1378,14 +1460,12 @@ const Roster = () => {
                                   >
                                     <div className={cn(
                                       "min-h-[60px] rounded-md p-0.5 transition-colors",
-                                      dayShifts.length === 0 && canEditRoster && "border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer",
-                                      dayShifts.length === 0 && !canEditRoster && "border border-dashed border-border/30"
+                                      !hasContent && canEditRoster && "border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer",
+                                      !hasContent && !canEditRoster && "border border-dashed border-border/30"
                                     )}>
-                                      {dayShifts.length > 0 ? (
+                                      {hasContent ? (
                                         <div className="space-y-1">
                                           {dayShifts.map((shift) => {
-                                            // Determine if this shift belongs to the current section
-                                            // Shifts with no job_role_id are never faded (they belong everywhere)
                                             const isFaded = sectionJobRoleIds && shift.job_role_id
                                               ? !sectionJobRoleIds.includes(shift.job_role_id)
                                               : false;
@@ -1421,6 +1501,22 @@ const Roster = () => {
                                               />
                                             );
                                           })}
+                                          {dayOrphaned.map((record) => (
+                                            <OrphanedClockRecord
+                                              key={`orphan-${record.id}`}
+                                              record={record}
+                                              canEdit={canEditRoster}
+                                              onReview={(r) => {
+                                                // Open shift creation popup so they can attach a shift
+                                                setShiftPopup({
+                                                  isOpen: true,
+                                                  employeeId: employee.id,
+                                                  employeeName: `${employee.first_name} ${employee.last_name}`,
+                                                  date: dateStr,
+                                                });
+                                              }}
+                                            />
+                                          ))}
                                         </div>
                                       ) : canEditRoster ? (
                                         <div className="flex items-center justify-center h-full min-h-[56px] opacity-0 hover:opacity-100 transition-opacity">
