@@ -32,16 +32,53 @@ serve(async (req) => {
       }
     );
 
+    // Verify caller identity and role
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const supabaseCaller = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    )
+    const { data: claimsData, error: claimsError } = await supabaseCaller.auth.getClaims(token)
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const callerId = claimsData.claims.sub
+
+    // Check caller has admin or super_admin role
+    const { data: roles } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', callerId)
+
+    const hasPrivilege = roles?.some((r: any) => ['admin', 'super_admin'].includes(r.role))
+    if (!hasPrivilege) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: insufficient privileges' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { email, redirectTo }: PasswordResetRequest = await req.json();
 
-    // Get the origin from the request headers to build the correct redirect URL
     const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/') || 'http://localhost:3000';
     const resetUrl = redirectTo || `${origin}/reset-password`;
 
     console.log('Sending password reset email to:', email);
     console.log('Redirect URL:', resetUrl);
 
-    // Generate a password reset token
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email,
@@ -53,7 +90,6 @@ serve(async (req) => {
     if (error) {
       console.error('Error generating reset link:', error);
       
-      // Log failed email attempt
       await supabaseAdmin.from('email_logs').insert({
         recipient_email: email,
         subject: 'Reset Your Password',
@@ -65,16 +101,12 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ error: error.message }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log('Generated reset link:', data.properties.action_link);
 
-    // Send email using Resend
     const emailResponse = await resend.emails.send({
       from: "HR System <noreply@resend.dev>",
       to: [email],
@@ -105,7 +137,6 @@ serve(async (req) => {
     if (emailResponse.error) {
       console.error('Error sending email:', emailResponse.error);
       
-      // Log failed email
       await supabaseAdmin.from('email_logs').insert({
         recipient_email: email,
         subject: 'Reset Your Password',
@@ -117,16 +148,12 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ error: 'Failed to send password reset email' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log('Password reset email sent successfully:', emailResponse);
 
-    // Log successful email
     await supabaseAdmin.from('email_logs').insert({
       recipient_email: email,
       subject: 'Reset Your Password',
@@ -142,20 +169,14 @@ serve(async (req) => {
         message: 'Password reset email sent successfully',
         emailId: emailResponse.data?.id 
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Exception in send-password-reset:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

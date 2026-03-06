@@ -13,13 +13,11 @@ interface SyncEmailRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Create admin client with service role key
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -31,16 +29,54 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
 
+    // Verify caller identity and role
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const supabaseCaller = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    )
+    const { data: claimsData, error: claimsError } = await supabaseCaller.auth.getClaims(token)
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const callerId = claimsData.claims.sub
+
+    // Check caller has admin or super_admin role
+    const { data: roles } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', callerId)
+
+    const hasPrivilege = roles?.some((r: any) => ['admin', 'super_admin'].includes(r.role))
+    if (!hasPrivilege) {
+      return new Response(JSON.stringify({ error: 'Forbidden: insufficient privileges' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { userId, newEmail }: SyncEmailRequest = await req.json();
 
     console.log('Syncing email for user:', userId, 'to:', newEmail);
 
-    // Update the auth user's email
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.updateUserById(
       userId,
       { 
         email: newEmail,
-        email_confirm: true // Skip email confirmation for admin updates
+        email_confirm: true
       }
     );
 
@@ -52,7 +88,6 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Also update the profile table
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({ email: newEmail })
@@ -60,7 +95,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (profileError) {
       console.error('Error updating profile email:', profileError);
-      // Don't fail the request if profile update fails, as auth update succeeded
     }
 
     console.log('Successfully synced email for user:', userId);
