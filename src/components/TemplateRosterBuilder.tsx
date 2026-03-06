@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
+import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Save, Users, Trash2, ArrowUpDown, Plus, UserPlus, Search, UserMinus } from "lucide-react";
 import StaffSortingDialog from "@/components/StaffSortingDialog";
 import ShiftCreationPopup from "@/components/ShiftCreationPopup";
