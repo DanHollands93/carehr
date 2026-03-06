@@ -5,8 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, MapPin, User, AlertCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useTimeClockSettings } from "@/hooks/useTimeClockSettings";
+import { useCompanyClockSettings } from "@/hooks/useCompanyClockSettings";
 import { useState } from "react";
 import ClockWarningDialog from "./ClockWarningDialog";
+import ClockCaptureDialog, { type CaptureData } from "./ClockCaptureDialog";
 
 interface TimeClockRecord {
   id: string;
@@ -26,8 +28,8 @@ interface TimeClockRecord {
 
 interface StaffShiftCardProps {
   record: TimeClockRecord;
-  onClockIn: (recordId: string) => void;
-  onClockOut: (recordId: string) => void;
+  onClockIn: (args: { recordId: string; captureData?: CaptureData }) => void;
+  onClockOut: (args: { recordId: string; captureData?: CaptureData }) => void;
   isClockingIn: boolean;
   isClockingOut: boolean;
   validateClockTime: (record: TimeClockRecord, isClockIn: boolean, tolerances: any) => {
@@ -54,7 +56,15 @@ const StaffShiftCard = ({
     lateClockOutMinutes 
   } = useTimeClockSettings();
 
+  const {
+    requireGeoClockIn,
+    requireGeoClockOut,
+    requirePhotoClockIn,
+    requirePhotoClockOut,
+  } = useCompanyClockSettings();
+
   const [showWarningDialog, setShowWarningDialog] = useState(false);
+  const [showCaptureDialog, setShowCaptureDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<{
     type: 'clock_in' | 'clock_out';
     minutesDiff: number;
@@ -95,6 +105,23 @@ const StaffShiftCard = ({
   const canClockIn = record.status === 'scheduled' && !record.clock_in_time;
   const canClockOut = record.clock_in_time && !record.clock_out_time;
 
+  const needsCaptureForClockIn = requireGeoClockIn || requirePhotoClockIn;
+  const needsCaptureForClockOut = requireGeoClockOut || requirePhotoClockOut;
+
+  const proceedWithAction = (actionType: 'clock_in' | 'clock_out') => {
+    const needsCapture = actionType === 'clock_in' ? needsCaptureForClockIn : needsCaptureForClockOut;
+    if (needsCapture) {
+      setPendingAction({ type: actionType, minutesDiff: 0 });
+      setShowCaptureDialog(true);
+    } else {
+      if (actionType === 'clock_in') {
+        onClockIn({ recordId: record.id });
+      } else {
+        onClockOut({ recordId: record.id });
+      }
+    }
+  };
+
   const handleClockIn = () => {
     const validation = validateClockTime(record, true, {
       earlyClockInMinutes, lateClockInMinutes, earlyClockOutMinutes, lateClockOutMinutes
@@ -103,7 +130,7 @@ const StaffShiftCard = ({
       setPendingAction({ type: 'clock_in', minutesDiff: validation.minutesDiff });
       setShowWarningDialog(true);
     } else {
-      onClockIn(record.id);
+      proceedWithAction('clock_in');
     }
   };
 
@@ -115,22 +142,30 @@ const StaffShiftCard = ({
       setPendingAction({ type: 'clock_out', minutesDiff: validation.minutesDiff });
       setShowWarningDialog(true);
     } else {
-      onClockOut(record.id);
+      proceedWithAction('clock_out');
     }
   };
 
-  const handleConfirmAction = () => {
-    if (pendingAction?.type === 'clock_in') {
-      onClockIn(record.id);
-    } else if (pendingAction?.type === 'clock_out') {
-      onClockOut(record.id);
-    }
+  const handleWarningConfirm = () => {
     setShowWarningDialog(false);
+    if (pendingAction) {
+      proceedWithAction(pendingAction.type);
+    }
+  };
+
+  const handleCaptureComplete = (captureData: CaptureData) => {
+    setShowCaptureDialog(false);
+    if (pendingAction?.type === 'clock_in') {
+      onClockIn({ recordId: record.id, captureData });
+    } else if (pendingAction?.type === 'clock_out') {
+      onClockOut({ recordId: record.id, captureData });
+    }
     setPendingAction(null);
   };
 
   const handleCancelAction = () => {
     setShowWarningDialog(false);
+    setShowCaptureDialog(false);
     setPendingAction(null);
   };
 
@@ -162,7 +197,6 @@ const StaffShiftCard = ({
             </span>
           </div>
 
-          {/* Allocation location */}
           {allocationLocation && (
             <div className="flex items-center space-x-2 text-sm text-primary font-medium">
               <MapPin className="w-4 h-4" />
@@ -224,9 +258,20 @@ const StaffShiftCard = ({
       <ClockWarningDialog
         isOpen={showWarningDialog}
         onClose={handleCancelAction}
-        onConfirm={handleConfirmAction}
+        onConfirm={handleWarningConfirm}
         isClockIn={pendingAction?.type === 'clock_in'}
         minutesDiff={pendingAction?.minutesDiff || 0}
+        isLoading={isClockingIn || isClockingOut}
+      />
+
+      <ClockCaptureDialog
+        isOpen={showCaptureDialog}
+        onClose={handleCancelAction}
+        onComplete={handleCaptureComplete}
+        requirePhoto={pendingAction?.type === 'clock_in' ? !!requirePhotoClockIn : !!requirePhotoClockOut}
+        requireGeo={pendingAction?.type === 'clock_in' ? !!requireGeoClockIn : !!requireGeoClockOut}
+        isClockIn={pendingAction?.type === 'clock_in'}
+        employeeId={record.employee_id}
         isLoading={isClockingIn || isClockingOut}
       />
     </>
