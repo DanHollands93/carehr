@@ -1,8 +1,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Clock, User } from "lucide-react";
+import { Calendar, Clock, User, MapPin } from "lucide-react";
 import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useTimeClockRecords } from "@/hooks/useTimeClockRecords";
 import { useTimeClockSettings } from "@/hooks/useTimeClockSettings";
 import StaffShiftCard from "@/components/StaffShiftCard";
@@ -22,28 +24,64 @@ const StaffShifts = () => {
     isClockingOut,
     validateClockTime 
   } = useTimeClockRecords();
-  
+
+  // Fetch employee profile to get employee_id
+  const { data: employeeProfile } = useQuery({
+    queryKey: ['employee-profile-for-allocation', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from('profiles')
+        .select('employee_id')
+        .eq('id', user.id)
+        .single();
+      return data;
+    },
+    enabled: !!user?.id
+  });
+
+  // Fetch today's allocation for this employee
   const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
+
+  const { data: todayAllocation } = useQuery({
+    queryKey: ['employee-today-allocation', employeeProfile?.employee_id, todayStr],
+    queryFn: async () => {
+      if (!employeeProfile?.employee_id) return null;
+      const { data, error } = await supabase
+        .from('roster_daily_allocations')
+        .select('*, roster_allocation_locations(name)')
+        .eq('employee_id', employeeProfile.employee_id)
+        .eq('date', todayStr)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employeeProfile?.employee_id
+  });
+  
   const formattedDate = format(today, 'EEEE, MMMM dd, yyyy');
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading your shifts...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Loading your shifts...</p>
         </div>
       </div>
     );
   }
 
+  const allocationLocationName = todayAllocation?.roster_allocation_locations?.name;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto p-3 md:p-4 space-y-4 md:space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900">My Shifts</h1>
-          <div className="flex items-center justify-center space-x-2 text-xs md:text-sm lg:text-base text-gray-600">
+          <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-foreground">My Shifts</h1>
+          <div className="flex items-center justify-center space-x-2 text-xs md:text-sm lg:text-base text-muted-foreground">
             <Calendar className="w-3 h-3 md:w-4 md:h-4" />
             <span className="truncate text-center">{formattedDate}</span>
           </div>
@@ -58,11 +96,28 @@ const StaffShifts = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="text-lg md:text-xl lg:text-2xl font-mono font-bold text-center text-blue-600">
+            <div className="text-lg md:text-xl lg:text-2xl font-mono font-bold text-center text-primary">
               {format(today, 'HH:mm:ss')}
             </div>
           </CardContent>
         </Card>
+
+        {/* Allocation Banner */}
+        {allocationLocationName && (
+          <Card className="shadow-sm border-primary/30 bg-primary/5">
+            <CardContent className="py-3 md:py-4">
+              <div className="flex items-center justify-center gap-2">
+                <MapPin className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                <span className="text-sm md:text-base font-medium text-foreground">
+                  Today you are working at:
+                </span>
+                <Badge variant="default" className="text-sm md:text-base px-3 py-0.5">
+                  {allocationLocationName}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Separator />
 
@@ -89,6 +144,7 @@ const StaffShifts = () => {
                   isClockingIn={isClockingIn}
                   isClockingOut={isClockingOut}
                   validateClockTime={validateClockTime}
+                  allocationLocation={allocationLocationName}
                 />
               ))}
             </div>
@@ -96,9 +152,9 @@ const StaffShifts = () => {
             <Card className="shadow-sm">
               <CardContent className="text-center py-6 md:py-8">
                 <div className="space-y-2 md:space-y-3">
-                  <Clock className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 mx-auto text-gray-400" />
-                  <h3 className="text-sm md:text-base lg:text-lg font-medium text-gray-900">No shifts today</h3>
-                  <p className="text-xs md:text-sm lg:text-base text-gray-500 px-2 md:px-4">
+                  <Clock className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground" />
+                  <h3 className="text-sm md:text-base lg:text-lg font-medium text-foreground">No shifts today</h3>
+                  <p className="text-xs md:text-sm lg:text-base text-muted-foreground px-2 md:px-4">
                     You don't have any shifts scheduled for today. Enjoy your day off!
                   </p>
                 </div>
@@ -120,9 +176,9 @@ const StaffShifts = () => {
             <Card className="shadow-sm">
               <CardContent className="text-center py-6 md:py-8">
                 <div className="space-y-2 md:space-y-3">
-                  <Calendar className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 mx-auto text-gray-400" />
-                  <h3 className="text-sm md:text-base lg:text-lg font-medium text-gray-900">No upcoming shifts</h3>
-                  <p className="text-xs md:text-sm lg:text-base text-gray-500 px-2 md:px-4">
+                  <Calendar className="w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground" />
+                  <h3 className="text-sm md:text-base lg:text-lg font-medium text-foreground">No upcoming shifts</h3>
+                  <p className="text-xs md:text-sm lg:text-base text-muted-foreground px-2 md:px-4">
                     You don't have any shifts scheduled for the next 6 weeks.
                   </p>
                 </div>
@@ -132,11 +188,11 @@ const StaffShifts = () => {
         </div>
 
         {/* Instructions */}
-        <Card className="bg-blue-50 border-blue-200 shadow-sm">
+        <Card className="bg-primary/5 border-primary/20 shadow-sm">
           <CardContent className="pt-4 md:pt-6">
             <div className="space-y-2 md:space-y-3">
-              <h3 className="font-medium text-blue-900 text-xs md:text-sm lg:text-base">How to use:</h3>
-              <ul className="text-xs md:text-sm text-blue-800 space-y-1 pl-2">
+              <h3 className="font-medium text-foreground text-xs md:text-sm lg:text-base">How to use:</h3>
+              <ul className="text-xs md:text-sm text-muted-foreground space-y-1 pl-2">
                 <li>• Clock in at the start of your shift</li>
                 <li>• Clock out when your shift ends</li>
                 <li>• You'll get warnings if clocking in/out outside the allowed time window</li>

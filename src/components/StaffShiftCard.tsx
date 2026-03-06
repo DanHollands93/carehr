@@ -35,6 +35,7 @@ interface StaffShiftCardProps {
     minutesDiff: number;
     warningMessage: string | null;
   };
+  allocationLocation?: string;
 }
 
 const StaffShiftCard = ({ 
@@ -43,7 +44,8 @@ const StaffShiftCard = ({
   onClockOut, 
   isClockingIn, 
   isClockingOut,
-  validateClockTime 
+  validateClockTime,
+  allocationLocation
 }: StaffShiftCardProps) => {
   const { 
     earlyClockInMinutes, 
@@ -60,22 +62,16 @@ const StaffShiftCard = ({
 
   const formatDiscrepancyType = (type: string) => {
     if (!type) return '';
-    
     return type
       .split(',')
       .map(t => t.trim())
       .map(t => {
         switch (t) {
-          case 'early_clock_in':
-            return 'Early clock in';
-          case 'late_clock_in':
-            return 'Late clock in';
-          case 'early_clock_out':
-            return 'Early clock out';
-          case 'late_clock_out':
-            return 'Late clock out';
-          default:
-            return t.replace(/_/g, ' ');
+          case 'early_clock_in': return 'Early clock in';
+          case 'late_clock_in': return 'Late clock in';
+          case 'early_clock_out': return 'Early clock out';
+          case 'late_clock_out': return 'Late clock out';
+          default: return t.replace(/_/g, ' ');
         }
       })
       .join(', ');
@@ -97,17 +93,12 @@ const StaffShiftCard = ({
   };
 
   const canClockIn = record.status === 'scheduled' && !record.clock_in_time;
-  // Allow clocking out if user has clocked in but not clocked out, regardless of discrepancy status
   const canClockOut = record.clock_in_time && !record.clock_out_time;
 
   const handleClockIn = () => {
     const validation = validateClockTime(record, true, {
-      earlyClockInMinutes,
-      lateClockInMinutes,
-      earlyClockOutMinutes,
-      lateClockOutMinutes
+      earlyClockInMinutes, lateClockInMinutes, earlyClockOutMinutes, lateClockOutMinutes
     });
-
     if (validation.warningMessage) {
       setPendingAction({ type: 'clock_in', minutesDiff: validation.minutesDiff });
       setShowWarningDialog(true);
@@ -118,12 +109,8 @@ const StaffShiftCard = ({
 
   const handleClockOut = () => {
     const validation = validateClockTime(record, false, {
-      earlyClockInMinutes,
-      lateClockInMinutes,
-      earlyClockOutMinutes,
-      lateClockOutMinutes
+      earlyClockInMinutes, lateClockInMinutes, earlyClockOutMinutes, lateClockOutMinutes
     });
-
     if (validation.warningMessage) {
       setPendingAction({ type: 'clock_out', minutesDiff: validation.minutesDiff });
       setShowWarningDialog(true);
@@ -159,7 +146,7 @@ const StaffShiftCard = ({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
             <Clock className="w-4 h-4" />
             <span>
               Duration: {(() => {
@@ -175,6 +162,14 @@ const StaffShiftCard = ({
             </span>
           </div>
 
+          {/* Allocation location */}
+          {allocationLocation && (
+            <div className="flex items-center space-x-2 text-sm text-primary font-medium">
+              <MapPin className="w-4 h-4" />
+              <span>Location: {allocationLocation}</span>
+            </div>
+          )}
+
           {record.clock_in_time && (
             <div className="flex items-center space-x-2 text-sm text-green-600">
               <User className="w-4 h-4" />
@@ -185,7 +180,7 @@ const StaffShiftCard = ({
           )}
 
           {record.clock_out_time && (
-            <div className="flex items-center space-x-2 text-sm text-blue-600">
+            <div className="flex items-center space-x-2 text-sm text-primary">
               <MapPin className="w-4 h-4" />
               <span>
                 Clocked out: {format(parseISO(record.clock_out_time), 'HH:mm')}
@@ -194,7 +189,7 @@ const StaffShiftCard = ({
           )}
 
           {record.discrepancy_type && (
-            <div className="flex items-center space-x-2 text-sm text-red-600">
+            <div className="flex items-center space-x-2 text-sm text-destructive">
               <AlertCircle className="w-4 h-4" />
               <span>Discrepancy: {formatDiscrepancyType(record.discrepancy_type)}</span>
             </div>
@@ -205,7 +200,8 @@ const StaffShiftCard = ({
               <Button
                 onClick={handleClockIn}
                 disabled={isClockingIn}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1"
+                variant="default"
               >
                 {isClockingIn ? 'Clocking In...' : 'Clock In'}
               </Button>
@@ -215,7 +211,8 @@ const StaffShiftCard = ({
               <Button
                 onClick={handleClockOut}
                 disabled={isClockingOut}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                className="flex-1"
+                variant="secondary"
               >
                 {isClockingOut ? 'Clocking Out...' : 'Clock Out'}
               </Button>
