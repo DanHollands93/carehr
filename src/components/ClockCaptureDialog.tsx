@@ -53,15 +53,8 @@ const ClockCaptureDialog = ({
     }
   }, [isOpen, requireGeo]);
 
-  // Auto-start camera on open
-  useEffect(() => {
-    if (isOpen && requirePhoto && photoStatus === 'idle') {
-      startCamera();
-    }
-    return () => {
-      stopCamera();
-    };
-  }, [isOpen, requirePhoto]);
+  // Do NOT auto-start camera in useEffect — browsers block getUserMedia
+  // unless it's triggered by a direct user gesture.
 
   // Reset on close
   useEffect(() => {
