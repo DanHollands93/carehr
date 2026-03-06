@@ -597,10 +597,20 @@ const Roster = () => {
         .eq('id', shiftId);
       
       if (error) throw error;
+
+      // Try to reattach any orphaned clock records at the destination
+      const formattedDate = format(new Date(date), 'yyyy-MM-dd');
+      const reattachedCount = await tryReattachOrphanedRecords(shiftId, employeeId, formattedDate);
+      return { reattachedCount };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast({ title: "Shift moved successfully" });
+      queryClient.invalidateQueries({ queryKey: ['orphaned-clock-records'] });
+      if (result.reattachedCount > 0) {
+        toast({ title: `Shift moved — ${result.reattachedCount} clock record(s) reattached for review` });
+      } else {
+        toast({ title: "Shift moved successfully" });
+      }
     },
     onError: (error) => {
       toast({ 
