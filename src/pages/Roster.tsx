@@ -1462,6 +1462,21 @@ const Roster = () => {
                                     {staffCount} shift{staffCount !== 1 ? 's' : ''}
                                   </div>
                                 )}
+                                {selectedRosterTemplate?.allow_allocations && allocationLocations.length > 0 && canEditRoster && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 mt-1 text-[10px] px-1.5 py-0"
+                                    onClick={() => setAllocationDialog({
+                                      isOpen: true,
+                                      date: format(day, 'yyyy-MM-dd'),
+                                      dateLabel: format(day, 'EEE dd MMM')
+                                    })}
+                                  >
+                                    <MapPin className="w-3 h-3 mr-0.5" />
+                                    Allocate
+                                  </Button>
+                                )}
                               </th>
                             );
                           })}
