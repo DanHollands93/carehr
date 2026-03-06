@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Clock, ArrowLeft, ArrowRight, Loader2, Save, Info } from "lucide-react";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { cn } from "@/lib/utils";
 
 interface SystemSetting {
