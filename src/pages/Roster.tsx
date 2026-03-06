@@ -490,6 +490,38 @@ const Roster = () => {
       employeeId: string;
       date: string;
     }) => {
+      // Check if this shift has any time_clock_records with actual clock data
+      const { data: clockRecords, error: clockErr } = await supabase
+        .from('time_clock_records')
+        .select('id, clock_in_time, clock_out_time, shift_date, shift_start_time, shift_end_time')
+        .eq('shift_id', shiftId);
+      
+      if (clockErr) throw clockErr;
+
+      // Get the current shift details to preserve on the detached record
+      const currentShift = shifts?.find(s => s.id === shiftId);
+
+      // Detach any clock records that have actual clock data
+      const recordsWithClockData = (clockRecords || []).filter(
+        r => r.clock_in_time || r.clock_out_time
+      );
+      
+      for (const record of recordsWithClockData) {
+        const { error: detachErr } = await supabase
+          .from('time_clock_records')
+          .update({
+            shift_id: null,
+            // Preserve the original shift info on the record so it remains useful
+            shift_date: record.shift_date || currentShift?.date || null,
+            shift_start_time: record.shift_start_time || currentShift?.start_time || null,
+            shift_end_time: record.shift_end_time || currentShift?.end_time || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', record.id);
+        if (detachErr) throw detachErr;
+      }
+
+      // Now move the shift
       const { error } = await supabase
         .from('shifts')
         .update({
@@ -554,6 +586,31 @@ const Roster = () => {
 
   const deleteShiftMutation = useMutation({
     mutationFn: async (shiftId: string) => {
+      // Check if this shift has any time_clock_records with actual clock data
+      const { data: clockRecords, error: clockErr } = await supabase
+        .from('time_clock_records')
+        .select('id, clock_in_time, clock_out_time')
+        .eq('shift_id', shiftId);
+      
+      if (clockErr) throw clockErr;
+
+      const hasClockData = (clockRecords || []).some(
+        r => r.clock_in_time || r.clock_out_time
+      );
+
+      if (hasClockData) {
+        throw new Error('This shift has clock-in/out records and cannot be deleted. Move it instead to detach the time records.');
+      }
+
+      // Safe to delete — also clean up any empty clock records (no clock data)
+      if (clockRecords && clockRecords.length > 0) {
+        const { error: delClockErr } = await supabase
+          .from('time_clock_records')
+          .delete()
+          .eq('shift_id', shiftId);
+        if (delClockErr) throw delClockErr;
+      }
+
       const { error } = await supabase
         .from('shifts')
         .delete()
