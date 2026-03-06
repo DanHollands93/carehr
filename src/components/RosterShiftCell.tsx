@@ -36,6 +36,7 @@ interface RosterShiftCellProps {
   canEdit: boolean;
   onDragStart?: (e: React.DragEvent) => void;
   shiftTemplateName?: string;
+  faded?: boolean;
 }
 
 const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
@@ -45,6 +46,7 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   canEdit,
   onDragStart,
   shiftTemplateName,
+  faded = false,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -187,21 +189,23 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
         <TooltipTrigger asChild>
           <div
             className={cn(
-              "group relative rounded-md border border-border bg-card p-2 cursor-pointer transition-all duration-150",
+              "group relative rounded-md border border-border bg-card p-2 transition-all duration-150",
               "border-l-[3px]",
               statusBorderClass(),
-              isHovered && "shadow-md ring-1 ring-primary/20",
-              canEdit && "hover:shadow-md",
-              (isDiscrepancy || needsReview) && "bg-destructive/5"
+              faded && "opacity-30 pointer-events-none select-none",
+              !faded && isHovered && "shadow-md ring-1 ring-primary/20",
+              !faded && canEdit && "cursor-pointer hover:shadow-md",
+              !faded && (isDiscrepancy || needsReview) && "bg-destructive/5"
             )}
             onClick={(e) => {
+              if (faded) return;
               e.stopPropagation();
               onEdit();
             }}
-            onMouseEnter={() => setIsHovered(true)}
+            onMouseEnter={() => !faded && setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            draggable={canEdit}
-            onDragStart={onDragStart}
+            draggable={canEdit && !faded}
+            onDragStart={faded ? undefined : onDragStart}
           >
             {/* Drag handle */}
             {canEdit && (

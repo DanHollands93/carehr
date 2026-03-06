@@ -1266,8 +1266,8 @@ const Roster = () => {
                       </thead>
                       <tbody>
                         {(() => {
-                          const renderEmployeeRow = (employee: Employee, idx: number) => (
-                            <tr key={employee.id} className={cn(
+                          const renderEmployeeRow = (employee: Employee, idx: number, sectionJobRoleIds?: string[]) => (
+                            <tr key={`${employee.id}-${sectionJobRoleIds?.join(',') || 'all'}`} className={cn(
                               "border-b transition-colors hover:bg-muted/30",
                               idx % 2 === 0 ? "bg-card" : "bg-muted/10"
                             )}>
@@ -1326,33 +1326,43 @@ const Roster = () => {
                                     )}>
                                       {dayShifts.length > 0 ? (
                                         <div className="space-y-1">
-                                          {dayShifts.map((shift) => (
-                                            <RosterShiftCell
-                                              key={shift.id}
-                                              shift={shift}
-                                              canEdit={canEditRoster}
-                                              onEdit={() => {
-                                                setShiftPopup({
-                                                  isOpen: true,
-                                                  employeeId: employee.id,
-                                                  employeeName: `${employee.first_name} ${employee.last_name}`,
-                                                  date: dateStr,
-                                                  existingShift: shift
-                                                });
-                                              }}
-                                              onReviewDiscrepancy={(s) => {
-                                                const emp = employees?.find(e => e.id === s.employee_id);
-                                                setDiscrepancyReview({
-                                                  isOpen: true,
-                                                  shift: s,
-                                                  employeeName: emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown',
-                                                });
-                                              }}
-                                              onDragStart={(e) => {
-                                                handleShiftDragStart(shift);
-                                              }}
-                                            />
-                                          ))}
+                                          {dayShifts.map((shift) => {
+                                            // Determine if this shift belongs to the current section
+                                            const isFaded = sectionJobRoleIds 
+                                              ? !sectionJobRoleIds.includes(shift.job_role_id)
+                                              : false;
+                                            return (
+                                              <RosterShiftCell
+                                                key={shift.id}
+                                                shift={shift}
+                                                canEdit={canEditRoster && !isFaded}
+                                                faded={isFaded}
+                                                onEdit={() => {
+                                                  if (isFaded) return;
+                                                  setShiftPopup({
+                                                    isOpen: true,
+                                                    employeeId: employee.id,
+                                                    employeeName: `${employee.first_name} ${employee.last_name}`,
+                                                    date: dateStr,
+                                                    existingShift: shift
+                                                  });
+                                                }}
+                                                onReviewDiscrepancy={(s) => {
+                                                  if (isFaded) return;
+                                                  const emp = employees?.find(e => e.id === s.employee_id);
+                                                  setDiscrepancyReview({
+                                                    isOpen: true,
+                                                    shift: s,
+                                                    employeeName: emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown',
+                                                  });
+                                                }}
+                                                onDragStart={(e) => {
+                                                  if (isFaded) return;
+                                                  handleShiftDragStart(shift);
+                                                }}
+                                              />
+                                            );
+                                          })}
                                         </div>
                                       ) : canEditRoster ? (
                                         <div className="flex items-center justify-center h-full min-h-[56px] opacity-0 hover:opacity-100 transition-opacity">
@@ -1393,10 +1403,11 @@ const Roster = () => {
                               {group.employeeIds.map((empId) => {
                                 const employee = employees.find(e => e.id === empId);
                                 if (!employee) return null;
-                                return renderEmployeeRow(employee, rowIdx++);
+                                return renderEmployeeRow(employee, rowIdx++, group.sectionJobRoleIds);
                               })}
                             </React.Fragment>
                           ));
+
                         })()}
                       </tbody>
                     </table>
