@@ -1285,6 +1285,48 @@ export type Database = {
           },
         ]
       }
+      roster_allocation_locations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          id: string
+          name: string
+          roster_template_id: string
+          sort_order: number
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          roster_template_id: string
+          sort_order?: number
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          roster_template_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_allocation_locations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_allocation_locations_roster_template_id_fkey"
+            columns: ["roster_template_id"]
+            isOneToOne: false
+            referencedRelation: "roster_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roster_categories: {
         Row: {
           company_id: string | null
@@ -1319,6 +1361,65 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roster_daily_allocations: {
+        Row: {
+          allocation_location_id: string
+          company_id: string | null
+          created_at: string
+          date: string
+          employee_id: string
+          id: string
+          roster_template_id: string
+        }
+        Insert: {
+          allocation_location_id: string
+          company_id?: string | null
+          created_at?: string
+          date: string
+          employee_id: string
+          id?: string
+          roster_template_id: string
+        }
+        Update: {
+          allocation_location_id?: string
+          company_id?: string | null
+          created_at?: string
+          date?: string
+          employee_id?: string
+          id?: string
+          roster_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_daily_allocations_allocation_location_id_fkey"
+            columns: ["allocation_location_id"]
+            isOneToOne: false
+            referencedRelation: "roster_allocation_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_daily_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_daily_allocations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_daily_allocations_roster_template_id_fkey"
+            columns: ["roster_template_id"]
+            isOneToOne: false
+            referencedRelation: "roster_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -1531,6 +1632,7 @@ export type Database = {
       }
       roster_templates: {
         Row: {
+          allow_allocations: boolean
           category_id: string | null
           company_id: string | null
           created_at: string
@@ -1546,6 +1648,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allow_allocations?: boolean
           category_id?: string | null
           company_id?: string | null
           created_at?: string
@@ -1561,6 +1664,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allow_allocations?: boolean
           category_id?: string | null
           company_id?: string | null
           created_at?: string
