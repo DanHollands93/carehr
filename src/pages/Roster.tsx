@@ -1328,7 +1328,8 @@ const Roster = () => {
                                         <div className="space-y-1">
                                           {dayShifts.map((shift) => {
                                             // Determine if this shift belongs to the current section
-                                            const isFaded = sectionJobRoleIds 
+                                            // Shifts with no job_role_id are never faded (they belong everywhere)
+                                            const isFaded = sectionJobRoleIds && shift.job_role_id
                                               ? !sectionJobRoleIds.includes(shift.job_role_id)
                                               : false;
                                             return (
