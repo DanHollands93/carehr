@@ -1355,6 +1355,10 @@ const Roster = () => {
                   <div className="w-3 h-2 rounded-full bg-destructive/70" />
                   <span>Late</span>
                 </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-2 rounded-full border border-dashed border-amber-400 bg-amber-100" />
+                  <span>Unlinked Clock</span>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
