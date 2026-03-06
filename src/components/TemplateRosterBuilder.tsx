@@ -907,20 +907,24 @@ const TemplateRosterBuilder = ({
                       );
 
                       return sectionGroups.map((group) => (
-                        <>
-                          <tr key={`section-${group.sectionId || 'other'}`} className="bg-muted/50">
+                        <React.Fragment key={`section-${group.sectionId || 'other'}`}>
+                          <tr className="bg-muted/50">
                             <td
                               colSpan={weekDays.length + 1}
                               className="px-3 py-2 font-semibold text-sm text-foreground border-b border-t"
                             >
                               {group.sectionName}
                               <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                ({group.employees.length} staff)
+                                ({group.employeeIds.length} staff)
                               </span>
                             </td>
                           </tr>
-                          {group.employees.map((employee) => renderEmployeeRow(employee))}
-                        </>
+                          {group.employeeIds.map((empId) => {
+                            const employee = employees.find(e => e.id === empId);
+                            if (!employee) return null;
+                            return renderEmployeeRow(employee);
+                          })}
+                        </React.Fragment>
                       ));
                     })()}
                   </tbody>

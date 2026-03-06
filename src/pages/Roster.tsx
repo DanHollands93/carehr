@@ -1386,11 +1386,15 @@ const Roster = () => {
                                 >
                                   {group.sectionName}
                                   <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                    ({group.employees.length} staff)
+                                    ({group.employeeIds.length} staff)
                                   </span>
                                 </td>
                               </tr>
-                              {group.employees.map((employee) => renderEmployeeRow(employee, rowIdx++))}
+                              {group.employeeIds.map((empId) => {
+                                const employee = employees.find(e => e.id === empId);
+                                if (!employee) return null;
+                                return renderEmployeeRow(employee, rowIdx++);
+                              })}
                             </React.Fragment>
                           ));
                         })()}
