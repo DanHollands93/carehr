@@ -226,7 +226,22 @@ const TemplateRosterBuilder = ({
     }
   });
 
-  // Load existing template assignments
+  // Load existing template shifts
+  const { data: existingTemplateShifts } = useQuery({
+    queryKey: ['template-shifts-data', templateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('template_shifts')
+        .select('*')
+        .eq('roster_template_id', templateId);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!templateId
+  });
+
+  // Also load roster_template_assignments for staff who were added but have no shifts yet
   const { data: existingAssignments } = useQuery({
     queryKey: ['template-assignments', templateId],
     queryFn: async () => {
@@ -242,49 +257,92 @@ const TemplateRosterBuilder = ({
   });
 
   useEffect(() => {
-    if (existingAssignments) {
-      const shifts: TemplateShift[] = existingAssignments.map((assignment: any) => ({
-        id: assignment.id,
-        employee_id: assignment.employee_id,
-        day_index: assignment.day_of_period || 0,
-        shift_template_id: assignment.shift_template_id || null
+    if (existingTemplateShifts) {
+      const shifts: TemplateShift[] = existingTemplateShifts.map((ts: any) => ({
+        id: ts.id,
+        employee_id: ts.employee_id,
+        day_index: ts.day_index || 0,
+        shift_template_id: ts.shift_template_id || null,
+        job_role_id: ts.job_role_id || undefined,
+        pay_rate: ts.pay_rate || undefined
       }));
       setTemplateShifts(shifts);
+      
+      // Also add employees from assignments who don't have shifts
+      if (existingAssignments) {
+        const shiftEmployeeIds = new Set(shifts.map(s => s.employee_id));
+        const assignmentOnlyEmployees = existingAssignments
+          .filter((a: any) => !shiftEmployeeIds.has(a.employee_id))
+          .map((a: any) => a.employee_id);
+        if (assignmentOnlyEmployees.length > 0) {
+          setStaffInRoster(prev => {
+            const next = new Set(prev);
+            assignmentOnlyEmployees.forEach((id: string) => next.add(id));
+            return next;
+          });
+        }
+      }
     }
-  }, [existingAssignments]);
+  }, [existingTemplateShifts, existingAssignments]);
 
   const saveTemplateAssignmentsMutation = useMutation({
     mutationFn: async () => {
-      // Delete existing assignments
-      const { error: deleteError } = await supabase
+      // Delete existing template_shifts
+      const { error: deleteShiftsError } = await supabase
+        .from('template_shifts')
+        .delete()
+        .eq('roster_template_id', templateId);
+      
+      if (deleteShiftsError) throw deleteShiftsError;
+
+      // Also clean up roster_template_assignments
+      const { error: deleteAssignError } = await supabase
         .from('roster_template_assignments')
         .delete()
         .eq('roster_template_id', templateId);
       
-      if (deleteError) throw deleteError;
+      if (deleteAssignError) throw deleteAssignError;
 
-      // Insert new assignments
       // Filter out invalid entries (no shift template or placeholder rows)
       const validShifts = templateShifts.filter(shift => 
         shift.shift_template_id && shift.shift_template_id.trim() !== '' && shift.day_index >= 0
       );
 
       if (validShifts.length > 0) {
-        const assignments = validShifts.map(shift => ({
+        // Save to template_shifts
+        const shifts = validShifts.map(shift => ({
           roster_template_id: templateId,
           employee_id: shift.employee_id,
-          day_of_period: shift.day_index,
-          shift_template_id: shift.shift_template_id || null
+          day_index: shift.day_index,
+          shift_template_id: shift.shift_template_id || null,
+          job_role_id: shift.job_role_id || null,
+          pay_rate: shift.pay_rate || null
         }));
 
         const { error: insertError } = await supabase
-          .from('roster_template_assignments')
-          .insert(assignments);
+          .from('template_shifts')
+          .insert(shifts);
         
         if (insertError) throw insertError;
       }
+
+      // Save roster_template_assignments for all staff in roster (for the live roster view)
+      const allStaffIds = [...staffInRoster];
+      if (allStaffIds.length > 0) {
+        const assignments = allStaffIds.map(empId => ({
+          roster_template_id: templateId,
+          employee_id: empId
+        }));
+
+        const { error: assignError } = await supabase
+          .from('roster_template_assignments')
+          .insert(assignments);
+        
+        if (assignError) throw assignError;
+      }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['template-shifts-data'] });
       queryClient.invalidateQueries({ queryKey: ['template-assignments'] });
       toast({ title: "Template saved successfully" });
       onSave();
