@@ -1323,6 +1323,52 @@ export type Database = {
           },
         ]
       }
+      roster_section_role_rules: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          id: string
+          job_role_id: string
+          section_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          job_role_id: string
+          section_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          job_role_id?: string
+          section_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_section_role_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_section_role_rules_job_role_id_fkey"
+            columns: ["job_role_id"]
+            isOneToOne: false
+            referencedRelation: "job_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_section_role_rules_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "roster_template_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roster_staff_assignments: {
         Row: {
           company_id: string | null
@@ -1380,6 +1426,7 @@ export type Database = {
           employee_id: string
           id: string
           roster_template_id: string
+          section_id: string | null
           shift_template_id: string | null
         }
         Insert: {
@@ -1389,6 +1436,7 @@ export type Database = {
           employee_id: string
           id?: string
           roster_template_id: string
+          section_id?: string | null
           shift_template_id?: string | null
         }
         Update: {
@@ -1398,6 +1446,7 @@ export type Database = {
           employee_id?: string
           id?: string
           roster_template_id?: string
+          section_id?: string | null
           shift_template_id?: string | null
         }
         Relationships: [
@@ -1423,10 +1472,59 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "roster_template_assignments_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "roster_template_sections"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "roster_template_assignments_shift_template_id_fkey"
             columns: ["shift_template_id"]
             isOneToOne: false
             referencedRelation: "shift_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roster_template_sections: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          id: string
+          name: string
+          roster_template_id: string
+          sort_order: number
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          roster_template_id: string
+          sort_order?: number
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          roster_template_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_template_sections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_template_sections_roster_template_id_fkey"
+            columns: ["roster_template_id"]
+            isOneToOne: false
+            referencedRelation: "roster_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -1554,6 +1652,7 @@ export type Database = {
           pay_rate: number | null
           position: string | null
           roster_template_id: string | null
+          section_id: string | null
           start_time: string
           updated_at: string
         }
@@ -1569,6 +1668,7 @@ export type Database = {
           pay_rate?: number | null
           position?: string | null
           roster_template_id?: string | null
+          section_id?: string | null
           start_time: string
           updated_at?: string
         }
@@ -1584,6 +1684,7 @@ export type Database = {
           pay_rate?: number | null
           position?: string | null
           roster_template_id?: string | null
+          section_id?: string | null
           start_time?: string
           updated_at?: string
         }
@@ -1621,6 +1722,13 @@ export type Database = {
             columns: ["roster_template_id"]
             isOneToOne: false
             referencedRelation: "roster_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "roster_template_sections"
             referencedColumns: ["id"]
           },
         ]

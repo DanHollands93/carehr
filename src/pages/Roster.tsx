@@ -25,6 +25,8 @@ import DiscrepancyReviewDialog, { DiscrepancyReviewResult } from "@/components/D
 import { useIsMobile } from "@/hooks/use-mobile";
 import ActiveRosterTemplates from "@/components/ActiveRosterTemplates";
 import { useTimeClockSettings } from "@/hooks/useTimeClockSettings";
+import { useRosterSections } from "@/hooks/useRosterSections";
+import { useAllEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
 
 interface Employee {
   id: string;
@@ -306,6 +308,10 @@ const Roster = () => {
     earlyClockInMinutes, lateClockInMinutes, earlyClockOutMinutes, lateClockOutMinutes,
     earlyClockInAutoAction, lateClockInAutoAction, earlyClockOutAutoAction, lateClockOutAutoAction,
   } = useTimeClockSettings();
+
+  // Roster sections for grouping employees
+  const { sections: rosterSections, getSectionForEmployee } = useRosterSections(selectedRosterTemplate?.id);
+  const { data: allEmployeeJobRolesData } = useAllEmployeeJobRoles();
 
   // Auto-apply exceptions for discrepancies within threshold
   const autoApplyProcessedRef = useRef<Set<string>>(new Set());
@@ -1260,105 +1266,149 @@ const Roster = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {employees.map((employee, idx) => (
-                          <tr key={employee.id} className={cn(
-                            "border-b transition-colors hover:bg-muted/30",
-                            idx % 2 === 0 ? "bg-card" : "bg-muted/10"
-                          )}>
-                            <td className="p-3 font-medium min-w-[160px] sticky left-0 bg-inherit z-10 border-r">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="text-sm font-semibold text-foreground">
-                                    {employee.first_name} {employee.last_name}
+                        {(() => {
+                          const renderEmployeeRow = (employee: Employee, idx: number) => (
+                            <tr key={employee.id} className={cn(
+                              "border-b transition-colors hover:bg-muted/30",
+                              idx % 2 === 0 ? "bg-card" : "bg-muted/10"
+                            )}>
+                              <td className="p-3 font-medium min-w-[160px] sticky left-0 bg-inherit z-10 border-r">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="text-sm font-semibold text-foreground">
+                                      {employee.first_name} {employee.last_name}
+                                    </div>
+                                    {employee.department && (
+                                      <div className="text-[10px] text-muted-foreground">{employee.department}</div>
+                                    )}
                                   </div>
-                                  {employee.department && (
-                                    <div className="text-[10px] text-muted-foreground">{employee.department}</div>
+                                  {canEditRoster && !templateEmployeeIds.has(employee.id) && (adHocEmployees || []).find(e => e.id === employee.id) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                                      onClick={() => setEmployeeToRemove(employee)}
+                                    >
+                                      <UserMinus className="w-3 h-3" />
+                                    </Button>
                                   )}
                                 </div>
-                                {canEditRoster && !templateEmployeeIds.has(employee.id) && (adHocEmployees || []).find(e => e.id === employee.id) && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                                    onClick={() => setEmployeeToRemove(employee)}
+                              </td>
+                              {weekDays.map((day) => {
+                                const dateStr = format(day, 'yyyy-MM-dd');
+                                const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
+                                const dayShifts = shifts?.filter(shift => 
+                                  shift.employee_id === employee.id && 
+                                  shift.date === dateStr
+                                ) || [];
+                                return (
+                                  <td
+                                    key={day.toISOString()}
+                                    className={cn(
+                                      "p-1.5 min-w-[140px] align-top",
+                                      isToday && "bg-primary/5"
+                                    )}
+                                    onDragOver={handleDragOver}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      handleDrop(employee.id, dateStr);
+                                    }}
+                                    onClick={() => canEditRoster && dayShifts.length === 0 && setShiftPopup({
+                                      isOpen: true,
+                                      employeeId: employee.id,
+                                      employeeName: `${employee.first_name} ${employee.last_name}`,
+                                      date: dateStr,
+                                    })}
                                   >
-                                    <UserMinus className="w-3 h-3" />
-                                  </Button>
-                                )}
-                              </div>
-                            </td>
-                            {weekDays.map((day) => {
-                              const dateStr = format(day, 'yyyy-MM-dd');
-                              const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
-                              const dayShifts = shifts?.filter(shift => 
-                                shift.employee_id === employee.id && 
-                                shift.date === dateStr
-                              ) || [];
-                              return (
+                                    <div className={cn(
+                                      "min-h-[60px] rounded-md p-0.5 transition-colors",
+                                      dayShifts.length === 0 && canEditRoster && "border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer",
+                                      dayShifts.length === 0 && !canEditRoster && "border border-dashed border-border/30"
+                                    )}>
+                                      {dayShifts.length > 0 ? (
+                                        <div className="space-y-1">
+                                          {dayShifts.map((shift) => (
+                                            <RosterShiftCell
+                                              key={shift.id}
+                                              shift={shift}
+                                              canEdit={canEditRoster}
+                                              onEdit={() => {
+                                                setShiftPopup({
+                                                  isOpen: true,
+                                                  employeeId: employee.id,
+                                                  employeeName: `${employee.first_name} ${employee.last_name}`,
+                                                  date: dateStr,
+                                                  existingShift: shift
+                                                });
+                                              }}
+                                              onReviewDiscrepancy={(s) => {
+                                                const emp = employees?.find(e => e.id === s.employee_id);
+                                                setDiscrepancyReview({
+                                                  isOpen: true,
+                                                  shift: s,
+                                                  employeeName: emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown',
+                                                });
+                                              }}
+                                              onDragStart={(e) => {
+                                                handleShiftDragStart(shift);
+                                              }}
+                                            />
+                                          ))}
+                                        </div>
+                                      ) : canEditRoster ? (
+                                        <div className="flex items-center justify-center h-full min-h-[56px] opacity-0 hover:opacity-100 transition-opacity">
+                                          <Plus className="w-4 h-4 text-muted-foreground" />
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+
+                          if (rosterSections.length === 0) {
+                            return employees.map((employee, idx) => renderEmployeeRow(employee, idx));
+                          }
+
+                          // Group employees by section
+                          const sectionGroups: { sectionId: string | null; sectionName: string; employees: Employee[] }[] = [];
+                          const assignedToSection = new Set<string>();
+
+                          for (const section of rosterSections) {
+                            const sectionEmployees = employees.filter(emp => {
+                              const empJobRoleIds = (allEmployeeJobRolesData || [])
+                                .filter(ejr => ejr.employee_id === emp.id)
+                                .map(ejr => ejr.job_role_id);
+                              return getSectionForEmployee(empJobRoleIds) === section.id;
+                            });
+                            sectionEmployees.forEach(e => assignedToSection.add(e.id));
+                            sectionGroups.push({ sectionId: section.id, sectionName: section.name, employees: sectionEmployees });
+                          }
+
+                          const unsectioned = employees.filter(e => !assignedToSection.has(e.id));
+                          if (unsectioned.length > 0) {
+                            sectionGroups.push({ sectionId: null, sectionName: 'Other Staff', employees: unsectioned });
+                          }
+
+                          let rowIdx = 0;
+                          return sectionGroups.map((group) => (
+                            <React.Fragment key={`section-${group.sectionId || 'other'}`}>
+                              <tr className="bg-muted/50">
                                 <td
-                                  key={day.toISOString()}
-                                  className={cn(
-                                    "p-1.5 min-w-[140px] align-top",
-                                    isToday && "bg-primary/5"
-                                  )}
-                                  onDragOver={handleDragOver}
-                                  onDrop={(e) => {
-                                    e.preventDefault();
-                                    handleDrop(employee.id, dateStr);
-                                  }}
-                                  onClick={() => canEditRoster && dayShifts.length === 0 && setShiftPopup({
-                                    isOpen: true,
-                                    employeeId: employee.id,
-                                    employeeName: `${employee.first_name} ${employee.last_name}`,
-                                    date: dateStr,
-                                  })}
+                                  colSpan={weekDays.length + 1}
+                                  className="px-3 py-2 font-semibold text-sm text-foreground border-b border-t sticky left-0"
                                 >
-                                  <div className={cn(
-                                    "min-h-[60px] rounded-md p-0.5 transition-colors",
-                                    dayShifts.length === 0 && canEditRoster && "border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer",
-                                    dayShifts.length === 0 && !canEditRoster && "border border-dashed border-border/30"
-                                  )}>
-                                    {dayShifts.length > 0 ? (
-                                      <div className="space-y-1">
-                                        {dayShifts.map((shift) => (
-                                          <RosterShiftCell
-                                            key={shift.id}
-                                            shift={shift}
-                                            canEdit={canEditRoster}
-                                            onEdit={() => {
-                                              setShiftPopup({
-                                                isOpen: true,
-                                                employeeId: employee.id,
-                                                employeeName: `${employee.first_name} ${employee.last_name}`,
-                                                date: dateStr,
-                                                existingShift: shift
-                                              });
-                                            }}
-                                            onReviewDiscrepancy={(s) => {
-                                              const emp = employees?.find(e => e.id === s.employee_id);
-                                              setDiscrepancyReview({
-                                                isOpen: true,
-                                                shift: s,
-                                                employeeName: emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown',
-                                              });
-                                            }}
-                                            onDragStart={(e) => {
-                                              handleShiftDragStart(shift);
-                                            }}
-                                          />
-                                        ))}
-                                      </div>
-                                    ) : canEditRoster ? (
-                                      <div className="flex items-center justify-center h-full min-h-[56px] opacity-0 hover:opacity-100 transition-opacity">
-                                        <Plus className="w-4 h-4 text-muted-foreground" />
-                                      </div>
-                                    ) : null}
-                                  </div>
+                                  {group.sectionName}
+                                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                    ({group.employees.length} staff)
+                                  </span>
                                 </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
+                              </tr>
+                              {group.employees.map((employee) => renderEmployeeRow(employee, rowIdx++))}
+                            </React.Fragment>
+                          ));
+                        })()}
                       </tbody>
                     </table>
                   </div>
