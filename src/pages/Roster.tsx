@@ -1370,25 +1370,11 @@ const Roster = () => {
                             return employees.map((employee, idx) => renderEmployeeRow(employee, idx));
                           }
 
-                          // Group employees by section
-                          const sectionGroups: { sectionId: string | null; sectionName: string; employees: Employee[] }[] = [];
-                          const assignedToSection = new Set<string>();
-
-                          for (const section of rosterSections) {
-                            const sectionEmployees = employees.filter(emp => {
-                              const empJobRoleIds = (allEmployeeJobRolesData || [])
-                                .filter(ejr => ejr.employee_id === emp.id)
-                                .map(ejr => ejr.job_role_id);
-                              return getSectionForEmployee(empJobRoleIds) === section.id;
-                            });
-                            sectionEmployees.forEach(e => assignedToSection.add(e.id));
-                            sectionGroups.push({ sectionId: section.id, sectionName: section.name, employees: sectionEmployees });
-                          }
-
-                          const unsectioned = employees.filter(e => !assignedToSection.has(e.id));
-                          if (unsectioned.length > 0) {
-                            sectionGroups.push({ sectionId: null, sectionName: 'Other Staff', employees: unsectioned });
-                          }
+                          // Group employees by their shifts' job roles
+                          const sectionGroups = groupEmployeesByShiftRoles(
+                            employees,
+                            (shifts || []).map(s => ({ employee_id: s.employee_id, job_role_id: s.job_role_id }))
+                          );
 
                           let rowIdx = 0;
                           return sectionGroups.map((group) => (
