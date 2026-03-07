@@ -59,6 +59,7 @@ interface EmployeeDetailsProps {
 
 const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
   const { user } = useAuth();
+  const { companyId } = useUserCompanyId();
   const queryClient = useQueryClient();
   const [showCareerForm, setShowCareerForm] = useState(false);
   const [editingCareerEntry, setEditingCareerEntry] = useState<any>(null);
@@ -74,6 +75,36 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
     };
     checkPermission();
   }, [user]);
+
+  // Load form configs for this company
+  const { data: formConfigs = [] } = useQuery({
+    queryKey: ['employee-form-configs', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employee_form_configs' as any)
+        .select('*')
+        .eq('company_id', companyId!);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  const getFieldConfig = (section: string, fieldKey: string) => {
+    const config = formConfigs.find((c: any) => c.section === section);
+    if (!config) return { visible: true, required: false };
+    const fc = (config as any).field_configs?.[fieldKey];
+    return fc || { visible: true, required: false };
+  };
+
+  const getCustomFields = (section: string) => {
+    const config = formConfigs.find((c: any) => c.section === section);
+    return ((config as any)?.custom_fields || []) as Array<{ key: string; label: string; type: string; required: boolean; options?: string[] }>;
+  };
+
+  const isFieldVisible = (section: string, fieldKey: string) => {
+    return getFieldConfig(section, fieldKey).visible !== false;
+  };
 
   const { data: employee, isLoading } = useQuery({
     queryKey: ['employee', employeeId],
