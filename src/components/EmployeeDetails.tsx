@@ -219,7 +219,7 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="personal" className="w-full">
+      <Tabs defaultValue={initialTab || "personal"} className="w-full">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="personal" className="flex items-center gap-2">
             <User className="w-4 h-4" />
