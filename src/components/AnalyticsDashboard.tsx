@@ -16,10 +16,12 @@ const AnalyticsDashboard = () => {
   const [personalData, setPersonalData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const isAdminUser = userRole === 'admin' || userRole === 'super_admin';
+
   useEffect(() => {
     const loadAnalytics = async () => {
       try {
-        if (userRole === 'admin') {
+        if (isAdminUser) {
           const data = await analyticsService.getAdminAnalytics();
           setAdminData(data);
         } else {
@@ -34,7 +36,7 @@ const AnalyticsDashboard = () => {
     };
 
     loadAnalytics();
-  }, [userRole, user]);
+  }, [userRole, user, isAdminUser]);
 
   if (loading) {
     return <div className="p-4">Loading analytics...</div>;
