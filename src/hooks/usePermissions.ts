@@ -37,6 +37,10 @@ export const usePermissions = () => {
     if (effectiveUserId) {
       loadUserPermissions();
       loadUserLocationPermissions();
+    } else {
+      setPermissions([]);
+      setLocationPermissions([]);
+      setLoading(false);
     }
   }, [effectiveUserId]);
 
