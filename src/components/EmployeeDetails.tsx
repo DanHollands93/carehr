@@ -55,6 +55,8 @@ interface AddressHistory {
 
 interface EmployeeDetailsProps {
   employeeId: string;
+  initialTab?: string;
+  initialReviewId?: string;
 }
 
 const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
