@@ -218,26 +218,30 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="personal" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="personal" className="flex items-center gap-2">
             <User className="w-4 h-4" />
-            Personal Details
+            Personal
           </TabsTrigger>
           <TabsTrigger value="compliance" className="flex items-center gap-2">
             <Shield className="w-4 h-4" />
             Compliance
           </TabsTrigger>
+          <TabsTrigger value="reviews" className="flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4" />
+            Reviews
+          </TabsTrigger>
           <TabsTrigger value="address" className="flex items-center gap-2">
             <MapPin className="w-4 h-4" />
-            Address History
+            Address
           </TabsTrigger>
           <TabsTrigger value="employment" className="flex items-center gap-2">
             <Briefcase className="w-4 h-4" />
-            Employment History
+            Employment
           </TabsTrigger>
           <TabsTrigger value="account" className="flex items-center gap-2">
             <User className="w-4 h-4" />
-            User Account
+            Account
           </TabsTrigger>
         </TabsList>
 
