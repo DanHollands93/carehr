@@ -437,7 +437,7 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
         </TabsContent>
 
         <TabsContent value="reviews" className="space-y-6">
-          <EmployeeReviewsTab employeeId={employeeId} canEdit={canEdit} />
+          <EmployeeReviewsTab employeeId={employeeId} canEdit={canEdit} initialReviewId={initialReviewId} />
         </TabsContent>
 
         <TabsContent value="address" className="space-y-6">
