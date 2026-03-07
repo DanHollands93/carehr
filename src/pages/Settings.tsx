@@ -10,6 +10,7 @@ import LookupListsManager from "@/components/LookupListsManager";
 import EnhancedPermissionsManager from "@/components/EnhancedPermissionsManager";
 import CompanySettingsManager from "@/components/CompanySettingsManager";
 import AutoExceptionsSettings from "@/components/AutoExceptionsSettings";
+import ComplianceTypeManager from "@/components/ComplianceTypeManager";
 
 const Settings = () => {
   const { toast } = useToast();
