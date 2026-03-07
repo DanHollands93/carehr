@@ -282,6 +282,8 @@ const PlatformCompanyDetail = () => {
               <TabsTrigger value="permissions">Permissions</TabsTrigger>
               <TabsTrigger value="lookups">Lookup Lists</TabsTrigger>
               <TabsTrigger value="compliance">Compliance Types</TabsTrigger>
+              <TabsTrigger value="employee-forms">Employee Forms</TabsTrigger>
+              <TabsTrigger value="reviews">Reviews</TabsTrigger>
             </TabsList>
 
             <TabsContent value="company">
@@ -298,6 +300,14 @@ const PlatformCompanyDetail = () => {
 
             <TabsContent value="compliance">
               <ComplianceTypeManager companyId={id} />
+            </TabsContent>
+
+            <TabsContent value="employee-forms">
+              <EmployeeFormConfigManager companyId={id} />
+            </TabsContent>
+
+            <TabsContent value="reviews">
+              <ReviewTypeManager companyId={id} />
             </TabsContent>
           </Tabs>
         </TabsContent>
