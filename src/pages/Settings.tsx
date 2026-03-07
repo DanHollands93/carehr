@@ -43,6 +43,8 @@ const Settings = () => {
           <TabsTrigger value="integration">Integration</TabsTrigger>
           <TabsTrigger value="lookups">Lookup Lists</TabsTrigger>
           <TabsTrigger value="compliance">Compliance Types</TabsTrigger>
+          <TabsTrigger value="employee-forms">Employee Forms</TabsTrigger>
+          <TabsTrigger value="reviews">Reviews</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
