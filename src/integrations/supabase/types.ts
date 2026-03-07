@@ -434,6 +434,59 @@ export type Database = {
           },
         ]
       }
+      compliance_type_templates: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          custom_fields: Json | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          show_expiry_date: boolean | null
+          show_issue_date: boolean | null
+          show_reference_number: boolean | null
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          show_expiry_date?: boolean | null
+          show_issue_date?: boolean | null
+          show_reference_number?: boolean | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          show_expiry_date?: boolean | null
+          show_issue_date?: boolean | null
+          show_reference_number?: boolean | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_type_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_logs: {
         Row: {
           body: string | null
@@ -482,7 +535,9 @@ export type Database = {
         Row: {
           company_id: string | null
           compliance_type: string
+          compliance_type_template_id: string | null
           created_at: string
+          custom_fields: Json | null
           employee_id: string
           expiry_date: string | null
           id: string
@@ -495,7 +550,9 @@ export type Database = {
         Insert: {
           company_id?: string | null
           compliance_type: string
+          compliance_type_template_id?: string | null
           created_at?: string
+          custom_fields?: Json | null
           employee_id: string
           expiry_date?: string | null
           id?: string
@@ -508,7 +565,9 @@ export type Database = {
         Update: {
           company_id?: string | null
           compliance_type?: string
+          compliance_type_template_id?: string | null
           created_at?: string
+          custom_fields?: Json | null
           employee_id?: string
           expiry_date?: string | null
           id?: string
@@ -524,6 +583,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_compliance_compliance_type_template_id_fkey"
+            columns: ["compliance_type_template_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_type_templates"
             referencedColumns: ["id"]
           },
           {
