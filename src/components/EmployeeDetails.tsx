@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,11 +6,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, User, MapPin, Briefcase, Pencil, Save, X } from "lucide-react";
+import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import CareerHistoryForm from "@/components/CareerHistoryForm";
 import UserAccountManager from "@/components/UserAccountManager";
+import EmployeeComplianceTab from "@/components/EmployeeComplianceTab";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -19,7 +19,9 @@ interface EmployeeData {
   id: string;
   first_name: string;
   last_name: string;
+  known_as?: string;
   email: string;
+  work_email?: string;
   phone_number?: string;
   date_of_birth?: string;
   department?: string;
@@ -60,7 +62,6 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
   const [editData, setEditData] = useState<Partial<EmployeeData>>({});
   const [canEdit, setCanEdit] = useState(false);
 
-  // Check edit permission
   useEffect(() => {
     const checkPermission = async () => {
       if (!user) return;
@@ -78,9 +79,8 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
         .select('*')
         .eq('id', employeeId)
         .single();
-      
       if (error) throw error;
-      return data as EmployeeData;
+      return data as unknown as EmployeeData;
     },
     enabled: !!employeeId
   });
@@ -95,7 +95,6 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
         .select('*')
         .eq('employee_id', employeeId)
         .order('start_date', { ascending: false });
-      
       if (error) throw error;
       return data as AddressHistory[];
     },
@@ -106,7 +105,7 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
     mutationFn: async (updates: Partial<EmployeeData>) => {
       const { error } = await supabase
         .from('employees')
-        .update(updates)
+        .update(updates as any)
         .eq('id', employeeId);
       if (error) throw error;
     },
@@ -126,16 +125,13 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
     setEditData({
       first_name: employee.first_name,
       last_name: employee.last_name,
+      known_as: employee.known_as || '',
       email: employee.email,
+      work_email: employee.work_email || '',
       phone_number: employee.phone_number || '',
       date_of_birth: employee.date_of_birth || '',
-      department: employee.department || '',
-      hire_date: employee.hire_date || '',
       national_insurance_number: employee.national_insurance_number || '',
       tax_code: employee.tax_code || '',
-      right_to_work_status: employee.right_to_work_status || '',
-      passport_number: employee.passport_number || '',
-      visa_expiry: employee.visa_expiry || '',
       emergency_contact: employee.emergency_contact || {},
     });
     setIsEditing(true);
@@ -187,10 +183,14 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="personal" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="personal" className="flex items-center gap-2">
             <User className="w-4 h-4" />
             Personal Details
+          </TabsTrigger>
+          <TabsTrigger value="compliance" className="flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            Compliance
           </TabsTrigger>
           <TabsTrigger value="address" className="flex items-center gap-2">
             <MapPin className="w-4 h-4" />
@@ -241,7 +241,10 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                   <AvatarFallback>{employee.first_name[0]}{employee.last_name[0]}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <h2 className="text-2xl font-semibold">{employee.first_name} {employee.last_name}</h2>
+                  <h2 className="text-2xl font-semibold">
+                    {employee.first_name} {employee.last_name}
+                    {employee.known_as && <span className="text-muted-foreground text-lg ml-2">({employee.known_as})</span>}
+                  </h2>
                   <p className="text-muted-foreground">{employee.department}</p>
                 </div>
               </div>
@@ -264,19 +267,12 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                   />
                 </div>
                 <div>
-                  <Label>Email</Label>
+                  <Label>Known As</Label>
                   <Input
-                    value={isEditing ? editData.email || '' : employee.email}
+                    value={isEditing ? editData.known_as || '' : employee.known_as || 'Not provided'}
                     readOnly={!isEditing}
-                    onChange={(e) => updateField('email', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Phone Number</Label>
-                  <Input
-                    value={isEditing ? editData.phone_number || '' : employee.phone_number || 'Not provided'}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('phone_number', e.target.value)}
+                    onChange={(e) => updateField('known_as', e.target.value)}
+                    placeholder="Preferred name"
                   />
                 </div>
                 <div>
@@ -292,23 +288,28 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                   )}
                 </div>
                 <div>
-                  <Label>Hire Date</Label>
-                  {isEditing ? (
-                    <Input
-                      type="date"
-                      value={editData.hire_date || ''}
-                      onChange={(e) => updateField('hire_date', e.target.value)}
-                    />
-                  ) : (
-                    <Input value={formatDate(employee.hire_date)} readOnly />
-                  )}
+                  <Label>Personal Email</Label>
+                  <Input
+                    value={isEditing ? editData.email || '' : employee.email}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('email', e.target.value)}
+                  />
                 </div>
                 <div>
-                  <Label>Department</Label>
+                  <Label>Work Email</Label>
                   <Input
-                    value={isEditing ? editData.department || '' : employee.department || 'Not provided'}
+                    value={isEditing ? editData.work_email || '' : employee.work_email || 'Not provided'}
                     readOnly={!isEditing}
-                    onChange={(e) => updateField('department', e.target.value)}
+                    onChange={(e) => updateField('work_email', e.target.value)}
+                    placeholder="Work email address"
+                  />
+                </div>
+                <div>
+                  <Label>Phone Number</Label>
+                  <Input
+                    value={isEditing ? editData.phone_number || '' : employee.phone_number || 'Not provided'}
+                    readOnly={!isEditing}
+                    onChange={(e) => updateField('phone_number', e.target.value)}
                   />
                 </div>
                 <div>
@@ -326,34 +327,6 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                     readOnly={!isEditing}
                     onChange={(e) => updateField('tax_code', e.target.value)}
                   />
-                </div>
-                <div>
-                  <Label>Right to Work Status</Label>
-                  <Input
-                    value={isEditing ? editData.right_to_work_status || '' : employee.right_to_work_status || 'Not provided'}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('right_to_work_status', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Passport Number</Label>
-                  <Input
-                    value={isEditing ? editData.passport_number || '' : employee.passport_number || 'Not provided'}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('passport_number', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Visa Expiry</Label>
-                  {isEditing ? (
-                    <Input
-                      type="date"
-                      value={editData.visa_expiry || ''}
-                      onChange={(e) => updateField('visa_expiry', e.target.value)}
-                    />
-                  ) : (
-                    <Input value={employee.visa_expiry || 'Not provided'} readOnly />
-                  )}
                 </div>
               </div>
 
@@ -392,6 +365,18 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="compliance" className="space-y-6">
+          <EmployeeComplianceTab
+            employeeId={employeeId}
+            canEdit={canEdit}
+            employee={{
+              right_to_work_status: employee.right_to_work_status,
+              passport_number: employee.passport_number,
+              visa_expiry: employee.visa_expiry,
+            }}
+          />
+        </TabsContent>
+
         <TabsContent value="address" className="space-y-6">
           <Card>
             <CardHeader>
@@ -422,39 +407,19 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                           </div>
                         )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label>Address Line 1</Label>
-                            <Input value={address.line_1} readOnly />
-                          </div>
-                          <div>
-                            <Label>Address Line 2</Label>
-                            <Input value={address.line_2 || 'N/A'} readOnly />
-                          </div>
-                          <div>
-                            <Label>City</Label>
-                            <Input value={address.city} readOnly />
-                          </div>
-                          <div>
-                            <Label>Postcode</Label>
-                            <Input value={address.postcode} readOnly />
-                          </div>
-                          <div>
-                            <Label>Country</Label>
-                            <Input value={address.country} readOnly />
-                          </div>
-                          <div>
-                            <Label>Period</Label>
-                            <Input value={`${formatDate(address.start_date)} - ${address.end_date ? formatDate(address.end_date) : 'Present'}`} readOnly />
-                          </div>
+                          <div><Label>Address Line 1</Label><Input value={address.line_1} readOnly /></div>
+                          <div><Label>Address Line 2</Label><Input value={address.line_2 || 'N/A'} readOnly /></div>
+                          <div><Label>City</Label><Input value={address.city} readOnly /></div>
+                          <div><Label>Postcode</Label><Input value={address.postcode} readOnly /></div>
+                          <div><Label>Country</Label><Input value={address.country} readOnly /></div>
+                          <div><Label>Period</Label><Input value={`${formatDate(address.start_date)} - ${address.end_date ? formatDate(address.end_date) : 'Present'}`} readOnly /></div>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No address history available
-                </div>
+                <div className="text-center py-8 text-muted-foreground">No address history available</div>
               )}
             </CardContent>
           </Card>
@@ -469,10 +434,7 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                   <CardDescription>Employee's career progression and employment records</CardDescription>
                 </div>
                 {canEdit && (
-                  <Button size="sm" onClick={() => {
-                    setEditingCareerEntry(null);
-                    setShowCareerForm(true);
-                  }}>
+                  <Button size="sm" onClick={() => { setEditingCareerEntry(null); setShowCareerForm(true); }}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Position
                   </Button>
@@ -493,41 +455,16 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                           </div>
                         )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label>Job Title</Label>
-                            <Input value={entry.job_title} readOnly />
-                          </div>
-                          <div>
-                            <Label>Location</Label>
-                            <Input value={entry.location} readOnly />
-                          </div>
-                          <div>
-                            <Label>Employment Type</Label>
-                            <Input value={entry.employment_type} readOnly />
-                          </div>
-                          <div>
-                            <Label>Contract Type</Label>
-                            <Input value={entry.contract_type} readOnly />
-                          </div>
-                          <div>
-                            <Label>Pay Rate</Label>
-                            <Input value={`${entry.currency} ${entry.pay_rate} (${entry.pay_type})`} readOnly />
-                          </div>
-                          <div>
-                            <Label>Period</Label>
-                            <Input value={`${formatDate(entry.start_date)} - ${entry.end_date ? formatDate(entry.end_date) : 'Present'}`} readOnly />
-                          </div>
+                          <div><Label>Job Title</Label><Input value={entry.job_title} readOnly /></div>
+                          <div><Label>Location</Label><Input value={entry.location} readOnly /></div>
+                          <div><Label>Employment Type</Label><Input value={entry.employment_type} readOnly /></div>
+                          <div><Label>Contract Type</Label><Input value={entry.contract_type} readOnly /></div>
+                          <div><Label>Pay Rate</Label><Input value={`${entry.currency} ${entry.pay_rate} (${entry.pay_type})`} readOnly /></div>
+                          <div><Label>Period</Label><Input value={`${formatDate(entry.start_date)} - ${entry.end_date ? formatDate(entry.end_date) : 'Present'}`} readOnly /></div>
                         </div>
                         {canEdit && (
                           <div className="flex justify-end mt-4 space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setEditingCareerEntry(entry);
-                                setShowCareerForm(true);
-                              }}
-                            >
+                            <Button variant="outline" size="sm" onClick={() => { setEditingCareerEntry(entry); setShowCareerForm(true); }}>
                               Edit
                             </Button>
                           </div>
@@ -537,9 +474,7 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No employment history available
-                </div>
+                <div className="text-center py-8 text-muted-foreground">No employment history available</div>
               )}
             </CardContent>
           </Card>
