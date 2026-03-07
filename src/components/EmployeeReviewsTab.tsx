@@ -57,11 +57,12 @@ interface Props {
   initialReviewId?: string;
 }
 
-const EmployeeReviewsTab = ({ employeeId, canEdit }: Props) => {
+const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => {
   const { companyId } = useUserCompanyId();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
+  const [hasOpenedInitial, setHasOpenedInitial] = useState(false);
 
   const [formData, setFormData] = useState({
     review_type_template_id: '',
