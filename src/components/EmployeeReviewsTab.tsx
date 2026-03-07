@@ -106,16 +106,6 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
     enabled: !!employeeId,
   });
 
-  // Auto-open a specific review if initialReviewId is provided
-  React.useEffect(() => {
-    if (initialReviewId && reviews.length > 0 && !hasOpenedInitial) {
-      const review = reviews.find(r => r.id === initialReviewId);
-      if (review) {
-        openEdit(review);
-        setHasOpenedInitial(true);
-      }
-    }
-  }, [initialReviewId, reviews, hasOpenedInitial]);
 
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
