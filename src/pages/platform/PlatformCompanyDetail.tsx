@@ -293,6 +293,10 @@ const PlatformCompanyDetail = () => {
             <TabsContent value="lookups">
               <LookupListsManager companyId={id} />
             </TabsContent>
+
+            <TabsContent value="compliance">
+              <ComplianceTypeManager companyId={id} />
+            </TabsContent>
           </Tabs>
         </TabsContent>
 
