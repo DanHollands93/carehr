@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Users, UserCheck, Clock, CheckCircle, Calendar, FileText, Activity } from "lucide-react";
 import HolidayApprovalsWidget from "./HolidayApprovalsWidget";
+import ReviewsDueWidget from "./reporting/ReviewsDueWidget";
 
 const AnalyticsDashboard = () => {
   const { userRole, user } = useAuth();
