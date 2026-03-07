@@ -478,6 +478,63 @@ export type Database = {
           },
         ]
       }
+      employee_compliance: {
+        Row: {
+          company_id: string | null
+          compliance_type: string
+          created_at: string
+          employee_id: string
+          expiry_date: string | null
+          id: string
+          issue_date: string | null
+          notes: string | null
+          reference_number: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          compliance_type: string
+          created_at?: string
+          employee_id: string
+          expiry_date?: string | null
+          id?: string
+          issue_date?: string | null
+          notes?: string | null
+          reference_number?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          compliance_type?: string
+          created_at?: string
+          employee_id?: string
+          expiry_date?: string | null
+          id?: string
+          issue_date?: string | null
+          notes?: string | null
+          reference_number?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_compliance_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_compliance_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_drafts: {
         Row: {
           company_id: string | null
@@ -589,6 +646,7 @@ export type Database = {
           hire_date: string | null
           id: string
           job_title: string | null
+          known_as: string | null
           last_name: string
           location: string | null
           national_insurance_number: string | null
@@ -601,6 +659,7 @@ export type Database = {
           tax_code: string | null
           updated_at: string
           visa_expiry: string | null
+          work_email: string | null
         }
         Insert: {
           address?: Json | null
@@ -616,6 +675,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           job_title?: string | null
+          known_as?: string | null
           last_name: string
           location?: string | null
           national_insurance_number?: string | null
@@ -628,6 +688,7 @@ export type Database = {
           tax_code?: string | null
           updated_at?: string
           visa_expiry?: string | null
+          work_email?: string | null
         }
         Update: {
           address?: Json | null
@@ -643,6 +704,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           job_title?: string | null
+          known_as?: string | null
           last_name?: string
           location?: string | null
           national_insurance_number?: string | null
@@ -655,6 +717,7 @@ export type Database = {
           tax_code?: string | null
           updated_at?: string
           visa_expiry?: string | null
+          work_email?: string | null
         }
         Relationships: [
           {
