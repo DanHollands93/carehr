@@ -10,6 +10,7 @@ import LookupListsManager from "@/components/LookupListsManager";
 import EnhancedPermissionsManager from "@/components/EnhancedPermissionsManager";
 import CompanySettingsManager from "@/components/CompanySettingsManager";
 import AutoExceptionsSettings from "@/components/AutoExceptionsSettings";
+import ComplianceTypeManager from "@/components/ComplianceTypeManager";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -39,6 +40,7 @@ const Settings = () => {
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="integration">Integration</TabsTrigger>
           <TabsTrigger value="lookups">Lookup Lists</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance Types</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -212,6 +214,10 @@ const Settings = () => {
 
         <TabsContent value="lookups">
           <LookupListsManager />
+        </TabsContent>
+
+        <TabsContent value="compliance">
+          <ComplianceTypeManager />
         </TabsContent>
       </Tabs>
     </div>
