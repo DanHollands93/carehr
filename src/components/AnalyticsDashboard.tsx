@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Users, UserCheck, Clock, CheckCircle, Calendar, FileText, Activity } from "lucide-react";
 import HolidayApprovalsWidget from "./HolidayApprovalsWidget";
+import ReviewsDueWidget from "./reporting/ReviewsDueWidget";
 
 const AnalyticsDashboard = () => {
   const { userRole, user } = useAuth();
@@ -93,6 +94,8 @@ const AnalyticsDashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ReviewsDueWidget />
+
           {/* Holiday Approvals Widget - Show for users with approve_holidays permission */}
           {hasPermission('approve_holidays') && (
             <HolidayApprovalsWidget />
