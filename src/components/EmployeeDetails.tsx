@@ -434,6 +434,10 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
           />
         </TabsContent>
 
+        <TabsContent value="reviews" className="space-y-6">
+          <EmployeeReviewsTab employeeId={employeeId} canEdit={canEdit} />
+        </TabsContent>
+
         <TabsContent value="address" className="space-y-6">
           <Card>
             <CardHeader>
