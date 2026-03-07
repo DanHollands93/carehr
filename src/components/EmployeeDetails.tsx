@@ -6,13 +6,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield, ClipboardCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import CareerHistoryForm from "@/components/CareerHistoryForm";
 import UserAccountManager from "@/components/UserAccountManager";
 import EmployeeComplianceTab from "@/components/EmployeeComplianceTab";
+import EmployeeReviewsTab from "@/components/EmployeeReviewsTab";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { toast } from "sonner";
 
 interface EmployeeData {
@@ -55,6 +59,7 @@ interface EmployeeDetailsProps {
 
 const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
   const { user } = useAuth();
+  const { companyId } = useUserCompanyId();
   const queryClient = useQueryClient();
   const [showCareerForm, setShowCareerForm] = useState(false);
   const [editingCareerEntry, setEditingCareerEntry] = useState<any>(null);
@@ -70,6 +75,36 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
     };
     checkPermission();
   }, [user]);
+
+  // Load form configs for this company
+  const { data: formConfigs = [] } = useQuery({
+    queryKey: ['employee-form-configs', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employee_form_configs' as any)
+        .select('*')
+        .eq('company_id', companyId!);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  const getFieldConfig = (section: string, fieldKey: string) => {
+    const config = formConfigs.find((c: any) => c.section === section);
+    if (!config) return { visible: true, required: false };
+    const fc = (config as any).field_configs?.[fieldKey];
+    return fc || { visible: true, required: false };
+  };
+
+  const getCustomFields = (section: string) => {
+    const config = formConfigs.find((c: any) => c.section === section);
+    return ((config as any)?.custom_fields || []) as Array<{ key: string; label: string; type: string; required: boolean; options?: string[] }>;
+  };
+
+  const isFieldVisible = (section: string, fieldKey: string) => {
+    return getFieldConfig(section, fieldKey).visible !== false;
+  };
 
   const { data: employee, isLoading } = useQuery({
     queryKey: ['employee', employeeId],
@@ -183,26 +218,30 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="personal" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="personal" className="flex items-center gap-2">
             <User className="w-4 h-4" />
-            Personal Details
+            Personal
           </TabsTrigger>
           <TabsTrigger value="compliance" className="flex items-center gap-2">
             <Shield className="w-4 h-4" />
             Compliance
           </TabsTrigger>
+          <TabsTrigger value="reviews" className="flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4" />
+            Reviews
+          </TabsTrigger>
           <TabsTrigger value="address" className="flex items-center gap-2">
             <MapPin className="w-4 h-4" />
-            Address History
+            Address
           </TabsTrigger>
           <TabsTrigger value="employment" className="flex items-center gap-2">
             <Briefcase className="w-4 h-4" />
-            Employment History
+            Employment
           </TabsTrigger>
           <TabsTrigger value="account" className="flex items-center gap-2">
             <User className="w-4 h-4" />
-            User Account
+            Account
           </TabsTrigger>
         </TabsList>
 
@@ -250,114 +289,132 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* First Name - always visible */}
                 <div>
                   <Label>First Name</Label>
-                  <Input
-                    value={isEditing ? editData.first_name || '' : employee.first_name}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('first_name', e.target.value)}
-                  />
+                  <Input value={isEditing ? editData.first_name || '' : employee.first_name} readOnly={!isEditing} onChange={(e) => updateField('first_name', e.target.value)} />
                 </div>
+                {/* Last Name - always visible */}
                 <div>
                   <Label>Last Name</Label>
-                  <Input
-                    value={isEditing ? editData.last_name || '' : employee.last_name}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('last_name', e.target.value)}
-                  />
+                  <Input value={isEditing ? editData.last_name || '' : employee.last_name} readOnly={!isEditing} onChange={(e) => updateField('last_name', e.target.value)} />
                 </div>
-                <div>
-                  <Label>Known As</Label>
-                  <Input
-                    value={isEditing ? editData.known_as || '' : employee.known_as || 'Not provided'}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('known_as', e.target.value)}
-                    placeholder="Preferred name"
-                  />
-                </div>
-                <div>
-                  <Label>Date of Birth</Label>
-                  {isEditing ? (
-                    <Input
-                      type="date"
-                      value={editData.date_of_birth || ''}
-                      onChange={(e) => updateField('date_of_birth', e.target.value)}
-                    />
-                  ) : (
-                    <Input value={formatDate(employee.date_of_birth)} readOnly />
-                  )}
-                </div>
+                {isFieldVisible('personal_details', 'known_as') && (
+                  <div>
+                    <Label>Known As</Label>
+                    <Input value={isEditing ? editData.known_as || '' : employee.known_as || 'Not provided'} readOnly={!isEditing} onChange={(e) => updateField('known_as', e.target.value)} />
+                  </div>
+                )}
+                {isFieldVisible('personal_details', 'date_of_birth') && (
+                  <div>
+                    <Label>Date of Birth</Label>
+                    {isEditing ? (
+                      <Input type="date" value={editData.date_of_birth || ''} onChange={(e) => updateField('date_of_birth', e.target.value)} />
+                    ) : (
+                      <Input value={formatDate(employee.date_of_birth)} readOnly />
+                    )}
+                  </div>
+                )}
+                {/* Email - always visible */}
                 <div>
                   <Label>Personal Email</Label>
-                  <Input
-                    value={isEditing ? editData.email || '' : employee.email}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('email', e.target.value)}
-                  />
+                  <Input value={isEditing ? editData.email || '' : employee.email} readOnly={!isEditing} onChange={(e) => updateField('email', e.target.value)} />
                 </div>
-                <div>
-                  <Label>Work Email</Label>
-                  <Input
-                    value={isEditing ? editData.work_email || '' : employee.work_email || 'Not provided'}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('work_email', e.target.value)}
-                    placeholder="Work email address"
-                  />
-                </div>
-                <div>
-                  <Label>Phone Number</Label>
-                  <Input
-                    value={isEditing ? editData.phone_number || '' : employee.phone_number || 'Not provided'}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('phone_number', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>National Insurance Number</Label>
-                  <Input
-                    value={isEditing ? editData.national_insurance_number || '' : employee.national_insurance_number || 'Not provided'}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('national_insurance_number', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Tax Code</Label>
-                  <Input
-                    value={isEditing ? editData.tax_code || '' : employee.tax_code || 'Not provided'}
-                    readOnly={!isEditing}
-                    onChange={(e) => updateField('tax_code', e.target.value)}
-                  />
-                </div>
+                {isFieldVisible('personal_details', 'work_email') && (
+                  <div>
+                    <Label>Work Email</Label>
+                    <Input value={isEditing ? editData.work_email || '' : employee.work_email || 'Not provided'} readOnly={!isEditing} onChange={(e) => updateField('work_email', e.target.value)} />
+                  </div>
+                )}
+                {isFieldVisible('personal_details', 'phone_number') && (
+                  <div>
+                    <Label>Phone Number</Label>
+                    <Input value={isEditing ? editData.phone_number || '' : employee.phone_number || 'Not provided'} readOnly={!isEditing} onChange={(e) => updateField('phone_number', e.target.value)} />
+                  </div>
+                )}
+                {isFieldVisible('personal_details', 'national_insurance_number') && (
+                  <div>
+                    <Label>National Insurance Number</Label>
+                    <Input value={isEditing ? editData.national_insurance_number || '' : employee.national_insurance_number || 'Not provided'} readOnly={!isEditing} onChange={(e) => updateField('national_insurance_number', e.target.value)} />
+                  </div>
+                )}
+                {isFieldVisible('personal_details', 'tax_code') && (
+                  <div>
+                    <Label>Tax Code</Label>
+                    <Input value={isEditing ? editData.tax_code || '' : employee.tax_code || 'Not provided'} readOnly={!isEditing} onChange={(e) => updateField('tax_code', e.target.value)} />
+                  </div>
+                )}
+
+                {/* Custom fields for personal_details */}
+                {getCustomFields('personal_details').map(cf => (
+                  <div key={cf.key}>
+                    <Label>{cf.label}</Label>
+                    {cf.type === 'yes_no' ? (
+                      <div className="flex items-center gap-3 mt-1">
+                        <Switch
+                          checked={(isEditing ? (editData as any).custom_fields?.[cf.key] : (employee as any).custom_fields?.[cf.key]) === true}
+                          disabled={!isEditing}
+                          onCheckedChange={(v) => setEditData(prev => ({
+                            ...prev,
+                            custom_fields: { ...((prev as any).custom_fields || {}), [cf.key]: v }
+                          }))}
+                        />
+                        <span className="text-sm">{(isEditing ? (editData as any).custom_fields?.[cf.key] : (employee as any).custom_fields?.[cf.key]) ? 'Yes' : 'No'}</span>
+                      </div>
+                    ) : cf.type === 'select' && cf.options ? (
+                      isEditing ? (
+                        <Select
+                          value={(editData as any).custom_fields?.[cf.key] || ''}
+                          onValueChange={(v) => setEditData(prev => ({
+                            ...prev,
+                            custom_fields: { ...((prev as any).custom_fields || {}), [cf.key]: v }
+                          }))}
+                        >
+                          <SelectTrigger><SelectValue placeholder={`Select ${cf.label}...`} /></SelectTrigger>
+                          <SelectContent>
+                            {cf.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input value={(employee as any).custom_fields?.[cf.key] || 'Not provided'} readOnly />
+                      )
+                    ) : (
+                      <Input
+                        type={cf.type === 'date' ? 'date' : cf.type === 'number' ? 'number' : 'text'}
+                        value={isEditing ? ((editData as any).custom_fields?.[cf.key] || '') : ((employee as any).custom_fields?.[cf.key] || 'Not provided')}
+                        readOnly={!isEditing}
+                        onChange={(e) => setEditData(prev => ({
+                          ...prev,
+                          custom_fields: { ...((prev as any).custom_fields || {}), [cf.key]: e.target.value }
+                        }))}
+                      />
+                    )}
+                  </div>
+                ))}
               </div>
 
               {(employee.emergency_contact || isEditing) && (
                 <div className="mt-6">
                   <h3 className="text-lg font-medium mb-4">Emergency Contact</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Contact Name</Label>
-                      <Input
-                        value={isEditing ? editData.emergency_contact?.name || '' : employee.emergency_contact?.name || 'Not provided'}
-                        readOnly={!isEditing}
-                        onChange={(e) => updateEmergencyContact('name', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label>Relationship</Label>
-                      <Input
-                        value={isEditing ? editData.emergency_contact?.relationship || '' : employee.emergency_contact?.relationship || 'Not provided'}
-                        readOnly={!isEditing}
-                        onChange={(e) => updateEmergencyContact('relationship', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label>Phone Number</Label>
-                      <Input
-                        value={isEditing ? editData.emergency_contact?.phone || '' : employee.emergency_contact?.phone || 'Not provided'}
-                        readOnly={!isEditing}
-                        onChange={(e) => updateEmergencyContact('phone', e.target.value)}
-                      />
-                    </div>
+                    {isFieldVisible('emergency_contact', 'name') && (
+                      <div>
+                        <Label>Contact Name</Label>
+                        <Input value={isEditing ? editData.emergency_contact?.name || '' : employee.emergency_contact?.name || 'Not provided'} readOnly={!isEditing} onChange={(e) => updateEmergencyContact('name', e.target.value)} />
+                      </div>
+                    )}
+                    {isFieldVisible('emergency_contact', 'relationship') && (
+                      <div>
+                        <Label>Relationship</Label>
+                        <Input value={isEditing ? editData.emergency_contact?.relationship || '' : employee.emergency_contact?.relationship || 'Not provided'} readOnly={!isEditing} onChange={(e) => updateEmergencyContact('relationship', e.target.value)} />
+                      </div>
+                    )}
+                    {isFieldVisible('emergency_contact', 'phone') && (
+                      <div>
+                        <Label>Phone Number</Label>
+                        <Input value={isEditing ? editData.emergency_contact?.phone || '' : employee.emergency_contact?.phone || 'Not provided'} readOnly={!isEditing} onChange={(e) => updateEmergencyContact('phone', e.target.value)} />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -375,6 +432,10 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
               visa_expiry: employee.visa_expiry,
             }}
           />
+        </TabsContent>
+
+        <TabsContent value="reviews" className="space-y-6">
+          <EmployeeReviewsTab employeeId={employeeId} canEdit={canEdit} />
         </TabsContent>
 
         <TabsContent value="address" className="space-y-6">

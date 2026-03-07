@@ -11,6 +11,8 @@ import EnhancedPermissionsManager from "@/components/EnhancedPermissionsManager"
 import CompanySettingsManager from "@/components/CompanySettingsManager";
 import AutoExceptionsSettings from "@/components/AutoExceptionsSettings";
 import ComplianceTypeManager from "@/components/ComplianceTypeManager";
+import EmployeeFormConfigManager from "@/components/EmployeeFormConfigManager";
+import ReviewTypeManager from "@/components/ReviewTypeManager";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -41,6 +43,8 @@ const Settings = () => {
           <TabsTrigger value="integration">Integration</TabsTrigger>
           <TabsTrigger value="lookups">Lookup Lists</TabsTrigger>
           <TabsTrigger value="compliance">Compliance Types</TabsTrigger>
+          <TabsTrigger value="employee-forms">Employee Forms</TabsTrigger>
+          <TabsTrigger value="reviews">Reviews</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -218,6 +222,14 @@ const Settings = () => {
 
         <TabsContent value="compliance">
           <ComplianceTypeManager />
+        </TabsContent>
+
+        <TabsContent value="employee-forms">
+          <EmployeeFormConfigManager />
+        </TabsContent>
+
+        <TabsContent value="reviews">
+          <ReviewTypeManager />
         </TabsContent>
       </Tabs>
     </div>
