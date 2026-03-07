@@ -18,6 +18,7 @@ import { useImpersonation } from "@/contexts/ImpersonationContext";
 import CompanySettingsManager from "@/components/CompanySettingsManager";
 import LookupListsManager from "@/components/LookupListsManager";
 import EnhancedPermissionsManager from "@/components/EnhancedPermissionsManager";
+import ComplianceTypeManager from "@/components/ComplianceTypeManager";
 const SETTING_DEFINITIONS = [
   { key: "clock_in_geolocation", label: "Require Geolocation on Clock-In", description: "Capture staff GPS location when clocking in", module: "time_attendance" },
   { key: "clock_in_photo", label: "Require Photo on Clock-In", description: "Take a photo of staff when clocking in", module: "time_attendance" },
