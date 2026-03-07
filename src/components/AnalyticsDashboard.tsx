@@ -94,6 +94,8 @@ const AnalyticsDashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ReviewsDueWidget />
+
           {/* Holiday Approvals Widget - Show for users with approve_holidays permission */}
           {hasPermission('approve_holidays') && (
             <HolidayApprovalsWidget />
