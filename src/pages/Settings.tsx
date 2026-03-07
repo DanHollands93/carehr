@@ -215,6 +215,10 @@ const Settings = () => {
         <TabsContent value="lookups">
           <LookupListsManager />
         </TabsContent>
+
+        <TabsContent value="compliance">
+          <ComplianceTypeManager />
+        </TabsContent>
       </Tabs>
     </div>
   );
