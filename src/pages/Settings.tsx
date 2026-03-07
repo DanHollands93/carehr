@@ -223,6 +223,14 @@ const Settings = () => {
         <TabsContent value="compliance">
           <ComplianceTypeManager />
         </TabsContent>
+
+        <TabsContent value="employee-forms">
+          <EmployeeFormConfigManager />
+        </TabsContent>
+
+        <TabsContent value="reviews">
+          <ReviewTypeManager />
+        </TabsContent>
       </Tabs>
     </div>
   );
