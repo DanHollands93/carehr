@@ -279,6 +279,7 @@ const PlatformCompanyDetail = () => {
               <TabsTrigger value="company">Company</TabsTrigger>
               <TabsTrigger value="permissions">Permissions</TabsTrigger>
               <TabsTrigger value="lookups">Lookup Lists</TabsTrigger>
+              <TabsTrigger value="compliance">Compliance Types</TabsTrigger>
             </TabsList>
 
             <TabsContent value="company">
