@@ -54,13 +54,15 @@ const STATUS_OPTIONS = ['scheduled', 'in_progress', 'completed', 'cancelled'];
 interface Props {
   employeeId: string;
   canEdit: boolean;
+  initialReviewId?: string;
 }
 
-const EmployeeReviewsTab = ({ employeeId, canEdit }: Props) => {
+const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => {
   const { companyId } = useUserCompanyId();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
+  const [hasOpenedInitial, setHasOpenedInitial] = useState(false);
 
   const [formData, setFormData] = useState({
     review_type_template_id: '',
@@ -103,6 +105,7 @@ const EmployeeReviewsTab = ({ employeeId, canEdit }: Props) => {
     },
     enabled: !!employeeId,
   });
+
 
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -150,6 +153,17 @@ const EmployeeReviewsTab = ({ employeeId, canEdit }: Props) => {
     });
     setShowForm(true);
   };
+
+  // Auto-open a specific review if initialReviewId is provided
+  React.useEffect(() => {
+    if (initialReviewId && reviews.length > 0 && !hasOpenedInitial) {
+      const review = reviews.find(r => r.id === initialReviewId);
+      if (review) {
+        openEdit(review);
+        setHasOpenedInitial(true);
+      }
+    }
+  }, [initialReviewId, reviews, hasOpenedInitial]);
 
   const closeForm = () => { setShowForm(false); setEditingReview(null); };
 

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -60,10 +61,13 @@ interface GroupedEmployee {
 
 const Employees = () => {
   const { companyId } = useUserCompanyId();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeTab, setActiveTab] = useState("list");
+  const [urlInitialTab, setUrlInitialTab] = useState<string | undefined>();
+  const [urlReviewId, setUrlReviewId] = useState<string | undefined>();
 
   const { data: employeePositions = [], isLoading, refetch } = useQuery({
     queryKey: ['employee-positions', companyId],
@@ -97,7 +101,39 @@ const Employees = () => {
     enabled: !!companyId
   });
 
-  // Group positions by employee and location
+  // Handle URL params to auto-open an employee and tab
+  useEffect(() => {
+    const urlId = searchParams.get('id');
+    const urlTab = searchParams.get('tab');
+    const urlReview = searchParams.get('reviewId');
+    if (urlId && employeePositions.length > 0 && !selectedEmployee) {
+      const emp = employeePositions.find(e => e.employee_id === urlId);
+      if (emp) {
+        setSelectedEmployee({
+          id: emp.employee_id,
+          first_name: emp.first_name,
+          last_name: emp.last_name,
+          email: emp.email,
+          department: emp.department,
+          phone_number: emp.phone_number,
+          hire_date: emp.hire_date,
+          job_title: emp.job_title,
+          location: emp.location,
+          employment_type: emp.employment_type,
+          national_insurance_number: undefined,
+          pay_rate: undefined,
+          pay_type: undefined,
+        });
+        setActiveTab("details");
+        if (urlTab) setUrlInitialTab(urlTab);
+        if (urlReview) setUrlReviewId(urlReview);
+        // Clean URL params
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, employeePositions, selectedEmployee]);
+
+
   const groupedEmployees = employeePositions.reduce((acc, position) => {
     const employeeKey = position.employee_id;
     
@@ -322,6 +358,8 @@ const Employees = () => {
           <TabsContent value="details">
             <EmployeeDetails 
               employeeId={selectedEmployee.id}
+              initialTab={urlInitialTab}
+              initialReviewId={urlReviewId}
             />
           </TabsContent>
         )}

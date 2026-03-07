@@ -55,9 +55,11 @@ interface AddressHistory {
 
 interface EmployeeDetailsProps {
   employeeId: string;
+  initialTab?: string;
+  initialReviewId?: string;
 }
 
-const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
+const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDetailsProps) => {
   const { user } = useAuth();
   const { companyId } = useUserCompanyId();
   const queryClient = useQueryClient();
@@ -217,7 +219,7 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="personal" className="w-full">
+      <Tabs defaultValue={initialTab || "personal"} className="w-full">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="personal" className="flex items-center gap-2">
             <User className="w-4 h-4" />
@@ -435,7 +437,7 @@ const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
         </TabsContent>
 
         <TabsContent value="reviews" className="space-y-6">
-          <EmployeeReviewsTab employeeId={employeeId} canEdit={canEdit} />
+          <EmployeeReviewsTab employeeId={employeeId} canEdit={canEdit} initialReviewId={initialReviewId} />
         </TabsContent>
 
         <TabsContent value="address" className="space-y-6">
