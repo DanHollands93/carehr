@@ -636,6 +636,44 @@ export type Database = {
           },
         ]
       }
+      employee_form_configs: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          custom_fields: Json | null
+          field_configs: Json | null
+          id: string
+          section: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          field_configs?: Json | null
+          id?: string
+          section: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          field_configs?: Json | null
+          id?: string
+          section?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_form_configs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_job_roles: {
         Row: {
           company_id: string | null
@@ -697,12 +735,102 @@ export type Database = {
           },
         ]
       }
+      employee_reviews: {
+        Row: {
+          career_history_id: string | null
+          category: string
+          company_id: string | null
+          completed_by: string | null
+          completed_date: string | null
+          created_at: string
+          custom_fields: Json | null
+          employee_id: string
+          employee_notes: string | null
+          id: string
+          outcome: string | null
+          review_type: string
+          review_type_template_id: string | null
+          reviewer_notes: string | null
+          scheduled_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          career_history_id?: string | null
+          category?: string
+          company_id?: string | null
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          employee_id: string
+          employee_notes?: string | null
+          id?: string
+          outcome?: string | null
+          review_type: string
+          review_type_template_id?: string | null
+          reviewer_notes?: string | null
+          scheduled_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          career_history_id?: string | null
+          category?: string
+          company_id?: string | null
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          employee_id?: string
+          employee_notes?: string | null
+          id?: string
+          outcome?: string | null
+          review_type?: string
+          review_type_template_id?: string | null
+          reviewer_notes?: string | null
+          scheduled_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_reviews_career_history_id_fkey"
+            columns: ["career_history_id"]
+            isOneToOne: false
+            referencedRelation: "career_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_reviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_reviews_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_reviews_review_type_template_id_fkey"
+            columns: ["review_type_template_id"]
+            isOneToOne: false
+            referencedRelation: "review_type_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           address: Json | null
           bank_details: Json | null
           company_id: string | null
           created_at: string
+          custom_fields: Json | null
           date_of_birth: string | null
           department: string | null
           email: string
@@ -732,6 +860,7 @@ export type Database = {
           bank_details?: Json | null
           company_id?: string | null
           created_at?: string
+          custom_fields?: Json | null
           date_of_birth?: string | null
           department?: string | null
           email: string
@@ -761,6 +890,7 @@ export type Database = {
           bank_details?: Json | null
           company_id?: string | null
           created_at?: string
+          custom_fields?: Json | null
           date_of_birth?: string | null
           department?: string | null
           email?: string
@@ -1410,6 +1540,65 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_type_templates: {
+        Row: {
+          auto_create_on_hire: boolean | null
+          auto_schedule: boolean | null
+          category: string
+          company_id: string | null
+          created_at: string
+          custom_fields: Json | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          schedule_count: number | null
+          schedule_interval_days: number | null
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          auto_create_on_hire?: boolean | null
+          auto_schedule?: boolean | null
+          category?: string
+          company_id?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          schedule_count?: number | null
+          schedule_interval_days?: number | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          auto_create_on_hire?: boolean | null
+          auto_schedule?: boolean | null
+          category?: string
+          company_id?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          schedule_count?: number | null
+          schedule_interval_days?: number | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_type_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
