@@ -40,6 +40,7 @@ const Settings = () => {
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="integration">Integration</TabsTrigger>
           <TabsTrigger value="lookups">Lookup Lists</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance Types</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
