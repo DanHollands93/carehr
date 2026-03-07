@@ -59,7 +59,7 @@ interface EmployeeDetailsProps {
   initialReviewId?: string;
 }
 
-const EmployeeDetails = ({ employeeId }: EmployeeDetailsProps) => {
+const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDetailsProps) => {
   const { user } = useAuth();
   const { companyId } = useUserCompanyId();
   const queryClient = useQueryClient();
