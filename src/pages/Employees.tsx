@@ -358,6 +358,8 @@ const Employees = () => {
           <TabsContent value="details">
             <EmployeeDetails 
               employeeId={selectedEmployee.id}
+              initialTab={urlInitialTab}
+              initialReviewId={urlReviewId}
             />
           </TabsContent>
         )}
