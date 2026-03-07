@@ -54,6 +54,7 @@ const STATUS_OPTIONS = ['scheduled', 'in_progress', 'completed', 'cancelled'];
 interface Props {
   employeeId: string;
   canEdit: boolean;
+  initialReviewId?: string;
 }
 
 const EmployeeReviewsTab = ({ employeeId, canEdit }: Props) => {
