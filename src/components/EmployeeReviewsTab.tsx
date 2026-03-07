@@ -154,7 +154,17 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
     setShowForm(true);
   };
 
-  const closeForm = () => { setShowForm(false); setEditingReview(null); };
+  // Auto-open a specific review if initialReviewId is provided
+  React.useEffect(() => {
+    if (initialReviewId && reviews.length > 0 && !hasOpenedInitial) {
+      const review = reviews.find(r => r.id === initialReviewId);
+      if (review) {
+        openEdit(review);
+        setHasOpenedInitial(true);
+      }
+    }
+  }, [initialReviewId, reviews, hasOpenedInitial]);
+
 
   const handleTypeChange = (templateId: string) => {
     const t = templates.find(x => x.id === templateId);
