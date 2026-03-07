@@ -6,13 +6,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield, ClipboardCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import CareerHistoryForm from "@/components/CareerHistoryForm";
 import UserAccountManager from "@/components/UserAccountManager";
 import EmployeeComplianceTab from "@/components/EmployeeComplianceTab";
+import EmployeeReviewsTab from "@/components/EmployeeReviewsTab";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { toast } from "sonner";
 
 interface EmployeeData {
