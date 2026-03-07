@@ -165,6 +165,7 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
     }
   }, [initialReviewId, reviews, hasOpenedInitial]);
 
+  const closeForm = () => { setShowForm(false); setEditingReview(null); };
 
   const handleTypeChange = (templateId: string) => {
     const t = templates.find(x => x.id === templateId);
