@@ -61,10 +61,13 @@ interface GroupedEmployee {
 
 const Employees = () => {
   const { companyId } = useUserCompanyId();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeTab, setActiveTab] = useState("list");
+  const [urlInitialTab, setUrlInitialTab] = useState<string | undefined>();
+  const [urlReviewId, setUrlReviewId] = useState<string | undefined>();
 
   const { data: employeePositions = [], isLoading, refetch } = useQuery({
     queryKey: ['employee-positions', companyId],
