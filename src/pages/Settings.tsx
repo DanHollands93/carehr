@@ -11,6 +11,8 @@ import EnhancedPermissionsManager from "@/components/EnhancedPermissionsManager"
 import CompanySettingsManager from "@/components/CompanySettingsManager";
 import AutoExceptionsSettings from "@/components/AutoExceptionsSettings";
 import ComplianceTypeManager from "@/components/ComplianceTypeManager";
+import EmployeeFormConfigManager from "@/components/EmployeeFormConfigManager";
+import ReviewTypeManager from "@/components/ReviewTypeManager";
 
 const Settings = () => {
   const { toast } = useToast();
