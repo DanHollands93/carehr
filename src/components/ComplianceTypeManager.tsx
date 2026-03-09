@@ -323,13 +323,20 @@ const ComplianceTypeManager = ({ companyId: propCompanyId }: Props) => {
               {formData.custom_fields.length > 0 && (
                 <div className="space-y-2">
                   {formData.custom_fields.map((f, i) => (
-                    <div key={i} className="flex items-center gap-2 p-2 border rounded bg-muted/30">
-                      <span className="flex-1 text-sm font-medium">{f.label}</span>
-                      <Badge variant="outline" className="text-xs">{f.type === 'yes_no' ? 'Yes/No' : f.type}</Badge>
-                      {f.required && <Badge variant="secondary" className="text-xs">Required</Badge>}
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeCustomField(i)}>
-                        <Trash2 className="w-3 h-3 text-destructive" />
-                      </Button>
+                    <div key={i} className="p-2 border rounded bg-muted/30 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="flex-1 text-sm font-medium">{f.label}</span>
+                        <Badge variant="outline" className="text-xs">{f.type === 'yes_no' ? 'Yes/No' : f.type}</Badge>
+                        {f.required && <Badge variant="secondary" className="text-xs">Required</Badge>}
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeCustomField(i)}>
+                          <Trash2 className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </div>
+                      {f.condition && (
+                        <p className="text-xs text-muted-foreground pl-1">
+                          ↳ Shown when <strong>{formData.custom_fields.find(cf => cf.key === f.condition!.field_key)?.label || f.condition.field_key}</strong> = <strong>{f.condition.value}</strong>
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
