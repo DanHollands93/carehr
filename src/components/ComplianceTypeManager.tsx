@@ -323,8 +323,26 @@ const ComplianceTypeManager = ({ companyId: propCompanyId }: Props) => {
               {formData.custom_fields.length > 0 && (
                 <div className="space-y-2">
                   {formData.custom_fields.map((f, i) => (
-                    <div key={i} className="p-2 border rounded bg-muted/30 space-y-1">
+                    <div
+                      key={f.key + i}
+                      draggable
+                      onDragStart={() => setDraggedFieldIndex(i)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (draggedFieldIndex === null || draggedFieldIndex === i) return;
+                        const newFields = [...formData.custom_fields];
+                        const dragged = newFields[draggedFieldIndex];
+                        newFields.splice(draggedFieldIndex, 1);
+                        newFields.splice(i, 0, dragged);
+                        setFormData(p => ({ ...p, custom_fields: newFields }));
+                        setDraggedFieldIndex(i);
+                      }}
+                      onDragEnd={() => setDraggedFieldIndex(null)}
+                      className="p-2 border rounded bg-muted/30 space-y-1 cursor-move transition-opacity"
+                      style={{ opacity: draggedFieldIndex === i ? 0.5 : 1 }}
+                    >
                       <div className="flex items-center gap-2">
+                        <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
                         <span className="flex-1 text-sm font-medium">{f.label}</span>
                         <Badge variant="outline" className="text-xs">{f.type === 'yes_no' ? 'Yes/No' : f.type}</Badge>
                         {f.required && <Badge variant="secondary" className="text-xs">Required</Badge>}
@@ -333,7 +351,7 @@ const ComplianceTypeManager = ({ companyId: propCompanyId }: Props) => {
                         </Button>
                       </div>
                       {f.condition && (
-                        <p className="text-xs text-muted-foreground pl-1">
+                        <p className="text-xs text-muted-foreground pl-5">
                           ↳ Shown when <strong>{formData.custom_fields.find(cf => cf.key === f.condition!.field_key)?.label || f.condition.field_key}</strong> = <strong>{f.condition.value}</strong>
                         </p>
                       )}
