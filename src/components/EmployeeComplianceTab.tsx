@@ -444,7 +444,8 @@ const EmployeeComplianceTab = ({ employeeId, canEdit, employee }: EmployeeCompli
                       </Select>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
