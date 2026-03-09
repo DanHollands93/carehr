@@ -319,6 +319,7 @@ const EmployeeComplianceTab = ({ employeeId, canEdit, employee }: EmployeeCompli
                           {template && template.custom_fields?.length > 0 && (
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-muted-foreground mt-1">
                               {template.custom_fields.map(f => {
+                                if (!isFieldVisible(f, record.custom_fields || {})) return null;
                                 const val = renderCustomFieldValue(record, f);
                                 if (!val) return null;
                                 return <div key={f.key}>{f.label}: {val}</div>;
