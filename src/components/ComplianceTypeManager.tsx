@@ -252,12 +252,17 @@ const ComplianceTypeManager = ({ companyId: propCompanyId }: Props) => {
                       <div className="space-y-1 mt-2">
                         <p className="text-sm font-medium">Custom Fields:</p>
                         {t.custom_fields.map((f, i) => (
-                          <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground pl-2">
+                          <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground pl-2 flex-wrap">
                             <span>• {f.label}</span>
                             <Badge variant="outline" className="text-xs">{f.type === 'yes_no' ? 'Yes/No' : f.type}</Badge>
                             {f.required && <Badge variant="secondary" className="text-xs">Required</Badge>}
                             {f.type === 'select' && f.options && (
                               <span className="text-xs">({f.options.join(', ')})</span>
+                            )}
+                            {f.condition && (
+                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                Show when {t.custom_fields.find(cf => cf.key === f.condition!.field_key)?.label || f.condition.field_key} = {f.condition.value}
+                              </Badge>
                             )}
                           </div>
                         ))}
