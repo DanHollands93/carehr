@@ -398,7 +398,9 @@ const EmployeeComplianceTab = ({ employeeId, canEdit, employee }: EmployeeCompli
             {selectedTemplate && selectedTemplate.custom_fields?.length > 0 && (
               <div className="space-y-4 border-t pt-4">
                 <h4 className="text-sm font-medium text-muted-foreground">Additional Fields</h4>
-                {selectedTemplate.custom_fields.map((field) => (
+                {selectedTemplate.custom_fields.map((field) => {
+                  if (!isFieldVisible(field, formData.custom_fields)) return null;
+                  return (
                   <div key={field.key}>
                     <Label>{field.label}{field.required ? ' *' : ''}</Label>
                     {field.type === 'text' && (
