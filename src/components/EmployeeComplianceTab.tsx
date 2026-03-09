@@ -211,7 +211,7 @@ const EmployeeComplianceTab = ({ employeeId, canEdit, employee }: EmployeeCompli
     // Validate required custom fields
     if (selectedTemplate) {
       for (const f of selectedTemplate.custom_fields) {
-        if (f.required && !formData.custom_fields[f.key]) {
+        if (f.required && isFieldVisible(f, formData.custom_fields) && !formData.custom_fields[f.key]) {
           toast.error(`${f.label} is required`);
           return;
         }
