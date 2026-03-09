@@ -280,7 +280,9 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
                           )}
                         </div>
                         {canEdit && (
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
+                            {r.status === 'completed' ? <Eye className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+                          </Button>
                         )}
                       </div>
                     </CardContent>
