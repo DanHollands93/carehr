@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, ClipboardCheck, Calendar, CheckCircle, Clock, AlertTriangle, Pencil } from 'lucide-react';
+import { Plus, ClipboardCheck, Calendar, CheckCircle, Clock, AlertTriangle, Pencil, Lock, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useUserCompanyId } from '@/hooks/useUserCompanyId';
