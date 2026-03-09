@@ -14,12 +14,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useUserCompanyId } from '@/hooks/useUserCompanyId';
 
+interface FieldCondition {
+  field_key: string;
+  value: string;
+}
+
 interface CustomField {
   key: string;
   label: string;
   type: 'text' | 'number' | 'date' | 'yes_no' | 'select';
   required: boolean;
   options?: string[];
+  condition?: FieldCondition;
 }
 
 interface ComplianceTemplate {
@@ -205,13 +211,21 @@ const EmployeeComplianceTab = ({ employeeId, canEdit, employee }: EmployeeCompli
     // Validate required custom fields
     if (selectedTemplate) {
       for (const f of selectedTemplate.custom_fields) {
-        if (f.required && !formData.custom_fields[f.key]) {
+        if (f.required && isFieldVisible(f, formData.custom_fields) && !formData.custom_fields[f.key]) {
           toast.error(`${f.label} is required`);
           return;
         }
       }
     }
     saveMutation.mutate(formData);
+  };
+
+  const isFieldVisible = (field: CustomField, customFieldValues: Record<string, any>) => {
+    if (!field.condition) return true;
+    const currentVal = customFieldValues[field.condition.field_key];
+    if (field.condition.value === 'true') return currentVal === true;
+    if (field.condition.value === 'false') return currentVal === false;
+    return String(currentVal) === field.condition.value;
   };
 
   const setCustomFieldValue = (key: string, value: any) => {
@@ -305,6 +319,7 @@ const EmployeeComplianceTab = ({ employeeId, canEdit, employee }: EmployeeCompli
                           {template && template.custom_fields?.length > 0 && (
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-muted-foreground mt-1">
                               {template.custom_fields.map(f => {
+                                if (!isFieldVisible(f, record.custom_fields || {})) return null;
                                 const val = renderCustomFieldValue(record, f);
                                 if (!val) return null;
                                 return <div key={f.key}>{f.label}: {val}</div>;
@@ -383,7 +398,9 @@ const EmployeeComplianceTab = ({ employeeId, canEdit, employee }: EmployeeCompli
             {selectedTemplate && selectedTemplate.custom_fields?.length > 0 && (
               <div className="space-y-4 border-t pt-4">
                 <h4 className="text-sm font-medium text-muted-foreground">Additional Fields</h4>
-                {selectedTemplate.custom_fields.map((field) => (
+                {selectedTemplate.custom_fields.map((field) => {
+                  if (!isFieldVisible(field, formData.custom_fields)) return null;
+                  return (
                   <div key={field.key}>
                     <Label>{field.label}{field.required ? ' *' : ''}</Label>
                     {field.type === 'text' && (
@@ -427,7 +444,8 @@ const EmployeeComplianceTab = ({ employeeId, canEdit, employee }: EmployeeCompli
                       </Select>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
