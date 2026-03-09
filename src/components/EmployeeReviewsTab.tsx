@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, ClipboardCheck, Calendar, CheckCircle, Clock, AlertTriangle, Pencil } from 'lucide-react';
+import { Plus, ClipboardCheck, Calendar, CheckCircle, Clock, AlertTriangle, Pencil, Lock, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useUserCompanyId } from '@/hooks/useUserCompanyId';
@@ -108,11 +108,19 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
 
 
   const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async ({ data, completing }: { data: any; completing: boolean }) => {
       const payload = { ...data };
       if (!payload.review_type_template_id) delete payload.review_type_template_id;
       if (!payload.completed_date) delete payload.completed_date;
       if (!payload.outcome) delete payload.outcome;
+
+      if (completing) {
+        payload.status = 'completed';
+        payload.completed_date = payload.completed_date || new Date().toISOString().split('T')[0];
+      } else if (editingReview && payload.status === 'scheduled') {
+        payload.status = 'in_progress';
+      }
+
       if (editingReview) {
         const { error } = await supabase.from('employee_reviews' as any).update(payload).eq('id', editingReview.id);
         if (error) throw error;
@@ -178,17 +186,19 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
     setFormData(p => ({ ...p, custom_fields: { ...p.custom_fields, [key]: value } }));
   };
 
-  const handleSave = () => {
+  const handleSave = (completing: boolean = false) => {
     if (!formData.review_type) { toast.error('Please select a review type'); return; }
-    if (selectedTemplate) {
+    if (completing && selectedTemplate) {
       for (const f of selectedTemplate.custom_fields) {
         if (f.required && !formData.custom_fields[f.key]) {
           toast.error(`${f.label} is required`); return;
         }
       }
     }
-    saveMutation.mutate(formData);
+    saveMutation.mutate({ data: formData, completing });
   };
+
+  const isCompleted = editingReview?.status === 'completed';
 
   const getStatusBadge = (status: string) => {
     const map: Record<string, { icon: React.ReactNode; className: string }> = {
@@ -270,7 +280,9 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
                           )}
                         </div>
                         {canEdit && (
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
+                            {r.status === 'completed' ? <Eye className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+                          </Button>
                         )}
                       </div>
                     </CardContent>
@@ -285,12 +297,20 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingReview ? 'Edit Review' : 'Add Review'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {isCompleted && <Lock className="w-4 h-4 text-muted-foreground" />}
+              {editingReview ? (isCompleted ? 'View Review' : 'Edit Review') : 'Add Review'}
+            </DialogTitle>
+            {isCompleted && (
+              <p className="text-sm text-muted-foreground">This review has been completed and is locked.</p>
+            )}
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Review Type *</Label>
-              {templates.length > 0 ? (
+              {editingReview ? (
+                <Input value={formData.review_type} disabled className="bg-muted" />
+              ) : templates.length > 0 ? (
                 <Select value={formData.review_type_template_id} onValueChange={handleTypeChange}>
                   <SelectTrigger><SelectValue placeholder="Select type..." /></SelectTrigger>
                   <SelectContent>
@@ -305,17 +325,12 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Status</Label>
-                <Select value={formData.status} onValueChange={(v) => setFormData(p => ({ ...p, status: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s.replace('_', ' ').replace(/^\w/, c => c.toUpperCase())}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Input value={formData.status.replace('_', ' ').replace(/^\w/, c => c.toUpperCase())} disabled className="bg-muted" />
               </div>
               <div>
                 <Label>Outcome</Label>
-                <Select value={formData.outcome} onValueChange={(v) => setFormData(p => ({ ...p, outcome: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select outcome..." /></SelectTrigger>
+                <Select value={formData.outcome} onValueChange={(v) => setFormData(p => ({ ...p, outcome: v }))} disabled={isCompleted}>
+                  <SelectTrigger disabled={isCompleted}><SelectValue placeholder="Select outcome..." /></SelectTrigger>
                   <SelectContent>
                     {(OUTCOMES[formData.category] || OUTCOMES.supervision).map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                   </SelectContent>
@@ -326,11 +341,11 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Scheduled Date</Label>
-                <Input type="date" value={formData.scheduled_date} onChange={(e) => setFormData(p => ({ ...p, scheduled_date: e.target.value }))} />
+                <Input type="date" value={formData.scheduled_date} onChange={(e) => setFormData(p => ({ ...p, scheduled_date: e.target.value }))} disabled={isCompleted} />
               </div>
               <div>
                 <Label>Completed Date</Label>
-                <Input type="date" value={formData.completed_date} onChange={(e) => setFormData(p => ({ ...p, completed_date: e.target.value }))} />
+                <Input type="date" value={formData.completed_date} onChange={(e) => setFormData(p => ({ ...p, completed_date: e.target.value }))} disabled={isCompleted} />
               </div>
             </div>
 
@@ -342,26 +357,26 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
                   <div key={field.key}>
                     <Label>{field.label}{field.required ? ' *' : ''}</Label>
                     {field.type === 'text' && (
-                      <Input value={formData.custom_fields[field.key] || ''} onChange={(e) => setCustomFieldValue(field.key, e.target.value)} />
+                      <Input value={formData.custom_fields[field.key] || ''} onChange={(e) => setCustomFieldValue(field.key, e.target.value)} disabled={isCompleted} />
                     )}
                     {field.type === 'textarea' && (
-                      <Textarea value={formData.custom_fields[field.key] || ''} onChange={(e) => setCustomFieldValue(field.key, e.target.value)} />
+                      <Textarea value={formData.custom_fields[field.key] || ''} onChange={(e) => setCustomFieldValue(field.key, e.target.value)} disabled={isCompleted} />
                     )}
                     {field.type === 'number' && (
-                      <Input type="number" value={formData.custom_fields[field.key] || ''} onChange={(e) => setCustomFieldValue(field.key, e.target.value)} />
+                      <Input type="number" value={formData.custom_fields[field.key] || ''} onChange={(e) => setCustomFieldValue(field.key, e.target.value)} disabled={isCompleted} />
                     )}
                     {field.type === 'date' && (
-                      <Input type="date" value={formData.custom_fields[field.key] || ''} onChange={(e) => setCustomFieldValue(field.key, e.target.value)} />
+                      <Input type="date" value={formData.custom_fields[field.key] || ''} onChange={(e) => setCustomFieldValue(field.key, e.target.value)} disabled={isCompleted} />
                     )}
                     {field.type === 'yes_no' && (
                       <div className="flex items-center gap-3 mt-1">
-                        <Switch checked={formData.custom_fields[field.key] === true} onCheckedChange={(v) => setCustomFieldValue(field.key, v)} />
+                        <Switch checked={formData.custom_fields[field.key] === true} onCheckedChange={(v) => setCustomFieldValue(field.key, v)} disabled={isCompleted} />
                         <span className="text-sm">{formData.custom_fields[field.key] ? 'Yes' : 'No'}</span>
                       </div>
                     )}
                     {field.type === 'select' && field.options && (
-                      <Select value={formData.custom_fields[field.key] || ''} onValueChange={(v) => setCustomFieldValue(field.key, v)}>
-                        <SelectTrigger><SelectValue placeholder={`Select...`} /></SelectTrigger>
+                      <Select value={formData.custom_fields[field.key] || ''} onValueChange={(v) => setCustomFieldValue(field.key, v)} disabled={isCompleted}>
+                        <SelectTrigger disabled={isCompleted}><SelectValue placeholder={`Select...`} /></SelectTrigger>
                         <SelectContent>
                           {field.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                         </SelectContent>
@@ -374,18 +389,27 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
 
             <div>
               <Label>Reviewer Notes</Label>
-              <Textarea value={formData.reviewer_notes} onChange={(e) => setFormData(p => ({ ...p, reviewer_notes: e.target.value }))} />
+              <Textarea value={formData.reviewer_notes} onChange={(e) => setFormData(p => ({ ...p, reviewer_notes: e.target.value }))} disabled={isCompleted} />
             </div>
             <div>
               <Label>Employee Notes</Label>
-              <Textarea value={formData.employee_notes} onChange={(e) => setFormData(p => ({ ...p, employee_notes: e.target.value }))} />
+              <Textarea value={formData.employee_notes} onChange={(e) => setFormData(p => ({ ...p, employee_notes: e.target.value }))} disabled={isCompleted} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeForm}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? 'Saving...' : 'Save'}
-            </Button>
+            {isCompleted ? (
+              <Button variant="outline" onClick={closeForm}>Close</Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={closeForm}>Cancel</Button>
+                <Button variant="secondary" onClick={() => handleSave(false)} disabled={saveMutation.isPending}>
+                  Save for Later
+                </Button>
+                <Button onClick={() => handleSave(true)} disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? 'Saving...' : 'Complete Review'}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
