@@ -220,7 +220,15 @@ const EmployeeComplianceTab = ({ employeeId, canEdit, employee }: EmployeeCompli
     saveMutation.mutate(formData);
   };
 
-  const setCustomFieldValue = (key: string, value: any) => {
+  const isFieldVisible = (field: CustomField, customFieldValues: Record<string, any>) => {
+    if (!field.condition) return true;
+    const currentVal = customFieldValues[field.condition.field_key];
+    if (field.condition.value === 'true') return currentVal === true;
+    if (field.condition.value === 'false') return currentVal === false;
+    return String(currentVal) === field.condition.value;
+  };
+
+
     setFormData(p => ({ ...p, custom_fields: { ...p.custom_fields, [key]: value } }));
   };
 
