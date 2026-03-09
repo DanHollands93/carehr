@@ -228,7 +228,7 @@ const EmployeeComplianceTab = ({ employeeId, canEdit, employee }: EmployeeCompli
     return String(currentVal) === field.condition.value;
   };
 
-
+  const setCustomFieldValue = (key: string, value: any) => {
     setFormData(p => ({ ...p, custom_fields: { ...p.custom_fields, [key]: value } }));
   };
 
