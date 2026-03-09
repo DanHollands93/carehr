@@ -169,10 +169,12 @@ const ComplianceTypeManager = ({ companyId: propCompanyId }: Props) => {
       ...newField,
       key,
       options: newField.type === 'select' ? newFieldOptions.split(',').map(o => o.trim()).filter(Boolean) : undefined,
+      condition: enableCondition && newField.condition?.field_key ? newField.condition : undefined,
     };
     setFormData(p => ({ ...p, custom_fields: [...p.custom_fields, field] }));
-    setNewField({ key: '', label: '', type: 'text', required: false, options: [] });
+    setNewField({ key: '', label: '', type: 'text', required: false, options: [], condition: undefined });
     setNewFieldOptions('');
+    setEnableCondition(false);
   };
 
   const removeCustomField = (idx: number) => {
