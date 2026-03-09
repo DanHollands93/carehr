@@ -76,8 +76,10 @@ const ComplianceTypeManager = ({ companyId: propCompanyId }: Props) => {
     type: 'text',
     required: false,
     options: [],
+    condition: undefined,
   });
   const [newFieldOptions, setNewFieldOptions] = useState('');
+  const [enableCondition, setEnableCondition] = useState(false);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['compliance-type-templates', companyId],
