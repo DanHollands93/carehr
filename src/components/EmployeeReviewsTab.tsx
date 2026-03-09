@@ -186,17 +186,19 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
     setFormData(p => ({ ...p, custom_fields: { ...p.custom_fields, [key]: value } }));
   };
 
-  const handleSave = () => {
+  const handleSave = (completing: boolean = false) => {
     if (!formData.review_type) { toast.error('Please select a review type'); return; }
-    if (selectedTemplate) {
+    if (completing && selectedTemplate) {
       for (const f of selectedTemplate.custom_fields) {
         if (f.required && !formData.custom_fields[f.key]) {
           toast.error(`${f.label} is required`); return;
         }
       }
     }
-    saveMutation.mutate(formData);
+    saveMutation.mutate({ data: formData, completing });
   };
+
+  const isCompleted = editingReview?.status === 'completed';
 
   const getStatusBadge = (status: string) => {
     const map: Record<string, { icon: React.ReactNode; className: string }> = {
