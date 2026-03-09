@@ -14,12 +14,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useUserCompanyId } from '@/hooks/useUserCompanyId';
 
+interface FieldCondition {
+  field_key: string;
+  value: string;
+}
+
 interface CustomField {
   key: string;
   label: string;
   type: 'text' | 'number' | 'date' | 'yes_no' | 'select';
   required: boolean;
   options?: string[];
+  condition?: FieldCondition;
 }
 
 interface ComplianceTemplate {
