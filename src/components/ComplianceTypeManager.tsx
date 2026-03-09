@@ -366,14 +366,86 @@ const ComplianceTypeManager = ({ companyId: propCompanyId }: Props) => {
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Switch checked={newField.required} onCheckedChange={(v) => setNewField(p => ({ ...p, required: v }))} />
-                    <Label className="text-sm">Required</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Switch checked={newField.required} onCheckedChange={(v) => setNewField(p => ({ ...p, required: v }))} />
+                      <Label className="text-sm">Required</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={enableCondition} onCheckedChange={(v) => { setEnableCondition(v); if (!v) setNewField(p => ({ ...p, condition: undefined })); }} />
+                      <Label className="text-sm">Conditional</Label>
+                    </div>
                   </div>
                   <Button size="sm" variant="outline" onClick={addCustomField}>
                     <Plus className="w-3 h-3 mr-1" /> Add Field
                   </Button>
                 </div>
+
+                {/* Condition builder */}
+                {enableCondition && formData.custom_fields.length > 0 && (
+                  <div className="border rounded p-3 space-y-2 bg-background">
+                    <p className="text-xs font-medium text-muted-foreground">Only show this field when:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs">Field</Label>
+                        <Select
+                          value={newField.condition?.field_key || ''}
+                          onValueChange={(v) => setNewField(p => ({ ...p, condition: { field_key: v, value: p.condition?.value || '' } }))}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Select field..." /></SelectTrigger>
+                          <SelectContent>
+                            {formData.custom_fields
+                              .filter(f => f.type === 'select' || f.type === 'yes_no')
+                              .map(f => <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Equals</Label>
+                        {(() => {
+                          const condField = formData.custom_fields.find(f => f.key === newField.condition?.field_key);
+                          if (condField?.type === 'yes_no') {
+                            return (
+                              <Select
+                                value={newField.condition?.value || ''}
+                                onValueChange={(v) => setNewField(p => ({ ...p, condition: { field_key: p.condition?.field_key || '', value: v } }))}
+                              >
+                                <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="true">Yes</SelectItem>
+                                  <SelectItem value="false">No</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            );
+                          }
+                          if (condField?.type === 'select' && condField.options) {
+                            return (
+                              <Select
+                                value={newField.condition?.value || ''}
+                                onValueChange={(v) => setNewField(p => ({ ...p, condition: { field_key: p.condition?.field_key || '', value: v } }))}
+                              >
+                                <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                <SelectContent>
+                                  {condField.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            );
+                          }
+                          return (
+                            <Input
+                              value={newField.condition?.value || ''}
+                              onChange={(e) => setNewField(p => ({ ...p, condition: { field_key: p.condition?.field_key || '', value: e.target.value } }))}
+                              placeholder="Value..."
+                            />
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {enableCondition && formData.custom_fields.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Add a dropdown or yes/no field first to use as a condition source.</p>
+                )}
               </div>
             </div>
           </div>
