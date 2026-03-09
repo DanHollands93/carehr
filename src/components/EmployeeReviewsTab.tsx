@@ -108,11 +108,19 @@ const EmployeeReviewsTab = ({ employeeId, canEdit, initialReviewId }: Props) => 
 
 
   const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async ({ data, completing }: { data: any; completing: boolean }) => {
       const payload = { ...data };
       if (!payload.review_type_template_id) delete payload.review_type_template_id;
       if (!payload.completed_date) delete payload.completed_date;
       if (!payload.outcome) delete payload.outcome;
+
+      if (completing) {
+        payload.status = 'completed';
+        payload.completed_date = payload.completed_date || new Date().toISOString().split('T')[0];
+      } else if (editingReview && payload.status === 'scheduled') {
+        payload.status = 'in_progress';
+      }
+
       if (editingReview) {
         const { error } = await supabase.from('employee_reviews' as any).update(payload).eq('id', editingReview.id);
         if (error) throw error;
