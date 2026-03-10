@@ -1295,6 +1295,83 @@ export type Database = {
           },
         ]
       }
+      pay_rates: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          effective_from: string
+          effective_to: string | null
+          employee_id: string | null
+          employee_job_role_id: string | null
+          id: string
+          job_role_id: string | null
+          pay_rate: number
+          pay_type: string
+          reason: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          effective_from: string
+          effective_to?: string | null
+          employee_id?: string | null
+          employee_job_role_id?: string | null
+          id?: string
+          job_role_id?: string | null
+          pay_rate: number
+          pay_type?: string
+          reason?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          effective_from?: string
+          effective_to?: string | null
+          employee_id?: string | null
+          employee_job_role_id?: string | null
+          id?: string
+          job_role_id?: string | null
+          pay_rate?: number
+          pay_type?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_rates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_rates_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_rates_employee_job_role_id_fkey"
+            columns: ["employee_job_role_id"]
+            isOneToOne: false
+            referencedRelation: "employee_job_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_rates_job_role_id_fkey"
+            columns: ["job_role_id"]
+            isOneToOne: false
+            referencedRelation: "job_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permission_group_permissions: {
         Row: {
           company_id: string | null

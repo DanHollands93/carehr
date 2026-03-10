@@ -1,53 +1,131 @@
 
 
-## Pay Rate History & Job Role Pay Management
+## Multi-Tenancy SaaS Architecture Plan
 
-### Problem
+This is a significant architectural change that transforms CareHR from a single-company app into a multi-tenant SaaS platform. Here is the plan broken into phases.
 
-Currently, pay rates are stored as a single value on `career_history`, `employee_job_roles`, and `job_roles` tables. There is no historical record of pay changes -- when a rate changes, the old value is overwritten. You also cannot apply annual uplifts across roles.
+---
 
-### Solution
+### Core Concept: Row-Level Tenancy
 
-Introduce a **`pay_rates`** table that stores every pay rate change with effective dates, linked to either a job role or an employee-job-role assignment. This gives a full audit trail of pay history and enables uplifts.
+Rather than separate databases per company (not feasible with Supabase), we use **row-level tenancy** — every table gets a `company_id` column, and RLS policies ensure users can only ever see their own company's data. This is the industry-standard approach for SaaS on shared databases and is completely secure.
 
-### Database Changes
+---
 
-**New table: `pay_rates`**
-- `id` (uuid, PK)
-- `company_id` (uuid, FK to companies)
-- `job_role_id` (uuid, nullable, FK to job_roles) -- base rate for the role
-- `employee_job_role_id` (uuid, nullable, FK to employee_job_roles) -- employee-specific override
-- `employee_id` (uuid, nullable, FK to employees) -- for easy querying
-- `pay_rate` (numeric, not null)
-- `pay_type` (text: 'hourly' | 'salary')
-- `currency` (text, default 'GBP')
-- `effective_from` (text, not null) -- date string
-- `effective_to` (text, nullable) -- null = current
-- `reason` (text, nullable) -- e.g. "Annual uplift 2026", "Promotion"
-- `created_by` (uuid, nullable)
-- `created_at` (timestamptz)
+### Phase 1: Company & Module Foundation
 
-RLS: company-scoped, admin/edit_employees to manage, authenticated users can view own company's.
+**Database changes:**
 
-**No existing tables are altered** -- the existing `pay_rate` columns on `career_history`, `employee_job_roles`, and `job_roles` remain for backward compatibility and represent the "current" rate. When a new pay rate record is added, the corresponding table's `pay_rate` column is updated to match.
+1. **`companies` table** — stores each customer company:
+   - `id`, `name`, `slug`, `is_active`, `created_at`, `settings` (JSONB for feature toggles like geo-clock, photo-clock)
 
-### UI Changes
+2. **`company_modules` table** — which modules each company has access to:
+   - `id`, `company_id`, `module_key` (e.g. `rostering`, `hr`, `care_planning`), `is_enabled`, `created_at`
 
-1. **Job Roles settings** -- Add a "Pay Rates" section to each job role showing rate history with an "Add Rate" button. Include an "Apply Uplift" action (percentage or fixed amount) that creates new rate records effective from a chosen date for one or all roles.
+3. **`modules` table** — master list of available modules:
+   - `id`, `key`, `name`, `description`, `is_available`
 
-2. **Employee Details > Career/Employment tab** -- Show pay rate timeline for each role assignment. Allow adding a new rate (effective date + amount + reason). Display history in a table: Rate, Type, Effective From, Effective To, Reason.
+4. **Add `company_id` column** to `profiles` table (linking users to companies)
 
-3. **Employee Form** -- When creating/editing a career history entry, the pay rate saved also creates a `pay_rates` record. Changing pay rate creates a new record rather than overwriting.
+5. **Create `company_settings` table** for per-company feature toggles:
+   - `id`, `company_id`, `setting_key`, `setting_value`, `description`
+   - Keys like: `clock_in_geolocation`, `clock_in_photo`, `require_break_logging`, etc.
 
-4. **Bulk Uplift tool** -- A dedicated action (accessible from Settings or Job Roles) to apply a percentage uplift across all active roles/employees from a given effective date, with preview before confirming.
+6. **Security definer function** `user_company_id(uuid)` that returns the company_id for a user — used in all RLS policies.
+
+**RLS approach:**
+- All existing tables get a `company_id` column over time
+- New RLS policies use `company_id = user_company_id(auth.uid())` to enforce isolation
+- This is done incrementally — we start with the core tables first
+
+---
+
+### Phase 2: Super Admin (System Owner) Layer
+
+**You (the CareHR owner) need a "super admin" role above company admins:**
+
+1. **Add `super_admin` to the `app_role` enum** — or create a separate `platform_roles` table
+2. **Super Admin dashboard pages:**
+   - `/platform/companies` — list, create, edit companies
+   - `/platform/companies/:id/modules` — toggle modules per company
+   - `/platform/companies/:id/settings` — manage company feature toggles
+3. **Super admin bypasses company_id filtering** in RLS (can see all data)
+
+---
+
+### Phase 3: Module-Aware UI
+
+**Sidebar and navigation filtered by company modules:**
+
+1. Map each menu group in `unifiedMenuConfig` to a module key (e.g. "Roster & Time" → `rostering`, "HR & Personal" → `hr`)
+2. Create a `useCompanyModules()` hook that fetches the current company's enabled modules
+3. Sidebar only renders menu groups whose module is enabled for the company
+4. Permission group management UI hides permissions for disabled modules
+5. Settings page only shows feature toggles relevant to enabled modules
+
+---
+
+### Phase 4: Company Feature Settings
+
+**Per-company settings page (for company admins):**
+
+1. A clean settings UI under the existing Settings page with toggle switches:
+   - "Require geolocation on clock-in" (on/off)
+   - "Require photo on clock-in" (on/off)
+   - Future: "Enable break logging", "Require shift acknowledgement", etc.
+2. `useCompanySettings()` hook to fetch and cache these
+3. Time clock and shift components check these settings before requesting location/camera
+
+---
+
+### Phase 5: Migrate Existing Tables
+
+**Add `company_id` to all existing data tables incrementally:**
+- `employees`, `shifts`, `shift_templates`, `roster_templates`, `holiday_requests`, `time_clock_records`, `notifications`, etc.
+- Update all RLS policies to include company_id filtering
+- Update all queries to include company_id context
+
+---
 
 ### Implementation Order
 
-1. Create `pay_rates` table with RLS and company_id trigger
-2. Seed existing pay rates from `career_history` and `employee_job_roles` into the new table
-3. Build `usePayRates` hook for querying pay history
-4. Add pay rate history UI to Employee Details (career tab)
-5. Add pay rate management to Job Roles settings
-6. Add bulk uplift functionality
-7. Update shift creation to pull the correct rate based on effective date
+Given the scale, I recommend building this in stages across multiple conversations:
+
+1. **First: Database foundation** — `companies`, `modules`, `company_modules`, `company_settings` tables + `company_id` on `profiles` + security functions + RLS
+2. **Second: Super admin UI** — company management pages, module toggling
+3. **Third: Module-aware sidebar** — hook + filtering logic
+4. **Fourth: Company settings UI** — feature toggle page for company admins
+5. **Fifth: Migrate existing tables** — add `company_id` progressively to employees, shifts, etc.
+
+---
+
+### Technical Detail
+
+```text
+┌─────────────────────────────────────┐
+│         PLATFORM (Super Admin)       │
+│  - Manage companies                  │
+│  - Assign modules                    │
+│  - View all data                     │
+└──────────────┬──────────────────────┘
+               │
+    ┌──────────┴──────────┐
+    │                     │
+┌───┴───┐           ┌────┴────┐
+│ Co. A │           │  Co. B  │
+│modules│           │ modules │
+│HR,Rost│           │ HR only │
+│settings│          │settings │
+└───┬───┘           └────┬────┘
+    │                    │
+  users                users
+  employees            employees
+  shifts               (no shifts)
+```
+
+Each company's data is isolated by `company_id` in every row. RLS enforces this at the database level — there is zero chance of cross-company data leakage.
+
+---
+
+Shall I start with Phase 1 (database foundation)?
 
