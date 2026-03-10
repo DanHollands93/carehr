@@ -540,8 +540,8 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
               ) : (
                 <div className="text-center py-8 text-muted-foreground">No employment history available</div>
               )}
-            </CardContent>
-          </Card>
+          
+          <PayRateHistory employeeId={employeeId} canEdit={canEdit} />
         </TabsContent>
 
         <TabsContent value="account" className="space-y-6">
