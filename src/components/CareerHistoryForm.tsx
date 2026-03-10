@@ -143,13 +143,39 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
           .eq('id', record.id);
 
         if (error) throw error;
+
+        // If pay rate changed, create a new pay_rates record
+        if (record.pay_rate !== Number(data.pay_rate)) {
+          await supabase.from('pay_rates').insert({
+            employee_id: employeeId,
+            pay_rate: Number(data.pay_rate),
+            pay_type: data.pay_type || 'hourly',
+            currency: data.currency || 'GBP',
+            effective_from: data.start_date,
+            reason: 'Updated via career history edit',
+          });
+        }
+
         toast.success("Career history updated successfully!");
       } else {
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('career_history')
-          .insert(careerData);
+          .insert(careerData)
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Create initial pay_rates record
+        await supabase.from('pay_rates').insert({
+          employee_id: employeeId,
+          pay_rate: Number(data.pay_rate),
+          pay_type: data.pay_type || 'hourly',
+          currency: data.currency || 'GBP',
+          effective_from: data.start_date,
+          reason: 'Initial rate',
+        });
+
         toast.success("Career history added successfully!");
       }
       
