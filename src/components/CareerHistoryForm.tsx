@@ -52,6 +52,7 @@ interface CareerHistoryFormProps {
 
 const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHistoryFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CareerHistoryFormData>();
   const isEditMode = !!record;
 
@@ -60,6 +61,9 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
   const location = watch('location');
   const employmentType = watch('employment_type');
   const contractType = watch('contract_type');
+
+  // Fetch position pay rates for the selected job title
+  const { data: positionPayRates = [] } = usePositionPayRates(jobTitle || undefined);
 
   // Fetch lookup lists from settings
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
