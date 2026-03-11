@@ -233,6 +233,10 @@ const Settings = () => {
         <TabsContent value="reviews">
           <ReviewTypeManager />
         </TabsContent>
+
+        <TabsContent value="job-roles">
+          <JobRolePayRateManager />
+        </TabsContent>
       </Tabs>
     </div>
   );
