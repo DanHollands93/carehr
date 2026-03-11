@@ -434,7 +434,10 @@ export const CareerHistoryEditForm = ({
   onSuccess: (entry: CareerHistoryRecord) => void;
 }) => {
   const [formData, setFormData] = useState<CareerHistoryRecord>(entry);
+  const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
 
+  // Fetch position pay rates for the selected job title
+  const { data: positionPayRates = [] } = usePositionPayRates(formData.job_title || undefined);
   // Fetch lookup lists from settings
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
     queryKey: ['lookup-lists-all'],
