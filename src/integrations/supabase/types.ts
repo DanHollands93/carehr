@@ -1494,6 +1494,53 @@ export type Database = {
           },
         ]
       }
+      position_pay_rates: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          is_active: boolean
+          name: string
+          pay_rate: number
+          pay_type: string
+          position: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          pay_rate: number
+          pay_type?: string
+          position: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          pay_rate?: number
+          pay_type?: string
+          position?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "position_pay_rates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       positions: {
         Row: {
           company_id: string | null
