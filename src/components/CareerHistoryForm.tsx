@@ -551,17 +551,17 @@ export const CareerHistoryEditForm = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <Label htmlFor="pay_type">Pay Type</Label>
               <Select 
                 value={formData.pay_type} 
                 onValueChange={(value) => setFormData({ ...formData, pay_type: value })}
               >
-                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select pay type" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-lg max-h-60 z-50">
                   {lookupsByCategory.pay_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase()}>
                       {type.value}
@@ -569,6 +569,33 @@ export const CareerHistoryEditForm = ({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label>Position Pay Rate</Label>
+              <Select
+                value={selectedPayRateId}
+                onValueChange={(value) => {
+                  setSelectedPayRateId(value);
+                  const selected = positionPayRates.find(r => r.id === value);
+                  if (selected) {
+                    setFormData({ ...formData, pay_rate: selected.pay_rate, pay_type: selected.pay_type });
+                  }
+                }}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder={positionPayRates.length > 0 ? "Select a rate" : "No rates available"} />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border shadow-lg max-h-60 z-50">
+                  {positionPayRates.map((rate) => (
+                    <SelectItem key={rate.id} value={rate.id}>
+                      {rate.name} — £{Number(rate.pay_rate).toFixed(2)}/{rate.pay_type === 'salary' ? 'yr' : 'hr'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {positionPayRates.length === 0 && formData.job_title && (
+                <p className="text-xs text-muted-foreground mt-1">No rates configured for "{formData.job_title}".</p>
+              )}
             </div>
             <div>
               <Label htmlFor="pay_rate">Pay Rate</Label>
