@@ -46,6 +46,7 @@ const Settings = () => {
           <TabsTrigger value="compliance">Compliance Types</TabsTrigger>
           <TabsTrigger value="employee-forms">Employee Forms</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
+          <TabsTrigger value="job-roles">Job Roles & Pay</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
