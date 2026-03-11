@@ -13,6 +13,7 @@ import AutoExceptionsSettings from "@/components/AutoExceptionsSettings";
 import ComplianceTypeManager from "@/components/ComplianceTypeManager";
 import EmployeeFormConfigManager from "@/components/EmployeeFormConfigManager";
 import ReviewTypeManager from "@/components/ReviewTypeManager";
+import JobRolePayRateManager from "@/components/JobRolePayRateManager";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -45,6 +46,7 @@ const Settings = () => {
           <TabsTrigger value="compliance">Compliance Types</TabsTrigger>
           <TabsTrigger value="employee-forms">Employee Forms</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
+          <TabsTrigger value="job-roles">Job Roles & Pay</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -230,6 +232,10 @@ const Settings = () => {
 
         <TabsContent value="reviews">
           <ReviewTypeManager />
+        </TabsContent>
+
+        <TabsContent value="job-roles">
+          <JobRolePayRateManager />
         </TabsContent>
       </Tabs>
     </div>
