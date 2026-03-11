@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { usePositionPayRates, type PositionPayRate } from "@/hooks/usePositionPayRates";
 
 interface CareerHistoryFormData {
   job_title: string;
@@ -51,6 +52,7 @@ interface CareerHistoryFormProps {
 
 const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHistoryFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CareerHistoryFormData>();
   const isEditMode = !!record;
 
@@ -59,6 +61,9 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
   const location = watch('location');
   const employmentType = watch('employment_type');
   const contractType = watch('contract_type');
+
+  // Fetch position pay rates for the selected job title
+  const { data: positionPayRates = [] } = usePositionPayRates(jobTitle || undefined);
 
   // Fetch lookup lists from settings
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
@@ -320,17 +325,17 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <Label htmlFor="pay_type">Pay Type *</Label>
               <Select 
                 value={payType || ''} 
                 onValueChange={(value) => setValue('pay_type', value as any)}
               >
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select pay type" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
                   {lookupsByCategory.pay_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase()}>
                       {type.value}
@@ -338,6 +343,34 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label>Position Pay Rate</Label>
+              <Select
+                value={selectedPayRateId}
+                onValueChange={(value) => {
+                  setSelectedPayRateId(value);
+                  const selected = positionPayRates.find(r => r.id === value);
+                  if (selected) {
+                    setValue('pay_rate', selected.pay_rate);
+                    setValue('pay_type', selected.pay_type as any);
+                  }
+                }}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder={positionPayRates.length > 0 ? "Select a rate" : "No rates for this position"} />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
+                  {positionPayRates.map((rate) => (
+                    <SelectItem key={rate.id} value={rate.id}>
+                      {rate.name} — £{Number(rate.pay_rate).toFixed(2)}/{rate.pay_type === 'salary' ? 'yr' : 'hr'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {positionPayRates.length === 0 && jobTitle && (
+                <p className="text-xs text-muted-foreground mt-1">No rates configured for "{jobTitle}". Set them up in Settings → Job Roles & Pay.</p>
+              )}
             </div>
             <div>
               <Label htmlFor="pay_rate">
@@ -355,7 +388,7 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
                 })}
               />
               {errors.pay_rate && (
-                <p className="text-sm text-red-600 mt-1">{errors.pay_rate.message}</p>
+                <p className="text-sm text-destructive mt-1">{errors.pay_rate.message}</p>
               )}
             </div>
           </div>
@@ -401,7 +434,10 @@ export const CareerHistoryEditForm = ({
   onSuccess: (entry: CareerHistoryRecord) => void;
 }) => {
   const [formData, setFormData] = useState<CareerHistoryRecord>(entry);
+  const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
 
+  // Fetch position pay rates for the selected job title
+  const { data: positionPayRates = [] } = usePositionPayRates(formData.job_title || undefined);
   // Fetch lookup lists from settings
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
     queryKey: ['lookup-lists-all'],
@@ -515,17 +551,17 @@ export const CareerHistoryEditForm = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <Label htmlFor="pay_type">Pay Type</Label>
               <Select 
                 value={formData.pay_type} 
                 onValueChange={(value) => setFormData({ ...formData, pay_type: value })}
               >
-                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select pay type" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-lg max-h-60 z-50">
                   {lookupsByCategory.pay_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase()}>
                       {type.value}
@@ -533,6 +569,33 @@ export const CareerHistoryEditForm = ({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label>Position Pay Rate</Label>
+              <Select
+                value={selectedPayRateId}
+                onValueChange={(value) => {
+                  setSelectedPayRateId(value);
+                  const selected = positionPayRates.find(r => r.id === value);
+                  if (selected) {
+                    setFormData({ ...formData, pay_rate: selected.pay_rate, pay_type: selected.pay_type });
+                  }
+                }}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder={positionPayRates.length > 0 ? "Select a rate" : "No rates available"} />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border shadow-lg max-h-60 z-50">
+                  {positionPayRates.map((rate) => (
+                    <SelectItem key={rate.id} value={rate.id}>
+                      {rate.name} — £{Number(rate.pay_rate).toFixed(2)}/{rate.pay_type === 'salary' ? 'yr' : 'hr'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {positionPayRates.length === 0 && formData.job_title && (
+                <p className="text-xs text-muted-foreground mt-1">No rates configured for "{formData.job_title}".</p>
+              )}
             </div>
             <div>
               <Label htmlFor="pay_rate">Pay Rate</Label>
