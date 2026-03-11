@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { usePositionPayRates, type PositionPayRate } from "@/hooks/usePositionPayRates";
 
 interface CareerHistoryFormData {
   job_title: string;
