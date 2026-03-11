@@ -13,6 +13,7 @@ import AutoExceptionsSettings from "@/components/AutoExceptionsSettings";
 import ComplianceTypeManager from "@/components/ComplianceTypeManager";
 import EmployeeFormConfigManager from "@/components/EmployeeFormConfigManager";
 import ReviewTypeManager from "@/components/ReviewTypeManager";
+import JobRolePayRateManager from "@/components/JobRolePayRateManager";
 
 const Settings = () => {
   const { toast } = useToast();
