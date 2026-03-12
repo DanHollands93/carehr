@@ -505,7 +505,7 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
                             )}
                           </CardContent>
                         </Card>
-                      )))}
+                      ))}
                     </div>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">No employment history available</div>
