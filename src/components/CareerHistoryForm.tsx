@@ -463,6 +463,8 @@ export const CareerHistoryEditForm = ({
 }) => {
   const [formData, setFormData] = useState<CareerHistoryRecord>(entry);
   const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
+  const [payRateEffectiveFrom, setPayRateEffectiveFrom] = useState<string>(new Date().toISOString().split('T')[0]);
+  const originalPayRate = entry.pay_rate;
 
   // Fetch position pay rates for the selected job title
   const { data: positionPayRates = [] } = usePositionPayRates(formData.job_title || undefined);
