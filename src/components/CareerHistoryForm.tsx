@@ -658,6 +658,17 @@ export const CareerHistoryEditForm = ({
             </div>
           </div>
 
+          <div>
+            <Label htmlFor="edit_pay_rate_effective_from">Pay Rate Effective From</Label>
+            <Input
+              id="edit_pay_rate_effective_from"
+              type="date"
+              value={payRateEffectiveFrom}
+              onChange={(e) => setPayRateEffectiveFrom(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-1">Date this pay rate applies from (used for pay history tracking)</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="employment_type">Employment Type</Label>
