@@ -143,15 +143,34 @@ const HoursAnalysisReport = () => {
         console.error('Error fetching time records:', timeError);
       }
       
-      // Get employee career history for pay rates
+      // Get employee pay rates history for date-based lookup
+      const { data: payRatesData } = await supabase
+        .from('pay_rates')
+        .select('employee_id, pay_rate, pay_type, effective_from, effective_to')
+        .in('employee_id', employeeIds)
+        .order('effective_from', { ascending: false });
+
+      // Get career history for job titles only
       const { data: careerHistory } = await supabase
         .from('career_history')
-        .select('employee_id, pay_rate, job_title, job_role_id, start_date, end_date')
+        .select('employee_id, job_title, job_role_id, start_date, end_date')
         .in('employee_id', employeeIds)
         .is('end_date', null);
       
       // Create employee lookup map
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
+
+      // Helper: find the effective pay rate for an employee on a given date
+      const getEffectivePayRate = (empId: string, shiftDate: string): number => {
+        if (!payRatesData) return 0;
+        const empRates = payRatesData.filter(r => r.employee_id === empId);
+        // Find rate where effective_from <= shiftDate and (effective_to is null or effective_to > shiftDate)
+        const effective = empRates.find(r => 
+          r.effective_from <= shiftDate && 
+          (!r.effective_to || r.effective_to > shiftDate)
+        );
+        return effective?.pay_rate || 0;
+      };
       
       // Process the data - create detailed records with time segments
       const processedData: HoursRecord[] = [];
@@ -173,15 +192,9 @@ const HoursAnalysisReport = () => {
         // Get time clock record if exists
         const timeRecord = timeRecords?.find(tr => tr.shift_id === shift.id);
         
-        // Get pay rate - match by job_role_id first, then by job_title matching shift position
-        const employeeCareer = careerHistory?.find(ch => 
-          ch.employee_id === employee.id && shift.job_role_id && ch.job_role_id === shift.job_role_id
-        ) || careerHistory?.find(ch => 
-          ch.employee_id === employee.id && ch.job_title === shift.position
-        ) || careerHistory?.find(ch => 
-          ch.employee_id === employee.id
-        );
-        const payRate = shift.pay_rate || employeeCareer?.pay_rate || 0;
+        // Get pay rate - use shift override first, then date-based lookup from pay_rates table
+        const employeeCareer = careerHistory?.find(ch => ch.employee_id === employee.id);
+        const payRate = shift.pay_rate || getEffectivePayRate(employee.id, shift.date) || 0;
         const jobTitle = shift.position || employeeCareer?.job_title || 'Unknown';
         
         let hasIssue = false;
