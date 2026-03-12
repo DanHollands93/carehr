@@ -69,6 +69,7 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<EmployeeData>>({});
   const [canEdit, setCanEdit] = useState(false);
+  const [employmentSubTab, setEmploymentSubTab] = useState('history');
 
   useEffect(() => {
     const checkPermission = async () => {
@@ -79,7 +80,6 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
     checkPermission();
   }, [user]);
 
-  // Load form configs for this company
   const { data: formConfigs = [] } = useQuery({
     queryKey: ['employee-form-configs', companyId],
     queryFn: async () => {
@@ -100,16 +100,17 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
     return fc || { visible: true, required: false };
   };
 
-  const getCustomFields = (section: string) => {
-    const config = formConfigs.find((c: any) => c.section === section);
-    return ((config as any)?.custom_fields || []) as Array<{ key: string; label: string; type: string; required: boolean; options?: string[] }>;
-  };
-
   const isFieldVisible = (section: string, fieldKey: string) => {
     return getFieldConfig(section, fieldKey).visible !== false;
   };
 
-  const { data: employee, isLoading } = useQuery({
+  const getCustomFields = (section: string) => {
+    const config = formConfigs.find((c: any) => c.section === section);
+    if (!config) return [];
+    return ((config as any).custom_fields || []) as Array<{ key: string; label: string; type: string; options?: string[] }>;
+  };
+
+  const { data: employee, isLoading: isLoadingEmployee } = useQuery({
     queryKey: ['employee', employeeId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -118,14 +119,12 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
         .eq('id', employeeId)
         .single();
       if (error) throw error;
-      return data as unknown as EmployeeData;
+      return data as EmployeeData;
     },
-    enabled: !!employeeId
+    enabled: !!employeeId,
   });
 
-  const { data: careerHistory, refetch: refetchCareer } = useCareerHistory(employeeId);
-
-  const { data: addressHistory } = useQuery({
+  const { data: addressHistory = [] } = useQuery({
     queryKey: ['address-history', employeeId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -134,45 +133,40 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
         .eq('employee_id', employeeId)
         .order('start_date', { ascending: false });
       if (error) throw error;
-      return data as AddressHistory[];
+      return (data || []) as AddressHistory[];
     },
-    enabled: !!employeeId
+    enabled: !!employeeId,
   });
+
+  const { data: careerHistory = [], refetch: refetchCareer } = useCareerHistory(employeeId);
 
   const updateMutation = useMutation({
     mutationFn: async (updates: Partial<EmployeeData>) => {
       const { error } = await supabase
         .from('employees')
-        .update(updates as any)
+        .update(updates)
         .eq('id', employeeId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee', employeeId] });
-      queryClient.invalidateQueries({ queryKey: ['employee-positions'] });
       setIsEditing(false);
-      toast.success('Employee details updated successfully');
+      toast.success("Employee details updated successfully!");
     },
-    onError: (error: any) => {
-      toast.error('Failed to update employee: ' + error.message);
+    onError: () => {
+      toast.error("Failed to update employee details.");
     }
   });
 
+  const handleSave = () => {
+    updateMutation.mutate(editData);
+  };
+
   const startEditing = () => {
-    if (!employee) return;
-    setEditData({
-      first_name: employee.first_name,
-      last_name: employee.last_name,
-      known_as: employee.known_as || '',
-      email: employee.email,
-      work_email: employee.work_email || '',
-      phone_number: employee.phone_number || '',
-      date_of_birth: employee.date_of_birth || '',
-      national_insurance_number: employee.national_insurance_number || '',
-      tax_code: employee.tax_code || '',
-      emergency_contact: employee.emergency_contact || {},
-    });
-    setIsEditing(true);
+    if (employee) {
+      setEditData({ ...employee });
+      setIsEditing(true);
+    }
   };
 
   const cancelEditing = () => {
@@ -180,26 +174,7 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
     setEditData({});
   };
 
-  const saveChanges = () => {
-    updateMutation.mutate(editData);
-  };
-
-  const handleCareerFormSuccess = () => {
-    setShowCareerForm(false);
-    setEditingCareerEntry(null);
-    refetchCareer();
-  };
-
-  const formatDate = (dateString: string | null): string => {
-    if (!dateString) return 'Not provided';
-    try {
-      return new Date(dateString).toLocaleDateString('en-GB');
-    } catch (error) {
-      return 'Invalid date';
-    }
-  };
-
-  const updateField = (field: string, value: string) => {
+  const updateField = (field: string, value: any) => {
     setEditData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -210,42 +185,50 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
     }));
   };
 
-  if (isLoading) {
-    return <div className="text-center py-4">Loading employee details...</div>;
-  }
+  const handleCareerFormSuccess = () => {
+    setShowCareerForm(false);
+    setEditingCareerEntry(null);
+    refetchCareer();
+  };
 
-  if (!employee) {
-    return <div className="text-center py-4">Employee not found.</div>;
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'Not provided';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-GB');
+    } catch {
+      return dateStr;
+    }
+  };
+
+  if (isLoadingEmployee || !employee) {
+    return <div className="text-center py-8">Loading employee details...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue={initialTab || "personal"} className="w-full">
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={employee.profile_picture || ''} />
+              <AvatarFallback className="text-lg">{employee.first_name?.[0]}{employee.last_name?.[0]}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h2 className="text-2xl font-bold">{employee.first_name} {employee.last_name}</h2>
+              <p className="text-muted-foreground">{employee.department || 'No department'}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue={initialTab || "personal"} className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="personal" className="flex items-center gap-2">
-            <User className="w-4 h-4" />
-            Personal
-          </TabsTrigger>
-          <TabsTrigger value="compliance" className="flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            Compliance
-          </TabsTrigger>
-          <TabsTrigger value="reviews" className="flex items-center gap-2">
-            <ClipboardCheck className="w-4 h-4" />
-            Reviews
-          </TabsTrigger>
-          <TabsTrigger value="address" className="flex items-center gap-2">
-            <MapPin className="w-4 h-4" />
-            Address
-          </TabsTrigger>
-          <TabsTrigger value="employment" className="flex items-center gap-2">
-            <Briefcase className="w-4 h-4" />
-            Employment
-          </TabsTrigger>
-          <TabsTrigger value="account" className="flex items-center gap-2">
-            <User className="w-4 h-4" />
-            Account
-          </TabsTrigger>
+          <TabsTrigger value="personal"><User className="w-4 h-4 mr-1 hidden sm:inline" /> Personal</TabsTrigger>
+          <TabsTrigger value="compliance"><Shield className="w-4 h-4 mr-1 hidden sm:inline" /> Compliance</TabsTrigger>
+          <TabsTrigger value="reviews"><ClipboardCheck className="w-4 h-4 mr-1 hidden sm:inline" /> Reviews</TabsTrigger>
+          <TabsTrigger value="address"><MapPin className="w-4 h-4 mr-1 hidden sm:inline" /> Address</TabsTrigger>
+          <TabsTrigger value="employment"><Briefcase className="w-4 h-4 mr-1 hidden sm:inline" /> Employment</TabsTrigger>
+          <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
 
         <TabsContent value="personal" className="space-y-6">
@@ -253,51 +236,32 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div>
-                  <CardTitle>Personal Information</CardTitle>
-                  <CardDescription>Employee's personal details and contact information</CardDescription>
+                  <CardTitle>Personal Details</CardTitle>
+                  <CardDescription>Employee's personal information</CardDescription>
                 </div>
                 {canEdit && !isEditing && (
-                  <Button variant="outline" size="sm" onClick={startEditing}>
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Edit
+                  <Button size="sm" variant="outline" onClick={startEditing}>
+                    <Pencil className="w-4 h-4 mr-2" /> Edit
                   </Button>
                 )}
                 {isEditing && (
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={saveChanges} disabled={updateMutation.isPending}>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save
+                    <Button size="sm" variant="outline" onClick={cancelEditing}>
+                      <X className="w-4 h-4 mr-2" /> Cancel
                     </Button>
-                    <Button variant="outline" size="sm" onClick={cancelEditing}>
-                      <X className="w-4 h-4 mr-2" />
-                      Cancel
+                    <Button size="sm" onClick={handleSave}>
+                      <Save className="w-4 h-4 mr-2" /> Save
                     </Button>
                   </div>
                 )}
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center space-x-4 mb-6">
-                <Avatar className="w-20 h-20">
-                  <AvatarImage src={employee.profile_picture || `https://api.dicebear.com/7.x/lorelei/svg?seed=${employee.first_name + employee.last_name}`} />
-                  <AvatarFallback>{employee.first_name[0]}{employee.last_name[0]}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h2 className="text-2xl font-semibold">
-                    {employee.first_name} {employee.last_name}
-                    {employee.known_as && <span className="text-muted-foreground text-lg ml-2">({employee.known_as})</span>}
-                  </h2>
-                  <p className="text-muted-foreground">{employee.department}</p>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* First Name - always visible */}
                 <div>
                   <Label>First Name</Label>
                   <Input value={isEditing ? editData.first_name || '' : employee.first_name} readOnly={!isEditing} onChange={(e) => updateField('first_name', e.target.value)} />
                 </div>
-                {/* Last Name - always visible */}
                 <div>
                   <Label>Last Name</Label>
                   <Input value={isEditing ? editData.last_name || '' : employee.last_name} readOnly={!isEditing} onChange={(e) => updateField('last_name', e.target.value)} />
@@ -318,7 +282,6 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
                     )}
                   </div>
                 )}
-                {/* Email - always visible */}
                 <div>
                   <Label>Personal Email</Label>
                   <Input value={isEditing ? editData.email || '' : employee.email} readOnly={!isEditing} onChange={(e) => updateField('email', e.target.value)} />
@@ -348,7 +311,6 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
                   </div>
                 )}
 
-                {/* Custom fields for personal_details */}
                 {getCustomFields('personal_details').map(cf => (
                   <div key={cf.key}>
                     <Label>{cf.label}</Label>
@@ -494,68 +456,80 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div>
-                  <CardTitle>Employment History</CardTitle>
-                  <CardDescription>Employee's career progression and employment records</CardDescription>
+                  <CardTitle>Employment</CardTitle>
+                  <CardDescription>Employment history and pay rates</CardDescription>
                 </div>
-                {canEdit && (
-                  <Button size="sm" onClick={() => { setEditingCareerEntry(null); setShowCareerForm(true); }}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Position
-                  </Button>
-                )}
               </div>
             </CardHeader>
             <CardContent>
-              {careerHistory && careerHistory.length > 0 ? (
-                <div className="space-y-4">
-                  {careerHistory.map((entry) => (
-                    <Card key={entry.id} className={!entry.end_date ? 'border-primary' : ''}>
-                      <CardContent className="pt-4">
-                        {!entry.end_date && (
-                          <div className="mb-2">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
-                              Current Position
-                            </span>
-                          </div>
-                        )}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div><Label>Job Title</Label><Input value={entry.job_title} readOnly /></div>
-                          <div><Label>Location</Label><Input value={entry.location} readOnly /></div>
-                          <div><Label>Employment Type</Label><Input value={entry.employment_type} readOnly /></div>
-                          <div><Label>Contract Type</Label><Input value={entry.contract_type} readOnly /></div>
-                          <div><Label>Pay Rate</Label><Input value={`${entry.currency} ${entry.pay_rate} (${entry.pay_type})`} readOnly /></div>
-                          <div><Label>Period</Label><Input value={`${formatDate(entry.start_date)} - ${entry.end_date ? formatDate(entry.end_date) : 'Present'}`} readOnly /></div>
-                        </div>
-                        {canEdit && (
-                          <div className="flex justify-end mt-4 space-x-2">
-                            <Button variant="outline" size="sm" onClick={() => { setEditingCareerEntry(entry); setShowCareerForm(true); }}>
-                              Edit
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">No employment history available</div>
-              )}
+              <Tabs value={employmentSubTab} onValueChange={setEmploymentSubTab}>
+                <TabsList className="mb-4">
+                  <TabsTrigger value="history">Employment History</TabsTrigger>
+                  <TabsTrigger value="pay-rates">Pay Rates</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="history">
+                  <div className="flex justify-end mb-4">
+                    {canEdit && (
+                      <Button size="sm" onClick={() => { setEditingCareerEntry(null); setShowCareerForm(true); }}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Position
+                      </Button>
+                    )}
+                  </div>
+                  {careerHistory && careerHistory.length > 0 ? (
+                    <div className="space-y-4">
+                      {careerHistory.map((entry) => (
+                        <Card key={entry.id} className={!entry.end_date ? 'border-primary' : ''}>
+                          <CardContent className="pt-4">
+                            {!entry.end_date && (
+                              <div className="mb-2">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
+                                  Current Position
+                                </span>
+                              </div>
+                            )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div><Label>Job Title</Label><Input value={entry.job_title} readOnly /></div>
+                              <div><Label>Location</Label><Input value={entry.location} readOnly /></div>
+                              <div><Label>Employment Type</Label><Input value={entry.employment_type} readOnly /></div>
+                              <div><Label>Contract Type</Label><Input value={entry.contract_type} readOnly /></div>
+                              <div><Label>Period</Label><Input value={`${formatDate(entry.start_date)} - ${entry.end_date ? formatDate(entry.end_date) : 'Present'}`} readOnly /></div>
+                            </div>
+                            {canEdit && (
+                              <div className="flex justify-end mt-4 space-x-2">
+                                <Button variant="outline" size="sm" onClick={() => { setEditingCareerEntry(entry); setShowCareerForm(true); }}>
+                                  Edit
+                                </Button>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">No employment history available</div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="pay-rates">
+                  <PayRateHistory employeeId={employeeId} canEdit={canEdit} />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
-          
-          <PayRateHistory employeeId={employeeId} canEdit={canEdit} />
         </TabsContent>
 
         <TabsContent value="account" className="space-y-6">
-          <UserAccountManager 
+          <UserAccountManager
             employee={{
               id: employee.id,
               first_name: employee.first_name,
               last_name: employee.last_name,
               email: employee.email,
               department: employee.department || ''
-            }} 
-            onUpdate={() => {}} 
+            }}
+            onUpdate={() => {}}
           />
         </TabsContent>
       </Tabs>

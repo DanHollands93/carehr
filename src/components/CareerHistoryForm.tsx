@@ -9,22 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { usePositionPayRates, type PositionPayRate } from "@/hooks/usePositionPayRates";
 
 interface CareerHistoryFormData {
   job_title: string;
   location: string;
   start_date: string;
   end_date: string;
-  pay_rate: number;
-  pay_type: 'salary' | 'hourly';
   employment_type: 'permanent' | 'temporary' | 'contract' | 'internship';
   contract_type: 'full_time' | 'part_time' | 'zero_hours';
   hours_per_week: number;
   probation_end_date: string;
   notice_period_weeks: number;
-  currency: string;
-  pay_rate_effective_from: string;
 }
 
 interface CareerHistoryRecord {
@@ -53,19 +48,13 @@ interface CareerHistoryFormProps {
 
 const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHistoryFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CareerHistoryFormData>();
-  const payRateEffectiveFrom = watch('pay_rate_effective_from');
   const isEditMode = !!record;
 
-  const payType = watch('pay_type');
   const jobTitle = watch('job_title');
   const location = watch('location');
   const employmentType = watch('employment_type');
   const contractType = watch('contract_type');
-
-  // Fetch position pay rates for the selected job title
-  const { data: positionPayRates = [] } = usePositionPayRates(jobTitle || undefined);
 
   // Fetch lookup lists from settings
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
@@ -98,22 +87,16 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
       setValue('location', record.location || '');
       setValue('start_date', record.start_date?.split('T')[0] || '');
       setValue('end_date', record.end_date?.split('T')[0] || '');
-      setValue('pay_rate', record.pay_rate || 0);
-      setValue('pay_type', record.pay_type as any || 'salary');
       setValue('employment_type', record.employment_type as any || 'permanent');
       setValue('contract_type', record.contract_type as any || 'full_time');
       setValue('hours_per_week', record.hours_per_week || 40);
       setValue('probation_end_date', record.probation_end_date || '');
       setValue('notice_period_weeks', record.notice_period_weeks || 4);
-      setValue('currency', record.currency || 'GBP');
     } else {
-      // Set defaults for new records
-      setValue('pay_type', 'salary');
       setValue('employment_type', 'permanent');
       setValue('contract_type', 'full_time');
       setValue('hours_per_week', 40);
       setValue('notice_period_weeks', 4);
-      setValue('currency', 'GBP');
     }
   }, [isEditMode, record, setValue]);
 
@@ -121,26 +104,17 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
     setIsSubmitting(true);
     
     try {
-      // Validate required fields
-      if (!data.pay_rate || data.pay_rate <= 0) {
-        toast.error("Pay rate is required and must be greater than 0");
-        return;
-      }
-
       const careerData = {
         employee_id: employeeId,
         job_title: data.job_title,
         location: data.location,
         start_date: data.start_date,
         end_date: data.end_date || null,
-        pay_rate: Number(data.pay_rate),
-        pay_type: data.pay_type,
         employment_type: data.employment_type,
         contract_type: data.contract_type,
         hours_per_week: data.hours_per_week || 40,
         probation_end_date: data.probation_end_date || null,
         notice_period_weeks: data.notice_period_weeks || 4,
-        currency: data.currency || 'GBP'
       };
 
       if (isEditMode && record) {
@@ -150,53 +124,15 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
           .eq('id', record.id);
 
         if (error) throw error;
-
-        // If pay rate changed, create a new pay_rates record
-        if (record.pay_rate !== Number(data.pay_rate)) {
-          // Close previous current rate
-          await supabase
-            .from('pay_rates')
-            .update({ effective_to: data.pay_rate_effective_from || data.start_date })
-            .eq('employee_id', employeeId)
-            .is('effective_to', null);
-
-          await supabase.from('pay_rates').insert({
-            employee_id: employeeId,
-            pay_rate: Number(data.pay_rate),
-            pay_type: data.pay_type || 'hourly',
-            currency: data.currency || 'GBP',
-            effective_from: data.pay_rate_effective_from || data.start_date,
-            reason: 'Updated via career history edit',
-          });
-        }
-
         toast.success("Career history updated successfully!");
       } else {
-        const { data: inserted, error } = await supabase
+        const { error } = await supabase
           .from('career_history')
           .insert(careerData)
           .select()
           .single();
 
         if (error) throw error;
-
-        // Close previous current rate
-        await supabase
-          .from('pay_rates')
-          .update({ effective_to: data.pay_rate_effective_from || data.start_date })
-          .eq('employee_id', employeeId)
-          .is('effective_to', null);
-
-        // Create initial pay_rates record
-        await supabase.from('pay_rates').insert({
-          employee_id: employeeId,
-          pay_rate: Number(data.pay_rate),
-          pay_type: data.pay_type || 'hourly',
-          currency: data.currency || 'GBP',
-          effective_from: data.pay_rate_effective_from || data.start_date,
-          reason: 'Initial rate',
-        });
-
         toast.success("Career history added successfully!");
       }
       
@@ -236,10 +172,10 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
                 value={jobTitle || ''} 
                 onValueChange={(value) => setValue('job_title', value)}
               >
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select job title" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
                   {lookupsByCategory.positions?.map((position) => (
                     <SelectItem key={position.id} value={position.value}>
                       {position.value}
@@ -248,7 +184,7 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
                 </SelectContent>
               </Select>
               {errors.job_title && (
-                <p className="text-sm text-red-600 mt-1">{errors.job_title.message}</p>
+                <p className="text-sm text-destructive mt-1">{errors.job_title.message}</p>
               )}
             </div>
             <div>
@@ -257,10 +193,10 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
                 value={location || ''} 
                 onValueChange={(value) => setValue('location', value)}
               >
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select work location" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
                   {lookupsByCategory.locations?.map((location) => (
                     <SelectItem key={location.id} value={location.value}>
                       {location.value}
@@ -269,7 +205,7 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
                 </SelectContent>
               </Select>
               {errors.location && (
-                <p className="text-sm text-red-600 mt-1">{errors.location.message}</p>
+                <p className="text-sm text-destructive mt-1">{errors.location.message}</p>
               )}
             </div>
           </div>
@@ -283,7 +219,7 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
                 {...register("start_date", { required: "Start date is required" })}
               />
               {errors.start_date && (
-                <p className="text-sm text-red-600 mt-1">{errors.start_date.message}</p>
+                <p className="text-sm text-destructive mt-1">{errors.start_date.message}</p>
               )}
             </div>
             <div>
@@ -299,10 +235,10 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
                 value={employmentType || ''} 
                 onValueChange={(value) => setValue('employment_type', value as any)}
               >
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
                   {lookupsByCategory.employment_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase()}>
                       {type.value}
@@ -317,10 +253,10 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
                 value={contractType || ''} 
                 onValueChange={(value) => setValue('contract_type', value as any)}
               >
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-md max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
                   {lookupsByCategory.contract_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase().replace(' ', '_')}>
                       {type.value}
@@ -341,87 +277,7 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="pay_type">Pay Type *</Label>
-              <Select 
-                value={payType || ''} 
-                onValueChange={(value) => setValue('pay_type', value as any)}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Select pay type" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
-                  {lookupsByCategory.pay_types?.map((type) => (
-                    <SelectItem key={type.id} value={type.value.toLowerCase()}>
-                      {type.value}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Position Pay Rate</Label>
-              <Select
-                value={selectedPayRateId}
-                onValueChange={(value) => {
-                  setSelectedPayRateId(value);
-                  const selected = positionPayRates.find(r => r.id === value);
-                  if (selected) {
-                    setValue('pay_rate', selected.pay_rate);
-                    setValue('pay_type', selected.pay_type as any);
-                  }
-                }}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder={positionPayRates.length > 0 ? "Select a rate" : "No rates for this position"} />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
-                  {positionPayRates.map((rate) => (
-                    <SelectItem key={rate.id} value={rate.id}>
-                      {rate.name} — £{Number(rate.pay_rate).toFixed(2)}/{rate.pay_type === 'salary' ? 'yr' : 'hr'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {positionPayRates.length === 0 && jobTitle && (
-                <p className="text-xs text-muted-foreground mt-1">No rates configured for "{jobTitle}". Set them up in Settings → Job Roles & Pay.</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="pay_rate">
-                {payType === 'hourly' ? 'Hourly Rate (£) *' : 'Annual Salary (£) *'}
-              </Label>
-              <Input
-                id="pay_rate"
-                type="number"
-                step="0.01"
-                min="0.01"
-                {...register("pay_rate", { 
-                  required: "Pay rate is required",
-                  valueAsNumber: true,
-                  min: { value: 0.01, message: "Pay rate must be greater than 0" }
-                })}
-              />
-              {errors.pay_rate && (
-                <p className="text-sm text-destructive mt-1">{errors.pay_rate.message}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="pay_rate_effective_from">Pay Rate Effective From *</Label>
-              <Input
-                id="pay_rate_effective_from"
-                type="date"
-                {...register("pay_rate_effective_from", { required: "Pay rate effective date is required" })}
-              />
-              {errors.pay_rate_effective_from && (
-                <p className="text-sm text-destructive mt-1">{errors.pay_rate_effective_from.message}</p>
-              )}
-              <p className="text-xs text-muted-foreground mt-1">Date this pay rate applies from</p>
-            </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="probation_end_date">Probation End Date</Label>
               <Input id="probation_end_date" type="date" {...register("probation_end_date")} />
@@ -462,13 +318,7 @@ export const CareerHistoryEditForm = ({
   onSuccess: (entry: CareerHistoryRecord) => void;
 }) => {
   const [formData, setFormData] = useState<CareerHistoryRecord>(entry);
-  const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
-  const [payRateEffectiveFrom, setPayRateEffectiveFrom] = useState<string>(new Date().toISOString().split('T')[0]);
-  const originalPayRate = entry.pay_rate;
 
-  // Fetch position pay rates for the selected job title
-  const { data: positionPayRates = [] } = usePositionPayRates(formData.job_title || undefined);
-  // Fetch lookup lists from settings
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
     queryKey: ['lookup-lists-all'],
     queryFn: async () => {
@@ -483,7 +333,6 @@ export const CareerHistoryEditForm = ({
     }
   });
 
-  // Group lookup lists by category
   const lookupsByCategory = lookupLists.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
@@ -499,8 +348,6 @@ export const CareerHistoryEditForm = ({
         .update({
           job_title: formData.job_title,
           location: formData.location,
-          pay_rate: formData.pay_rate,
-          pay_type: formData.pay_type,
           employment_type: formData.employment_type,
           contract_type: formData.contract_type,
           hours_per_week: formData.hours_per_week,
@@ -512,25 +359,6 @@ export const CareerHistoryEditForm = ({
         .eq('id', formData.id);
 
       if (error) throw error;
-
-      // If pay rate changed, create a pay_rates history record
-      if (originalPayRate !== formData.pay_rate) {
-        // Close previous current rate
-        await supabase
-          .from('pay_rates')
-          .update({ effective_to: payRateEffectiveFrom })
-          .eq('employee_id', formData.employee_id)
-          .is('effective_to', null);
-
-        await supabase.from('pay_rates').insert({
-          employee_id: formData.employee_id,
-          pay_rate: formData.pay_rate,
-          pay_type: formData.pay_type || 'hourly',
-          currency: formData.currency || 'GBP',
-          effective_from: payRateEffectiveFrom,
-          reason: 'Updated via career history edit',
-        });
-      }
       
       toast.success("Career history updated successfully!");
       onSuccess(formData);
@@ -567,10 +395,10 @@ export const CareerHistoryEditForm = ({
                 value={formData.job_title} 
                 onValueChange={(value) => setFormData({ ...formData, job_title: value })}
               >
-                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select job title" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
                   {lookupsByCategory.positions?.map((position) => (
                     <SelectItem key={position.id} value={position.value}>
                       {position.value}
@@ -586,10 +414,10 @@ export const CareerHistoryEditForm = ({
                 value={formData.location} 
                 onValueChange={(value) => setFormData({ ...formData, location: value })}
               >
-                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select work location" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
                   {lookupsByCategory.locations?.map((location) => (
                     <SelectItem key={location.id} value={location.value}>
                       {location.value}
@@ -600,75 +428,6 @@ export const CareerHistoryEditForm = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="pay_type">Pay Type</Label>
-              <Select 
-                value={formData.pay_type} 
-                onValueChange={(value) => setFormData({ ...formData, pay_type: value })}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Select pay type" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border shadow-lg max-h-60 z-50">
-                  {lookupsByCategory.pay_types?.map((type) => (
-                    <SelectItem key={type.id} value={type.value.toLowerCase()}>
-                      {type.value}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Position Pay Rate</Label>
-              <Select
-                value={selectedPayRateId}
-                onValueChange={(value) => {
-                  setSelectedPayRateId(value);
-                  const selected = positionPayRates.find(r => r.id === value);
-                  if (selected) {
-                    setFormData({ ...formData, pay_rate: selected.pay_rate, pay_type: selected.pay_type });
-                  }
-                }}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder={positionPayRates.length > 0 ? "Select a rate" : "No rates available"} />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border shadow-lg max-h-60 z-50">
-                  {positionPayRates.map((rate) => (
-                    <SelectItem key={rate.id} value={rate.id}>
-                      {rate.name} — £{Number(rate.pay_rate).toFixed(2)}/{rate.pay_type === 'salary' ? 'yr' : 'hr'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {positionPayRates.length === 0 && formData.job_title && (
-                <p className="text-xs text-muted-foreground mt-1">No rates configured for "{formData.job_title}".</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="pay_rate">Pay Rate</Label>
-              <Input
-                id="pay_rate"
-                type="number"
-                step="0.01"
-                value={formData.pay_rate}
-                onChange={(e) => setFormData({ ...formData, pay_rate: parseFloat(e.target.value) })}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="edit_pay_rate_effective_from">Pay Rate Effective From</Label>
-            <Input
-              id="edit_pay_rate_effective_from"
-              type="date"
-              value={payRateEffectiveFrom}
-              onChange={(e) => setPayRateEffectiveFrom(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground mt-1">Date this pay rate applies from (used for pay history tracking)</p>
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="employment_type">Employment Type</Label>
@@ -676,10 +435,10 @@ export const CareerHistoryEditForm = ({
                 value={formData.employment_type} 
                 onValueChange={(value) => setFormData({ ...formData, employment_type: value })}
               >
-                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select employment type" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
                   {lookupsByCategory.employment_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase()}>
                       {type.value}
@@ -694,10 +453,10 @@ export const CareerHistoryEditForm = ({
                 value={formData.contract_type} 
                 onValueChange={(value) => setFormData({ ...formData, contract_type: value })}
               >
-                <SelectTrigger className="bg-white border border-gray-300 shadow-sm z-10">
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select contract type" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border shadow-lg max-h-60 z-50">
+                <SelectContent className="bg-popover border shadow-md max-h-60 z-50">
                   {lookupsByCategory.contract_types?.map((type) => (
                     <SelectItem key={type.id} value={type.value.toLowerCase().replace(' ', '_')}>
                       {type.value}
@@ -776,7 +535,7 @@ export const CareerHistoryEditForm = ({
   );
 };
 
-// Simple address form component - now without Card wrapper since it's in a dialog
+// Simple address form component
 const AddressForm = ({ onClose, onSave }: { onClose: () => void; onSave: (data: any) => void }) => {
   const [addressData, setAddressData] = useState({
     line_1: '',
