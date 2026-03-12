@@ -24,6 +24,7 @@ interface CareerHistoryFormData {
   probation_end_date: string;
   notice_period_weeks: number;
   currency: string;
+  pay_rate_effective_from: string;
 }
 
 interface CareerHistoryRecord {
@@ -54,6 +55,7 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CareerHistoryFormData>();
+  const payRateEffectiveFrom = watch('pay_rate_effective_from');
   const isEditMode = !!record;
 
   const payType = watch('pay_type');
@@ -151,12 +153,19 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
 
         // If pay rate changed, create a new pay_rates record
         if (record.pay_rate !== Number(data.pay_rate)) {
+          // Close previous current rate
+          await supabase
+            .from('pay_rates')
+            .update({ effective_to: data.pay_rate_effective_from || data.start_date })
+            .eq('employee_id', employeeId)
+            .is('effective_to', null);
+
           await supabase.from('pay_rates').insert({
             employee_id: employeeId,
             pay_rate: Number(data.pay_rate),
             pay_type: data.pay_type || 'hourly',
             currency: data.currency || 'GBP',
-            effective_from: data.start_date,
+            effective_from: data.pay_rate_effective_from || data.start_date,
             reason: 'Updated via career history edit',
           });
         }
@@ -171,13 +180,20 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
 
         if (error) throw error;
 
+        // Close previous current rate
+        await supabase
+          .from('pay_rates')
+          .update({ effective_to: data.pay_rate_effective_from || data.start_date })
+          .eq('employee_id', employeeId)
+          .is('effective_to', null);
+
         // Create initial pay_rates record
         await supabase.from('pay_rates').insert({
           employee_id: employeeId,
           pay_rate: Number(data.pay_rate),
           pay_type: data.pay_type || 'hourly',
           currency: data.currency || 'GBP',
-          effective_from: data.start_date,
+          effective_from: data.pay_rate_effective_from || data.start_date,
           reason: 'Initial rate',
         });
 
@@ -393,7 +409,19 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="pay_rate_effective_from">Pay Rate Effective From *</Label>
+              <Input
+                id="pay_rate_effective_from"
+                type="date"
+                {...register("pay_rate_effective_from", { required: "Pay rate effective date is required" })}
+              />
+              {errors.pay_rate_effective_from && (
+                <p className="text-sm text-destructive mt-1">{errors.pay_rate_effective_from.message}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">Date this pay rate applies from</p>
+            </div>
             <div>
               <Label htmlFor="probation_end_date">Probation End Date</Label>
               <Input id="probation_end_date" type="date" {...register("probation_end_date")} />
@@ -435,6 +463,8 @@ export const CareerHistoryEditForm = ({
 }) => {
   const [formData, setFormData] = useState<CareerHistoryRecord>(entry);
   const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
+  const [payRateEffectiveFrom, setPayRateEffectiveFrom] = useState<string>(new Date().toISOString().split('T')[0]);
+  const originalPayRate = entry.pay_rate;
 
   // Fetch position pay rates for the selected job title
   const { data: positionPayRates = [] } = usePositionPayRates(formData.job_title || undefined);
@@ -482,6 +512,25 @@ export const CareerHistoryEditForm = ({
         .eq('id', formData.id);
 
       if (error) throw error;
+
+      // If pay rate changed, create a pay_rates history record
+      if (originalPayRate !== formData.pay_rate) {
+        // Close previous current rate
+        await supabase
+          .from('pay_rates')
+          .update({ effective_to: payRateEffectiveFrom })
+          .eq('employee_id', formData.employee_id)
+          .is('effective_to', null);
+
+        await supabase.from('pay_rates').insert({
+          employee_id: formData.employee_id,
+          pay_rate: formData.pay_rate,
+          pay_type: formData.pay_type || 'hourly',
+          currency: formData.currency || 'GBP',
+          effective_from: payRateEffectiveFrom,
+          reason: 'Updated via career history edit',
+        });
+      }
       
       toast.success("Career history updated successfully!");
       onSuccess(formData);
@@ -607,6 +656,17 @@ export const CareerHistoryEditForm = ({
                 onChange={(e) => setFormData({ ...formData, pay_rate: parseFloat(e.target.value) })}
               />
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="edit_pay_rate_effective_from">Pay Rate Effective From</Label>
+            <Input
+              id="edit_pay_rate_effective_from"
+              type="date"
+              value={payRateEffectiveFrom}
+              onChange={(e) => setPayRateEffectiveFrom(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-1">Date this pay rate applies from (used for pay history tracking)</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
