@@ -55,6 +55,7 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CareerHistoryFormData>();
+  const payRateEffectiveFrom = watch('pay_rate_effective_from');
   const isEditMode = !!record;
 
   const payType = watch('pay_type');
