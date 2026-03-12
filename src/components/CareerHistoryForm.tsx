@@ -24,6 +24,7 @@ interface CareerHistoryFormData {
   probation_end_date: string;
   notice_period_weeks: number;
   currency: string;
+  pay_rate_effective_from: string;
 }
 
 interface CareerHistoryRecord {
