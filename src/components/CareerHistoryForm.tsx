@@ -153,12 +153,19 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
 
         // If pay rate changed, create a new pay_rates record
         if (record.pay_rate !== Number(data.pay_rate)) {
+          // Close previous current rate
+          await supabase
+            .from('pay_rates')
+            .update({ effective_to: data.pay_rate_effective_from || data.start_date })
+            .eq('employee_id', employeeId)
+            .is('effective_to', null);
+
           await supabase.from('pay_rates').insert({
             employee_id: employeeId,
             pay_rate: Number(data.pay_rate),
             pay_type: data.pay_type || 'hourly',
             currency: data.currency || 'GBP',
-            effective_from: data.start_date,
+            effective_from: data.pay_rate_effective_from || data.start_date,
             reason: 'Updated via career history edit',
           });
         }
