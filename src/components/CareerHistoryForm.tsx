@@ -409,7 +409,7 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <Label htmlFor="pay_rate_effective_from">Pay Rate Effective From *</Label>
               <Input
@@ -420,10 +420,8 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
               {errors.pay_rate_effective_from && (
                 <p className="text-sm text-destructive mt-1">{errors.pay_rate_effective_from.message}</p>
               )}
-              <p className="text-xs text-muted-foreground mt-1">Date from which this pay rate applies</p>
+              <p className="text-xs text-muted-foreground mt-1">Date this pay rate applies from</p>
             </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="probation_end_date">Probation End Date</Label>
               <Input id="probation_end_date" type="date" {...register("probation_end_date")} />
