@@ -512,6 +512,25 @@ export const CareerHistoryEditForm = ({
         .eq('id', formData.id);
 
       if (error) throw error;
+
+      // If pay rate changed, create a pay_rates history record
+      if (originalPayRate !== formData.pay_rate) {
+        // Close previous current rate
+        await supabase
+          .from('pay_rates')
+          .update({ effective_to: payRateEffectiveFrom })
+          .eq('employee_id', formData.employee_id)
+          .is('effective_to', null);
+
+        await supabase.from('pay_rates').insert({
+          employee_id: formData.employee_id,
+          pay_rate: formData.pay_rate,
+          pay_type: formData.pay_type || 'hourly',
+          currency: formData.currency || 'GBP',
+          effective_from: payRateEffectiveFrom,
+          reason: 'Updated via career history edit',
+        });
+      }
       
       toast.success("Career history updated successfully!");
       onSuccess(formData);
