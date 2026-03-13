@@ -160,11 +160,22 @@ const HoursAnalysisReport = () => {
       // Create employee lookup map
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
 
-      // Helper: find the effective pay rate for an employee on a given date
-      const getEffectivePayRate = (empId: string, shiftDate: string): number => {
+      // Helper: find the effective pay rate for an employee on a given date, optionally scoped to a job role
+      const getEffectivePayRate = (empId: string, shiftDate: string, jobRoleId?: string): number => {
         if (!payRatesData) return 0;
         const empRates = payRatesData.filter(r => r.employee_id === empId);
-        // Find rate where effective_from <= shiftDate and (effective_to is null or effective_to > shiftDate)
+        
+        // First try to find a rate matching the specific job role
+        if (jobRoleId) {
+          const roleRate = empRates.find(r => 
+            r.job_role_id === jobRoleId &&
+            r.effective_from <= shiftDate && 
+            (!r.effective_to || r.effective_to > shiftDate)
+          );
+          if (roleRate) return roleRate.pay_rate;
+        }
+        
+        // Fallback: any rate for this employee on this date
         const effective = empRates.find(r => 
           r.effective_from <= shiftDate && 
           (!r.effective_to || r.effective_to > shiftDate)
