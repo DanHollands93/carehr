@@ -66,12 +66,19 @@ export const useAddPayRate = () => {
       effective_from: string;
       reason?: string;
     }) => {
-      // Close previous current rate by setting effective_to
-      if (payRate.employee_id) {
+      // Close previous current rate scoped to the specific employee_job_role
+      if (payRate.employee_job_role_id) {
+        await supabase
+          .from('pay_rates')
+          .update({ effective_to: payRate.effective_from })
+          .eq('employee_job_role_id', payRate.employee_job_role_id)
+          .is('effective_to', null);
+      } else if (payRate.employee_id) {
         await supabase
           .from('pay_rates')
           .update({ effective_to: payRate.effective_from })
           .eq('employee_id', payRate.employee_id)
+          .is('employee_job_role_id', null)
           .is('effective_to', null);
       } else if (payRate.job_role_id && !payRate.employee_id) {
         await supabase

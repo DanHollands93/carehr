@@ -143,10 +143,10 @@ const HoursAnalysisReport = () => {
         console.error('Error fetching time records:', timeError);
       }
       
-      // Get employee pay rates history for date-based lookup
+      // Get employee pay rates history for date-based lookup (includes employee_job_role_id and job_role_id)
       const { data: payRatesData } = await supabase
         .from('pay_rates')
-        .select('employee_id, pay_rate, pay_type, effective_from, effective_to')
+        .select('employee_id, employee_job_role_id, job_role_id, pay_rate, pay_type, effective_from, effective_to')
         .in('employee_id', employeeIds)
         .order('effective_from', { ascending: false });
 
@@ -160,11 +160,22 @@ const HoursAnalysisReport = () => {
       // Create employee lookup map
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
 
-      // Helper: find the effective pay rate for an employee on a given date
-      const getEffectivePayRate = (empId: string, shiftDate: string): number => {
+      // Helper: find the effective pay rate for an employee on a given date, optionally scoped to a job role
+      const getEffectivePayRate = (empId: string, shiftDate: string, jobRoleId?: string): number => {
         if (!payRatesData) return 0;
         const empRates = payRatesData.filter(r => r.employee_id === empId);
-        // Find rate where effective_from <= shiftDate and (effective_to is null or effective_to > shiftDate)
+        
+        // First try to find a rate matching the specific job role
+        if (jobRoleId) {
+          const roleRate = empRates.find(r => 
+            r.job_role_id === jobRoleId &&
+            r.effective_from <= shiftDate && 
+            (!r.effective_to || r.effective_to > shiftDate)
+          );
+          if (roleRate) return roleRate.pay_rate;
+        }
+        
+        // Fallback: any rate for this employee on this date
         const effective = empRates.find(r => 
           r.effective_from <= shiftDate && 
           (!r.effective_to || r.effective_to > shiftDate)
@@ -194,7 +205,7 @@ const HoursAnalysisReport = () => {
         
         // Get pay rate - use shift override first, then date-based lookup from pay_rates table
         const employeeCareer = careerHistory?.find(ch => ch.employee_id === employee.id);
-        const payRate = shift.pay_rate || getEffectivePayRate(employee.id, shift.date) || 0;
+        const payRate = shift.pay_rate || getEffectivePayRate(employee.id, shift.date, shift.job_role_id) || 0;
         const jobTitle = shift.position || employeeCareer?.job_title || 'Unknown';
         
         let hasIssue = false;
