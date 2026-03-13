@@ -205,7 +205,7 @@ const HoursAnalysisReport = () => {
         
         // Get pay rate - use shift override first, then date-based lookup from pay_rates table
         const employeeCareer = careerHistory?.find(ch => ch.employee_id === employee.id);
-        const payRate = shift.pay_rate || getEffectivePayRate(employee.id, shift.date) || 0;
+        const payRate = shift.pay_rate || getEffectivePayRate(employee.id, shift.date, shift.job_role_id) || 0;
         const jobTitle = shift.position || employeeCareer?.job_title || 'Unknown';
         
         let hasIssue = false;
