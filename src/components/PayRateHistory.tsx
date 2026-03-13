@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { PoundSterling, RefreshCw } from "lucide-react";
-import { usePayRates, useAddPayRate } from "@/hooks/usePayRates";
+import { usePayRates, useAddPayRate, PayRate } from "@/hooks/usePayRates";
+import { useEmployeeJobRoles } from "@/hooks/useEmployeeJobRoles";
 import { usePositionPayRates } from "@/hooks/usePositionPayRates";
-import { useCareerHistory } from "@/hooks/useCareerHistory";
 import { toast } from "sonner";
 
 interface PayRateHistoryProps {
@@ -19,68 +20,107 @@ interface PayRateHistoryProps {
 
 const PayRateHistory = ({ employeeId, canEdit }: PayRateHistoryProps) => {
   const { data: payRates = [], isLoading } = usePayRates(employeeId);
-  const { data: careerHistory = [] } = useCareerHistory(employeeId);
-  const addPayRate = useAddPayRate();
-  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
-
-  // Get unique positions from career history
-  const positions = [...new Set(careerHistory.map(ch => ch.job_title).filter(Boolean))];
+  const { data: employeeJobRoles = [] } = useEmployeeJobRoles(employeeId);
+  const [updateRoleId, setUpdateRoleId] = useState<string | null>(null);
 
   const formatDate = (d: string) => {
     if (!d) return '-';
     try { return new Date(d).toLocaleDateString('en-GB'); } catch { return d; }
   };
 
+  // Group pay rates by employee_job_role_id
+  const getRatesForRole = (ejrId: string) =>
+    payRates.filter(r => r.employee_job_role_id === ejrId);
+
+  const getCurrentRate = (ejrId: string): PayRate | undefined =>
+    payRates.find(r => r.employee_job_role_id === ejrId && !r.effective_to);
+
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading pay history...</div>;
 
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-base font-semibold flex items-center gap-2">
-          <PoundSterling className="w-4 h-4" />
-          Pay Rate History
-        </h3>
-        {canEdit && (
-          <Button size="sm" onClick={() => setShowUpdateDialog(true)}>
-            <RefreshCw className="w-4 h-4 mr-1" /> Update Pay Rate
-          </Button>
-        )}
+  if (employeeJobRoles.length === 0) {
+    return (
+      <div className="text-center py-6 text-muted-foreground text-sm border rounded-md">
+        No active job roles assigned. Add a job role first, then assign pay rates.
       </div>
+    );
+  }
 
-      {payRates.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Rate</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>From</TableHead>
-              <TableHead>To</TableHead>
-              <TableHead>Reason</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {payRates.map((rate) => (
-              <TableRow key={rate.id}>
-                <TableCell className="font-medium">{rate.currency} {Number(rate.pay_rate).toFixed(2)}</TableCell>
-                <TableCell className="capitalize">{rate.pay_type}</TableCell>
-                <TableCell>{formatDate(rate.effective_from)}</TableCell>
-                <TableCell>{rate.effective_to ? formatDate(rate.effective_to) : <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Current</span>}</TableCell>
-                <TableCell className="text-muted-foreground">{rate.reason || '-'}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : (
-        <div className="text-center py-4 text-muted-foreground text-sm border rounded-md">No pay rate history recorded. Click "Update Pay Rate" to add one.</div>
-      )}
+  return (
+    <div className="space-y-6">
+      {employeeJobRoles.map((ejr) => {
+        const roleRates = getRatesForRole(ejr.id);
+        const currentRate = getCurrentRate(ejr.id);
+        const roleTitle = ejr.job_roles?.title || 'Unknown Role';
 
-      {showUpdateDialog && (
+        return (
+          <Card key={ejr.id}>
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <PoundSterling className="w-4 h-4" />
+                    {roleTitle}
+                  </CardTitle>
+                  {ejr.is_primary && <Badge variant="secondary" className="text-xs">Primary</Badge>}
+                </div>
+                <div className="flex items-center gap-3">
+                  {currentRate ? (
+                    <span className="text-sm font-medium text-foreground">
+                      Current: {currentRate.currency} {Number(currentRate.pay_rate).toFixed(2)}/{currentRate.pay_type === 'salary' ? 'yr' : 'hr'}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">No rate set</span>
+                  )}
+                  {canEdit && (
+                    <Button size="sm" variant="outline" onClick={() => setUpdateRoleId(ejr.id)}>
+                      <RefreshCw className="w-3 h-3 mr-1" /> {currentRate ? 'Update' : 'Set Rate'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            {roleRates.length > 0 && (
+              <CardContent className="pt-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Rate</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>From</TableHead>
+                      <TableHead>To</TableHead>
+                      <TableHead>Reason</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {roleRates.map((rate) => (
+                      <TableRow key={rate.id}>
+                        <TableCell className="font-medium">{rate.currency} {Number(rate.pay_rate).toFixed(2)}</TableCell>
+                        <TableCell className="capitalize">{rate.pay_type}</TableCell>
+                        <TableCell>{formatDate(rate.effective_from)}</TableCell>
+                        <TableCell>
+                          {rate.effective_to ? formatDate(rate.effective_to) : (
+                            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Current</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{rate.reason || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            )}
+          </Card>
+        );
+      })}
+
+      {updateRoleId && (
         <UpdatePayRateDialog
           employeeId={employeeId}
-          positions={positions}
-          onClose={() => setShowUpdateDialog(false)}
+          employeeJobRoleId={updateRoleId}
+          jobRoleTitle={employeeJobRoles.find(r => r.id === updateRoleId)?.job_roles?.title || ''}
+          onClose={() => setUpdateRoleId(null)}
           onSuccess={() => {
-            setShowUpdateDialog(false);
+            setUpdateRoleId(null);
             toast.success("Pay rate updated successfully");
           }}
         />
@@ -89,22 +129,22 @@ const PayRateHistory = ({ employeeId, canEdit }: PayRateHistoryProps) => {
   );
 };
 
-// Dialog for updating/adding a pay rate
 const UpdatePayRateDialog = ({
   employeeId,
-  positions,
+  employeeJobRoleId,
+  jobRoleTitle,
   onClose,
   onSuccess,
 }: {
   employeeId: string;
-  positions: string[];
+  employeeJobRoleId: string;
+  jobRoleTitle: string;
   onClose: () => void;
   onSuccess: () => void;
 }) => {
   const addPayRate = useAddPayRate();
-  const [selectedPosition, setSelectedPosition] = useState<string>(positions[0] || '');
-  const { data: positionPayRates = [] } = usePositionPayRates(selectedPosition || undefined);
-  const [selectedPayRateId, setSelectedPayRateId] = useState<string>('');
+  const { data: positionPayRates = [] } = usePositionPayRates(jobRoleTitle || undefined);
+  const [selectedPayRateId, setSelectedPayRateId] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().split('T')[0]);
   const [customRate, setCustomRate] = useState('');
   const [customPayType, setCustomPayType] = useState('hourly');
@@ -129,11 +169,12 @@ const UpdatePayRateDialog = ({
     try {
       await addPayRate.mutateAsync({
         employee_id: employeeId,
+        employee_job_role_id: employeeJobRoleId,
         pay_rate: rate,
         pay_type: payType,
         currency: 'GBP',
         effective_from: effectiveFrom,
-        reason: reason || (useCustom ? 'Custom rate' : `${selectedTier?.name} (${selectedPosition})`),
+        reason: reason || (useCustom ? 'Custom rate' : `${selectedTier?.name} (${jobRoleTitle})`),
       });
       onSuccess();
     } catch {
@@ -145,30 +186,16 @@ const UpdatePayRateDialog = ({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Update Pay Rate</DialogTitle>
+          <DialogTitle>Update Pay Rate — {jobRoleTitle}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {/* Position selector */}
-          {positions.length > 0 && (
-            <div>
-              <Label>Position</Label>
-              <Select value={selectedPosition} onValueChange={(v) => { setSelectedPosition(v); setSelectedPayRateId(''); }}>
-                <SelectTrigger><SelectValue placeholder="Select position" /></SelectTrigger>
-                <SelectContent>
-                  {positions.map(p => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Pay rate tier selector */}
           {!useCustom && (
             <div>
               <Label>Pay Rate Tier</Label>
               <Select value={selectedPayRateId} onValueChange={setSelectedPayRateId}>
-                <SelectTrigger><SelectValue placeholder={positionPayRates.length > 0 ? "Select a rate tier" : "No tiers for this position"} /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder={positionPayRates.length > 0 ? "Select a rate tier" : "No tiers for this position"} />
+                </SelectTrigger>
                 <SelectContent>
                   {positionPayRates.map((rate) => (
                     <SelectItem key={rate.id} value={rate.id}>
@@ -185,7 +212,6 @@ const UpdatePayRateDialog = ({
             </div>
           )}
 
-          {/* Custom rate toggle */}
           <Button variant="ghost" size="sm" className="text-xs" onClick={() => { setUseCustom(!useCustom); setSelectedPayRateId(''); }}>
             {useCustom ? '← Select from tiers instead' : 'Enter custom rate instead'}
           </Button>
@@ -212,12 +238,12 @@ const UpdatePayRateDialog = ({
           <div>
             <Label>Effective From *</Label>
             <Input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
-            <p className="text-xs text-muted-foreground mt-1">The date this rate starts. Previous rate will be ended on this date.</p>
+            <p className="text-xs text-muted-foreground mt-1">Previous rate for this role will be ended on this date.</p>
           </div>
 
           <div>
             <Label>Reason</Label>
-            <Input placeholder="e.g. Annual uplift, Promotion, Role change" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <Input placeholder="e.g. Annual uplift, Promotion" value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

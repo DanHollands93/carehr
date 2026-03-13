@@ -143,10 +143,10 @@ const HoursAnalysisReport = () => {
         console.error('Error fetching time records:', timeError);
       }
       
-      // Get employee pay rates history for date-based lookup
+      // Get employee pay rates history for date-based lookup (includes employee_job_role_id and job_role_id)
       const { data: payRatesData } = await supabase
         .from('pay_rates')
-        .select('employee_id, pay_rate, pay_type, effective_from, effective_to')
+        .select('employee_id, employee_job_role_id, job_role_id, pay_rate, pay_type, effective_from, effective_to')
         .in('employee_id', employeeIds)
         .order('effective_from', { ascending: false });
 
