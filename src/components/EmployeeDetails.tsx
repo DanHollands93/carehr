@@ -12,6 +12,7 @@ import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield, ClipboardCheck,
 import PayRateHistory from "@/components/PayRateHistory";
 import { supabase } from "@/integrations/supabase/client";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
+import { usePayRates } from "@/hooks/usePayRates";
 import CareerHistoryForm from "@/components/CareerHistoryForm";
 import UserAccountManager from "@/components/UserAccountManager";
 import EmployeeComplianceTab from "@/components/EmployeeComplianceTab";
