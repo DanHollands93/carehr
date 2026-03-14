@@ -28,12 +28,11 @@ const PayRateHistory = ({ employeeId, canEdit }: PayRateHistoryProps) => {
     try { return new Date(d).toLocaleDateString('en-GB'); } catch { return d; }
   };
 
-  // Group pay rates by career_history_id or fall back to matching by job title
   const getRatesForEntry = (entryId: string) =>
-    payRates.filter(r => r.employee_job_role_id === entryId);
+    payRates.filter(r => (r as any).career_history_id === entryId);
 
   const getCurrentRate = (entryId: string): PayRate | undefined =>
-    payRates.find(r => r.employee_job_role_id === entryId && !r.effective_to);
+    payRates.find(r => (r as any).career_history_id === entryId && !r.effective_to);
 
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading pay history...</div>;
 
@@ -170,7 +169,7 @@ const UpdatePayRateDialog = ({
     try {
       await addPayRate.mutateAsync({
         employee_id: employeeId,
-        employee_job_role_id: careerHistoryId,
+        career_history_id: careerHistoryId,
         pay_rate: rate,
         pay_type: payType,
         currency: 'GBP',
