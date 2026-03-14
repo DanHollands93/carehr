@@ -140,6 +140,12 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
   });
 
   const { data: careerHistory = [], refetch: refetchCareer } = useCareerHistory(employeeId);
+  const { data: payRates = [] } = usePayRates(employeeId);
+
+  // Check if any current career history entry is missing an active pay rate
+  const hasPayRateWarning = careerHistory.some(entry => 
+    !entry.end_date && !payRates.some(r => r.employee_job_role_id === entry.id && !r.effective_to)
+  );
 
   const updateMutation = useMutation({
     mutationFn: async (updates: Partial<EmployeeData>) => {
