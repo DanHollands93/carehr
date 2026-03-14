@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield, ClipboardCheck } from "lucide-react";
+import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield, ClipboardCheck, AlertTriangle } from "lucide-react";
 import PayRateHistory from "@/components/PayRateHistory";
 import { supabase } from "@/integrations/supabase/client";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
+import { usePayRates } from "@/hooks/usePayRates";
 import CareerHistoryForm from "@/components/CareerHistoryForm";
 import UserAccountManager from "@/components/UserAccountManager";
 import EmployeeComplianceTab from "@/components/EmployeeComplianceTab";
@@ -139,6 +140,12 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
   });
 
   const { data: careerHistory = [], refetch: refetchCareer } = useCareerHistory(employeeId);
+  const { data: payRates = [] } = usePayRates(employeeId);
+
+  // Check if any current career history entry is missing an active pay rate
+  const hasPayRateWarning = careerHistory.some(entry => 
+    !entry.end_date && !payRates.some(r => r.employee_job_role_id === entry.id && !r.effective_to)
+  );
 
   const updateMutation = useMutation({
     mutationFn: async (updates: Partial<EmployeeData>) => {
@@ -227,7 +234,12 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
           <TabsTrigger value="compliance"><Shield className="w-4 h-4 mr-1 hidden sm:inline" /> Compliance</TabsTrigger>
           <TabsTrigger value="reviews"><ClipboardCheck className="w-4 h-4 mr-1 hidden sm:inline" /> Reviews</TabsTrigger>
           <TabsTrigger value="address"><MapPin className="w-4 h-4 mr-1 hidden sm:inline" /> Address</TabsTrigger>
-          <TabsTrigger value="employment"><Briefcase className="w-4 h-4 mr-1 hidden sm:inline" /> Employment</TabsTrigger>
+          <TabsTrigger value="employment" className="relative">
+            <Briefcase className="w-4 h-4 mr-1 hidden sm:inline" /> Employment
+            {hasPayRateWarning && (
+              <AlertTriangle className="w-4 h-4 text-destructive ml-1" />
+            )}
+          </TabsTrigger>
           <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
 
