@@ -70,10 +70,10 @@ export const useAddPayRate = () => {
     }) => {
       // Close previous current rate scoped to the specific career_history entry
       if (payRate.career_history_id) {
-        await supabase
+        await (supabase
           .from('pay_rates')
-          .update({ effective_to: payRate.effective_from })
-          .eq('career_history_id' as any, payRate.career_history_id)
+          .update({ effective_to: payRate.effective_from }) as any)
+          .eq('career_history_id', payRate.career_history_id)
           .is('effective_to', null);
       } else if (payRate.employee_job_role_id) {
         await supabase
