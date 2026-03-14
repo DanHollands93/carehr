@@ -1297,6 +1297,7 @@ export type Database = {
       }
       pay_rates: {
         Row: {
+          career_history_id: string | null
           company_id: string | null
           created_at: string
           created_by: string | null
@@ -1312,6 +1313,7 @@ export type Database = {
           reason: string | null
         }
         Insert: {
+          career_history_id?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1327,6 +1329,7 @@ export type Database = {
           reason?: string | null
         }
         Update: {
+          career_history_id?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1342,6 +1345,13 @@ export type Database = {
           reason?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pay_rates_career_history_id_fkey"
+            columns: ["career_history_id"]
+            isOneToOne: false
+            referencedRelation: "career_history"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pay_rates_company_id_fkey"
             columns: ["company_id"]

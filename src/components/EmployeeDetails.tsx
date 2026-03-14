@@ -144,7 +144,7 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
 
   // Check if any current career history entry is missing an active pay rate
   const hasPayRateWarning = careerHistory.some(entry => 
-    !entry.end_date && !payRates.some(r => r.employee_job_role_id === entry.id && !r.effective_to)
+    !entry.end_date && !payRates.some(r => (r as any).career_history_id === entry.id && !r.effective_to)
   );
 
   const updateMutation = useMutation({
