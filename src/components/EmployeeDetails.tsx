@@ -234,7 +234,12 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
           <TabsTrigger value="compliance"><Shield className="w-4 h-4 mr-1 hidden sm:inline" /> Compliance</TabsTrigger>
           <TabsTrigger value="reviews"><ClipboardCheck className="w-4 h-4 mr-1 hidden sm:inline" /> Reviews</TabsTrigger>
           <TabsTrigger value="address"><MapPin className="w-4 h-4 mr-1 hidden sm:inline" /> Address</TabsTrigger>
-          <TabsTrigger value="employment"><Briefcase className="w-4 h-4 mr-1 hidden sm:inline" /> Employment</TabsTrigger>
+          <TabsTrigger value="employment" className="relative">
+            <Briefcase className="w-4 h-4 mr-1 hidden sm:inline" /> Employment
+            {hasPayRateWarning && (
+              <AlertTriangle className="w-4 h-4 text-destructive ml-1" />
+            )}
+          </TabsTrigger>
           <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
 
