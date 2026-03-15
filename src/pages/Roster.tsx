@@ -30,7 +30,7 @@ import { useRosterSections } from "@/hooks/useRosterSections";
 import { useAllocationLocations } from "@/hooks/useAllocationLocations";
 import { useDailyAllocations } from "@/hooks/useDailyAllocations";
 import AllocationAssignmentDialog from "@/components/AllocationAssignmentDialog";
-
+import { useAbsencesForDateRange, getAbsenceForEmployeeDate } from "@/hooks/useAbsences";
 
 interface Employee {
   id: string;
