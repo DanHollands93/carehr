@@ -39,6 +39,7 @@ const StaffShifts = () => {
   } = useCompanyClockSettings();
 
   const [showAdHocCapture, setShowAdHocCapture] = useState(false);
+  const [showAbsenceDialog, setShowAbsenceDialog] = useState(false);
 
   // Fetch employee profile to get employee_id
   const { data: employeeProfile } = useQuery({
