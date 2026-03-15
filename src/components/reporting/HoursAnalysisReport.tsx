@@ -379,7 +379,10 @@ const HoursAnalysisReport = () => {
           const now = new Date();
           const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
           
-          if (now > shiftEndTime) {
+          if (absenceInfo.isAbsence) {
+            hasIssue = true;
+            issueType = `Absence: ${absenceInfo.absenceName}`;
+          } else if (now > shiftEndTime) {
             hasIssue = true;
             issueType = 'Did not clock in';
           } else {
@@ -397,13 +400,13 @@ const HoursAnalysisReport = () => {
             clock_in: null,
             clock_out: null,
             scheduled_hours: scheduledHours,
-            paid_hours: 0, // No pay if didn't clock in
+            paid_hours: (absenceInfo.isAbsence && absenceInfo.isPayable) ? scheduledHours : 0,
             pay_rate: payRate,
-            total_pay: 0,
+            total_pay: (absenceInfo.isAbsence && absenceInfo.isPayable) ? scheduledHours * payRate : 0,
             has_issue: hasIssue,
             issue_type: issueType,
-            exception_status: 'pending',
-            segment_description: 'No time record'
+            exception_status: absenceInfo.isAbsence ? 'approved' : 'pending',
+            segment_description: absenceInfo.isAbsence ? `${absenceInfo.absenceName}${absenceInfo.isPayable ? ' — Paid' : ' — Unpaid'}` : 'No time record'
           });
         }
       }
