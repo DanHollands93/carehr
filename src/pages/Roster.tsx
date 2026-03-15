@@ -1523,6 +1523,7 @@ const Roster = () => {
                                 ) || [];
                                 const dayOrphaned = getOrphanedRecordsForEmployeeAndDate(employee.id, dateStr);
                                 const hasContent = dayShifts.length > 0 || dayOrphaned.length > 0;
+                                const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, employee.id, dateStr);
                                 return (
                                   <td
                                     key={day.toISOString()}
@@ -1543,10 +1544,23 @@ const Roster = () => {
                                     })}
                                   >
                                     <div className={cn(
-                                      "min-h-[60px] rounded-md p-0.5 transition-colors",
-                                      !hasContent && canEditRoster && "border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer",
-                                      !hasContent && !canEditRoster && "border border-dashed border-border/30"
+                                      "min-h-[60px] rounded-md p-0.5 transition-colors relative",
+                                      !hasContent && !dayAbsence && canEditRoster && "border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer",
+                                      !hasContent && !dayAbsence && !canEditRoster && "border border-dashed border-border/30"
                                     )}>
+                                      {/* Absence banner */}
+                                      {dayAbsence && (
+                                        <div
+                                          className="rounded px-1.5 py-1 mb-1 text-[10px] font-semibold text-white text-center truncate"
+                                          style={{ backgroundColor: dayAbsence.absence_types?.color || '#6366f1' }}
+                                          title={`${dayAbsence.absence_types?.name}${dayAbsence.status === 'pending' ? ' (Pending)' : ''}`}
+                                        >
+                                          {dayAbsence.absence_types?.name}
+                                          {dayAbsence.status === 'pending' && (
+                                            <span className="ml-1 opacity-75">⏳</span>
+                                          )}
+                                        </div>
+                                      )}
                                       {hasContent ? (
                                         <div className="space-y-1">
                                           {dayShifts.map((shift) => {
