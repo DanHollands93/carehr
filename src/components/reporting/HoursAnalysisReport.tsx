@@ -205,7 +205,7 @@ const HoursAnalysisReport = () => {
 
         // 3. Last resort: job_role default pay_rate from job_roles table
         if (jobRoleId && jobRolePayMap.has(jobRoleId)) {
-          return jobRolePayMap.get(jobRoleId) || 0;
+          return jobRolePayMap.get(jobRoleId)!;
         }
 
         return 0;
