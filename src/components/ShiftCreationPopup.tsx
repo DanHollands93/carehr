@@ -454,8 +454,6 @@ const ShiftCreationPopup = ({
                       <br />
                       <strong>Location:</strong> {selectedCareerEntry.location}
                       <br />
-                      <strong>Pay Rate:</strong> £{selectedCareerEntry.pay_rate.toFixed(2)}/hr ({selectedCareerEntry.currency})
-                      <br />
                       <strong>Employment Type:</strong> {selectedCareerEntry.employment_type}
                       <br />
                       <strong>Contract Type:</strong> {selectedCareerEntry.contract_type}
