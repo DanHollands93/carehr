@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Clock, User, MapPin, Plus } from "lucide-react";
+import { Calendar, Clock, User, MapPin, Plus, CalendarOff } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import ClockCaptureDialog, { type CaptureData } from "@/components/ClockCaptureDialog";
+import RequestAbsenceDialog from "@/components/RequestAbsenceDialog";
+import { useMyAbsences } from "@/hooks/useAbsences";
 
 const StaffShifts = () => {
   const { user } = useAuth();
