@@ -443,7 +443,7 @@ const ShiftCreationPopup = ({
                     <SelectContent>
                       {careerHistory.map((entry) => (
                         <SelectItem key={entry.id} value={entry.id}>
-                          {entry.job_title} - {entry.location} - £{entry.pay_rate.toFixed(2)}/hr
+                          {entry.job_title} - {entry.location}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -453,8 +453,6 @@ const ShiftCreationPopup = ({
                       <strong>Position:</strong> {selectedCareerEntry.job_title}
                       <br />
                       <strong>Location:</strong> {selectedCareerEntry.location}
-                      <br />
-                      <strong>Pay Rate:</strong> £{selectedCareerEntry.pay_rate.toFixed(2)}/hr ({selectedCareerEntry.currency})
                       <br />
                       <strong>Employment Type:</strong> {selectedCareerEntry.employment_type}
                       <br />
