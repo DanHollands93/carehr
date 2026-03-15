@@ -166,7 +166,7 @@ const HoursAnalysisReport = () => {
       
       // Create employee lookup map
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
-      const jobRolePayMap = new Map(jobRolesData?.map(jr => [jr.id, jr.pay_rate]) || []);
+      const jobRolePayMap = new Map<string, number>(jobRolesData?.map(jr => [jr.id, jr.pay_rate || 0] as [string, number]) || []);
 
       // Helper: find the effective pay rate for a shift based on its job_role_id and date
       const getEffectivePayRate = (empId: string, shiftDate: string, jobRoleId?: string | null): number => {
