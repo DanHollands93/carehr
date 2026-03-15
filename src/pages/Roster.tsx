@@ -392,6 +392,9 @@ const Roster = () => {
     selectedRosterTemplate?.id, weekStartStr, weekEndStr
   );
 
+  // Absences for the current week
+  const { data: weekAbsences = [] } = useAbsencesForDateRange(weekStartStr, weekEndStr, !!selectedRosterTemplate?.id);
+
   // Fetch job roles for allocation dialog
   const { data: jobRolesData } = useQuery({
     queryKey: ['job-roles-for-allocations'],
