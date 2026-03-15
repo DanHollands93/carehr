@@ -321,14 +321,14 @@ const HoursAnalysisReport = () => {
                 clock_in: timeRecord.clock_in_time || null,
                 clock_out: timeRecord.clock_out_time || null,
                 scheduled_hours: segment.segment_type === 'scheduled' ? segmentHours : 0,
-                paid_hours: paidHours,
+                paid_hours: effectivePaidHours,
                 pay_rate: payRate,
                 total_pay: totalPay,
-                has_issue: hasIssue && segment.segment_type === 'scheduled', // Only show issue on main scheduled row
-                issue_type: issueType,
+                has_issue: hasIssue && segment.segment_type === 'scheduled',
+                issue_type: absenceInfo.isAbsence ? `Absence: ${absenceInfo.absenceName}${!absenceInfo.isPayable ? ' (Unpaid)' : ''}` : issueType,
                 exception_status: exceptionStatus,
                 segment_type: segment.segment_type,
-                segment_description: segmentDescription
+                segment_description: absenceInfo.isAbsence ? `${absenceInfo.absenceName}${!absenceInfo.isPayable ? ' — Unpaid' : ' — Paid'}` : segmentDescription
               });
             }
           } else {
