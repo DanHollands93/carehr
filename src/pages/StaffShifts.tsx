@@ -266,6 +266,15 @@ const StaffShifts = () => {
         employeeId={employeeProfile?.employee_id || ''}
         isLoading={isAdHocClockingIn}
       />
+
+      {/* Request Absence Dialog */}
+      {employeeProfile?.employee_id && (
+        <RequestAbsenceDialog
+          isOpen={showAbsenceDialog}
+          onClose={() => setShowAbsenceDialog(false)}
+          employeeId={employeeProfile.employee_id}
+        />
+      )}
     </div>
   );
 };
