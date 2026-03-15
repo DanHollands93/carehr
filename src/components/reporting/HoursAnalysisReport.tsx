@@ -143,12 +143,19 @@ const HoursAnalysisReport = () => {
         console.error('Error fetching time records:', timeError);
       }
       
-      // Get employee pay rates history for date-based lookup (includes employee_job_role_id and job_role_id)
+      // Get all pay rates for date-based lookup by job_role_id
       const { data: payRatesData } = await supabase
         .from('pay_rates')
-        .select('employee_id, employee_job_role_id, job_role_id, pay_rate, pay_type, effective_from, effective_to')
-        .in('employee_id', employeeIds)
+        .select('employee_id, employee_job_role_id, job_role_id, career_history_id, pay_rate, pay_type, effective_from, effective_to')
         .order('effective_from', { ascending: false });
+
+      // Get unique job role IDs from shifts for fallback lookup
+      const shiftJobRoleIds = [...new Set(shifts.map(s => s.job_role_id).filter(Boolean))] as string[];
+
+      // Get job role default pay rates as a last resort
+      const { data: jobRolesData } = shiftJobRoleIds.length > 0 
+        ? await supabase.from('job_roles').select('id, pay_rate').in('id', shiftJobRoleIds)
+        : { data: [] };
 
       // Get career history for job titles only
       const { data: careerHistory } = await supabase
@@ -159,28 +166,49 @@ const HoursAnalysisReport = () => {
       
       // Create employee lookup map
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
+      const jobRolePayMap = new Map(jobRolesData?.map(jr => [jr.id, jr.pay_rate]) || []);
 
-      // Helper: find the effective pay rate for an employee on a given date, optionally scoped to a job role
-      const getEffectivePayRate = (empId: string, shiftDate: string, jobRoleId?: string): number => {
+      // Helper: find the effective pay rate for a shift based on its job_role_id and date
+      const getEffectivePayRate = (empId: string, shiftDate: string, jobRoleId?: string | null): number => {
         if (!payRatesData) return 0;
-        const empRates = payRatesData.filter(r => r.employee_id === empId);
         
-        // First try to find a rate matching the specific job role
+        // 1. Try to find a pay_rate record matching this job_role_id (via career_history_id link) for this employee on this date
         if (jobRoleId) {
-          const roleRate = empRates.find(r => 
-            r.job_role_id === jobRoleId &&
-            r.effective_from <= shiftDate && 
-            (!r.effective_to || r.effective_to > shiftDate)
-          );
+          // Look for rates linked to a career_history entry that matches this job_role_id for this employee
+          const roleRate = payRatesData.find(r => {
+            // Direct job_role_id match on the pay_rate record
+            if (r.job_role_id === jobRoleId && r.employee_id === empId &&
+                r.effective_from <= shiftDate && (!r.effective_to || r.effective_to > shiftDate)) {
+              return true;
+            }
+            return false;
+          });
           if (roleRate) return roleRate.pay_rate;
+
+          // Try career_history-linked rates for this employee where the career entry has this job_role_id
+          const careerEntries = careerHistory?.filter(ch => ch.employee_id === empId && ch.job_role_id === jobRoleId) || [];
+          for (const ce of careerEntries) {
+            const chRate = payRatesData.find(r =>
+              r.career_history_id === (ce as any).id &&
+              r.effective_from <= shiftDate && (!r.effective_to || r.effective_to > shiftDate)
+            );
+            if (chRate) return chRate.pay_rate;
+          }
         }
         
-        // Fallback: any rate for this employee on this date
-        const effective = empRates.find(r => 
-          r.effective_from <= shiftDate && 
-          (!r.effective_to || r.effective_to > shiftDate)
+        // 2. Fallback: any active rate for this employee on this date
+        const empRate = payRatesData.find(r => 
+          r.employee_id === empId &&
+          r.effective_from <= shiftDate && (!r.effective_to || r.effective_to > shiftDate)
         );
-        return effective?.pay_rate || 0;
+        if (empRate) return empRate.pay_rate;
+
+        // 3. Last resort: job_role default pay_rate from job_roles table
+        if (jobRoleId && jobRolePayMap.has(jobRoleId)) {
+          return jobRolePayMap.get(jobRoleId) || 0;
+        }
+
+        return 0;
       };
       
       // Process the data - create detailed records with time segments
