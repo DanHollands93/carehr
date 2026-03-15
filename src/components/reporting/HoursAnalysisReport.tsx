@@ -163,6 +163,32 @@ const HoursAnalysisReport = () => {
         .select('employee_id, job_title, job_role_id, start_date, end_date')
         .in('employee_id', employeeIds)
         .is('end_date', null);
+
+      // Get approved absences in date range to check payability
+      const { data: absencesData } = await supabase
+        .from('absences')
+        .select('employee_id, start_date, end_date, start_time, end_time, status, absence_types(is_payable, name)')
+        .in('employee_id', employeeIds)
+        .eq('status', 'approved')
+        .lte('start_date', endDate)
+        .gte('end_date', startDate);
+
+      // Helper: check if a shift is covered by an unpaid absence
+      const isShiftUnpaidAbsence = (empId: string, shiftDate: string): { isAbsence: boolean; absenceName: string; isPayable: boolean } => {
+        if (!absencesData) return { isAbsence: false, absenceName: '', isPayable: true };
+        const match = absencesData.find(a =>
+          a.employee_id === empId &&
+          a.start_date <= shiftDate &&
+          a.end_date >= shiftDate
+        );
+        if (!match) return { isAbsence: false, absenceName: '', isPayable: true };
+        const absenceType = match.absence_types as any;
+        return {
+          isAbsence: true,
+          absenceName: absenceType?.name || 'Absence',
+          isPayable: absenceType?.is_payable ?? false,
+        };
+      };
       
       // Create employee lookup map
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp]) || []);
