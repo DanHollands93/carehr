@@ -239,6 +239,10 @@ const Settings = () => {
         <TabsContent value="job-roles">
           <JobRolePayRateManager />
         </TabsContent>
+
+        <TabsContent value="absences">
+          <AbsenceTypeManager />
+        </TabsContent>
       </Tabs>
     </div>
   );
