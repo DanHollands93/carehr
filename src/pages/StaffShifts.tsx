@@ -148,6 +148,15 @@ const StaffShifts = () => {
               <Badge variant="outline" className="text-xs">
                 {todayRecords?.length || 0} shifts
               </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowAbsenceDialog(true)}
+                className="text-xs"
+              >
+                <CalendarOff className="w-3 h-3 mr-1" />
+                Request Absence
+              </Button>
               {/* Only show ad-hoc button if not already clocked into an ad-hoc shift */}
               {!todayRecords?.some(r => !r.shift_id && r.clock_in_time && !r.clock_out_time) && (
                 <Button
