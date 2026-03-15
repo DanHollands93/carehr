@@ -351,7 +351,8 @@ const HoursAnalysisReport = () => {
               }
             }
             
-            const totalPay = paidHours * payRate;
+            const effectivePaidHours = (absenceInfo.isAbsence && !absenceInfo.isPayable) ? 0 : paidHours;
+            const totalPay = effectivePaidHours * payRate;
             
             processedData.push({
               employee_id: employee.id,
@@ -364,13 +365,13 @@ const HoursAnalysisReport = () => {
               clock_in: timeRecord.clock_in_time || null,
               clock_out: timeRecord.clock_out_time || null,
               scheduled_hours: scheduledHours,
-              paid_hours: paidHours,
+              paid_hours: effectivePaidHours,
               pay_rate: payRate,
               total_pay: totalPay,
-              has_issue: hasIssue,
-              issue_type: issueType,
+              has_issue: hasIssue || absenceInfo.isAbsence,
+              issue_type: absenceInfo.isAbsence ? `Absence: ${absenceInfo.absenceName}${!absenceInfo.isPayable ? ' (Unpaid)' : ''}` : issueType,
               exception_status: exceptionStatus,
-              segment_description: 'Full shift'
+              segment_description: absenceInfo.isAbsence ? `${absenceInfo.absenceName}${!absenceInfo.isPayable ? ' — Unpaid' : ' — Paid'}` : 'Full shift'
             });
           }
         } else {
