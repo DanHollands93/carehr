@@ -14,6 +14,129 @@ export type Database = {
   }
   public: {
     Tables: {
+      absence_types: {
+        Row: {
+          color: string
+          company_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          is_payable: boolean
+          is_requestable: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_payable?: boolean
+          is_requestable?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_payable?: boolean
+          is_requestable?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "absence_types_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      absences: {
+        Row: {
+          absence_type_id: string
+          approved_at: string | null
+          approved_by: string | null
+          company_id: string | null
+          created_at: string
+          employee_id: string
+          end_date: string
+          end_time: string | null
+          id: string
+          notes: string | null
+          reason: string | null
+          start_date: string
+          start_time: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          absence_type_id: string
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          employee_id: string
+          end_date: string
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          reason?: string | null
+          start_date: string
+          start_time?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          absence_type_id?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          employee_id?: string
+          end_date?: string
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          reason?: string | null
+          start_date?: string
+          start_time?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "absences_absence_type_id_fkey"
+            columns: ["absence_type_id"]
+            isOneToOne: false
+            referencedRelation: "absence_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "absences_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "absences_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       address_history: {
         Row: {
           city: string

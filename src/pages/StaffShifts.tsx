@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Clock, User, MapPin, Plus } from "lucide-react";
+import { Calendar, Clock, User, MapPin, Plus, CalendarOff } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import ClockCaptureDialog, { type CaptureData } from "@/components/ClockCaptureDialog";
+import RequestAbsenceDialog from "@/components/RequestAbsenceDialog";
+import { useMyAbsences } from "@/hooks/useAbsences";
 
 const StaffShifts = () => {
   const { user } = useAuth();
@@ -37,6 +39,7 @@ const StaffShifts = () => {
   } = useCompanyClockSettings();
 
   const [showAdHocCapture, setShowAdHocCapture] = useState(false);
+  const [showAbsenceDialog, setShowAbsenceDialog] = useState(false);
 
   // Fetch employee profile to get employee_id
   const { data: employeeProfile } = useQuery({
@@ -145,6 +148,15 @@ const StaffShifts = () => {
               <Badge variant="outline" className="text-xs">
                 {todayRecords?.length || 0} shifts
               </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowAbsenceDialog(true)}
+                className="text-xs"
+              >
+                <CalendarOff className="w-3 h-3 mr-1" />
+                Request Absence
+              </Button>
               {/* Only show ad-hoc button if not already clocked into an ad-hoc shift */}
               {!todayRecords?.some(r => !r.shift_id && r.clock_in_time && !r.clock_out_time) && (
                 <Button
@@ -254,6 +266,15 @@ const StaffShifts = () => {
         employeeId={employeeProfile?.employee_id || ''}
         isLoading={isAdHocClockingIn}
       />
+
+      {/* Request Absence Dialog */}
+      {employeeProfile?.employee_id && (
+        <RequestAbsenceDialog
+          isOpen={showAbsenceDialog}
+          onClose={() => setShowAbsenceDialog(false)}
+          employeeId={employeeProfile.employee_id}
+        />
+      )}
     </div>
   );
 };

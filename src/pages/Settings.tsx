@@ -14,6 +14,7 @@ import ComplianceTypeManager from "@/components/ComplianceTypeManager";
 import EmployeeFormConfigManager from "@/components/EmployeeFormConfigManager";
 import ReviewTypeManager from "@/components/ReviewTypeManager";
 import JobRolePayRateManager from "@/components/JobRolePayRateManager";
+import AbsenceTypeManager from "@/components/AbsenceTypeManager";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -47,6 +48,7 @@ const Settings = () => {
           <TabsTrigger value="employee-forms">Employee Forms</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="job-roles">Position Pay Rates</TabsTrigger>
+          <TabsTrigger value="absences">Absences</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -236,6 +238,10 @@ const Settings = () => {
 
         <TabsContent value="job-roles">
           <JobRolePayRateManager />
+        </TabsContent>
+
+        <TabsContent value="absences">
+          <AbsenceTypeManager />
         </TabsContent>
       </Tabs>
     </div>

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { usePermissions } from "@/hooks/usePermissions";
 import AnalyticsDashboard from "@/components/AnalyticsDashboard";
 import MobileDefaultRedirect from "@/components/MobileDefaultRedirect";
+import AbsenceApprovalsWidget from "@/components/AbsenceApprovalsWidget";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -46,6 +47,7 @@ const Dashboard = () => {
           <p className="text-gray-600 mt-2">System overview and user management</p>
         </div>
 
+        <AbsenceApprovalsWidget />
         <AnalyticsDashboard />
       </div>
     </MobileDefaultRedirect>
