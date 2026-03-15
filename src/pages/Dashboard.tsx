@@ -47,6 +47,7 @@ const Dashboard = () => {
           <p className="text-gray-600 mt-2">System overview and user management</p>
         </div>
 
+        <AbsenceApprovalsWidget />
         <AnalyticsDashboard />
       </div>
     </MobileDefaultRedirect>
