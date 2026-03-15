@@ -261,6 +261,9 @@ const HoursAnalysisReport = () => {
         const employeeCareer = careerHistory?.find(ch => ch.employee_id === employee.id);
         const payRate = shift.pay_rate || getEffectivePayRate(employee.id, shift.date, shift.job_role_id) || 0;
         const jobTitle = shift.position || employeeCareer?.job_title || 'Unknown';
+
+        // Check if this shift is during an approved absence
+        const absenceInfo = isShiftUnpaidAbsence(employee.id, shift.date);
         
         let hasIssue = false;
         let issueType = '';
