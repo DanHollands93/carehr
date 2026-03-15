@@ -292,7 +292,8 @@ const HoursAnalysisReport = () => {
             for (const segment of timeRecord.time_segments as any[]) {
               const segmentHours = Math.round(((segment.minutes_worked || 0) / 60) * 100) / 100;
               const paidHours = Math.round(((segment.minutes_paid || 0) / 60) * 100) / 100;
-              const totalPay = paidHours * payRate;
+              const effectivePaidHours = (absenceInfo.isAbsence && !absenceInfo.isPayable) ? 0 : paidHours;
+              const totalPay = effectivePaidHours * payRate;
               
               let segmentDescription = '';
               switch (segment.segment_type) {
