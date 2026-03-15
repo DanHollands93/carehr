@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { usePermissions } from "@/hooks/usePermissions";
 import AnalyticsDashboard from "@/components/AnalyticsDashboard";
 import MobileDefaultRedirect from "@/components/MobileDefaultRedirect";
+import AbsenceApprovalsWidget from "@/components/AbsenceApprovalsWidget";
 
 const Dashboard = () => {
   const navigate = useNavigate();
