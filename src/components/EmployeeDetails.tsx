@@ -17,6 +17,7 @@ import CareerHistoryForm from "@/components/CareerHistoryForm";
 import UserAccountManager from "@/components/UserAccountManager";
 import EmployeeComplianceTab from "@/components/EmployeeComplianceTab";
 import EmployeeReviewsTab from "@/components/EmployeeReviewsTab";
+import EmployeeAbsencesTab from "@/components/EmployeeAbsencesTab";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { toast } from "sonner";
