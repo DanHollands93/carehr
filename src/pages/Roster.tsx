@@ -58,6 +58,7 @@ interface Shift {
   position: string;
   job_role_id: string;
   roster_template_id?: string;
+  absence_pay_override?: string | null;
 }
 
 interface ShiftWithTimeRecord extends Shift {
@@ -545,6 +546,7 @@ const Roster = () => {
         position: string;
         job_role_id: string;
         pay_rate: number;
+        absence_pay_override?: string | null;
       };
     }) => {
       // Fresh DB check for overlapping shifts
@@ -579,7 +581,8 @@ const Roster = () => {
           job_role_id: shiftData.job_role_id,
           actual_job_role_id: shiftData.job_role_id,
           pay_rate: shiftData.pay_rate,
-          roster_template_id: selectedRosterTemplate?.id
+          roster_template_id: selectedRosterTemplate?.id,
+          absence_pay_override: shiftData.absence_pay_override || null,
         }])
         .select()
         .single();
@@ -900,6 +903,24 @@ const Roster = () => {
     },
     onError: (error) => {
       toast({ title: "Error removing staff", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Update absence pay override on a shift
+  const updateAbsencePayOverrideMutation = useMutation({
+    mutationFn: async ({ shiftId, override }: { shiftId: string; override: string | null }) => {
+      const { error } = await supabase
+        .from('shifts')
+        .update({ absence_pay_override: override })
+        .eq('id', shiftId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast({ title: "Pay override updated" });
+    },
+    onError: (error) => {
+      toast({ title: "Error updating pay override", description: error.message, variant: "destructive" });
     }
   });
 
@@ -1321,6 +1342,10 @@ const Roster = () => {
           employeeId={shiftPopup.employeeId}
           date={shiftPopup.date}
           existingShift={shiftPopup.existingShift}
+          dayAbsence={getAbsenceForEmployeeDate(weekAbsences, shiftPopup.employeeId, shiftPopup.date) || null}
+          onUpdateAbsencePayOverride={(shiftId, override) => {
+            updateAbsencePayOverrideMutation.mutate({ shiftId, override });
+          }}
         />
       )}
 
@@ -1573,6 +1598,8 @@ const Roster = () => {
                                                 shift={shift}
                                                 canEdit={canEditRoster && !isFaded}
                                                 faded={isFaded}
+                                                hasAbsence={!!dayAbsence}
+                                                absencePayOverride={shift.absence_pay_override}
                                                 onEdit={() => {
                                                   if (isFaded) return;
                                                   setShiftPopup({

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Clock, AlertTriangle, Check, RotateCcw, Camera, Navigation, MapPin } from "lucide-react";
+import { Trash2, Clock, AlertTriangle, Check, RotateCcw, Camera, Navigation, MapPin, CalendarOff } from "lucide-react";
 import { useCompanyClockSettings } from "@/hooks/useCompanyClockSettings";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { cn } from "@/lib/utils";
+import type { AbsenceWithType } from "@/hooks/useAbsences";
 
 interface ShiftTemplate {
   id: string;
@@ -56,6 +57,7 @@ interface Shift {
   position: string;
   job_role_id: string;
   time_record?: TimeRecord | null;
+  absence_pay_override?: string | null;
 }
 
 interface JobRole {
@@ -74,6 +76,7 @@ interface ShiftCreationPopupProps {
     position: string;
     job_role_id: string;
     pay_rate: number;
+    absence_pay_override?: string | null;
   }) => void;
   onDeleteShift?: () => void;
   onReviewDiscrepancy?: (shift: Shift) => void;
@@ -84,6 +87,8 @@ interface ShiftCreationPopupProps {
   employeeId?: string;
   date: string;
   existingShift?: Shift;
+  dayAbsence?: AbsenceWithType | null;
+  onUpdateAbsencePayOverride?: (shiftId: string, override: string | null) => void;
 }
 
 const ShiftCreationPopup = ({
@@ -98,7 +103,9 @@ const ShiftCreationPopup = ({
   employeeName,
   employeeId,
   date,
-  existingShift
+  existingShift,
+  dayAbsence,
+  onUpdateAbsencePayOverride,
 }: ShiftCreationPopupProps) => {
   const { toast } = useToast();
   const { companyId } = useUserCompanyId();
@@ -106,7 +113,7 @@ const ShiftCreationPopup = ({
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
   const [selectedCareerHistoryId, setSelectedCareerHistoryId] = useState<string>('');
-
+  const [absencePayOverride, setAbsencePayOverride] = useState<string | null>(null);
   // Use career history hook
   const { data: careerHistory, isLoading: careerLoading, error: careerError } = useCareerHistory(employeeId);
 
@@ -134,6 +141,7 @@ const ShiftCreationPopup = ({
     if (existingShift) {
       setStartTime(existingShift.start_time);
       setEndTime(existingShift.end_time);
+      setAbsencePayOverride((existingShift as any).absence_pay_override ?? null);
       
       // Find matching career history entry by job_role_id or position
       // Only pre-select if there's a clear match — never auto-select a different role
@@ -167,13 +175,14 @@ const ShiftCreationPopup = ({
       setStartTime('09:00');
       setEndTime('17:00');
       setSelectedCareerHistoryId('');
+      setAbsencePayOverride(dayAbsence ? (dayAbsence.absence_types?.is_payable ? 'paid' : 'unpaid') : null);
       
       // Auto-select career history if employee has only one active position
       if (careerHistory && careerHistory.length === 1) {
         setSelectedCareerHistoryId(careerHistory[0].id);
       }
     }
-  }, [existingShift, shiftTemplates, isOpen, careerHistory]);
+  }, [existingShift, shiftTemplates, isOpen, careerHistory, dayAbsence]);
 
   const handleTemplateSelect = (templateId: string) => {
     const template = shiftTemplates.find(t => t.id === templateId);
@@ -283,7 +292,8 @@ const ShiftCreationPopup = ({
       end_time: endTime,
       position: selectedCareerEntry.job_title,
       job_role_id: matchingJobRole.id,
-      pay_rate: selectedCareerEntry.pay_rate || 0
+      pay_rate: selectedCareerEntry.pay_rate || 0,
+      absence_pay_override: dayAbsence ? absencePayOverride : null,
     };
     
     console.log('Creating shift with data:', shiftData);
@@ -489,6 +499,68 @@ const ShiftCreationPopup = ({
                   <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
                 </div>
               </div>
+
+              {/* Absence Pay Override */}
+              {dayAbsence && (
+                <div className="rounded-md border p-3 space-y-2" style={{ borderColor: dayAbsence.absence_types?.color || 'hsl(var(--border))' }}>
+                  <div className="flex items-center gap-2">
+                    <CalendarOff className="w-4 h-4" style={{ color: dayAbsence.absence_types?.color }} />
+                    <span className="text-sm font-medium">
+                      Absence: {dayAbsence.absence_types?.name}
+                      {dayAbsence.status === 'pending' && <Badge variant="outline" className="ml-2 text-[10px]">Pending</Badge>}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This shift falls during an absence. Choose how to handle payment:
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={absencePayOverride === 'paid' ? 'default' : 'outline'}
+                      className="flex-1 text-xs h-7"
+                      onClick={() => {
+                        setAbsencePayOverride('paid');
+                        if (existingShift && onUpdateAbsencePayOverride) {
+                          onUpdateAbsencePayOverride(existingShift.id, 'paid');
+                        }
+                      }}
+                    >
+                      Pay Shift
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={absencePayOverride === 'unpaid' ? 'default' : 'outline'}
+                      className="flex-1 text-xs h-7"
+                      onClick={() => {
+                        setAbsencePayOverride('unpaid');
+                        if (existingShift && onUpdateAbsencePayOverride) {
+                          onUpdateAbsencePayOverride(existingShift.id, 'unpaid');
+                        }
+                      }}
+                    >
+                      Don't Pay
+                    </Button>
+                    {existingShift && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={absencePayOverride === null ? 'default' : 'outline'}
+                        className="flex-1 text-xs h-7"
+                        onClick={() => {
+                          setAbsencePayOverride(null);
+                          if (onUpdateAbsencePayOverride) {
+                            onUpdateAbsencePayOverride(existingShift.id, null);
+                          }
+                        }}
+                      >
+                        Default ({dayAbsence.absence_types?.is_payable ? 'Paid' : 'Unpaid'})
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-between pt-4">
                 <div>
