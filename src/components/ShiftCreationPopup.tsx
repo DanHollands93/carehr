@@ -141,6 +141,7 @@ const ShiftCreationPopup = ({
     if (existingShift) {
       setStartTime(existingShift.start_time);
       setEndTime(existingShift.end_time);
+      setAbsencePayOverride((existingShift as any).absence_pay_override ?? null);
       
       // Find matching career history entry by job_role_id or position
       // Only pre-select if there's a clear match — never auto-select a different role
