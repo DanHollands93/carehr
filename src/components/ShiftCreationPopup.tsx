@@ -173,13 +173,14 @@ const ShiftCreationPopup = ({
       setStartTime('09:00');
       setEndTime('17:00');
       setSelectedCareerHistoryId('');
+      setAbsencePayOverride(dayAbsence ? (dayAbsence.absence_types?.is_payable ? 'paid' : 'unpaid') : null);
       
       // Auto-select career history if employee has only one active position
       if (careerHistory && careerHistory.length === 1) {
         setSelectedCareerHistoryId(careerHistory[0].id);
       }
     }
-  }, [existingShift, shiftTemplates, isOpen, careerHistory]);
+  }, [existingShift, shiftTemplates, isOpen, careerHistory, dayAbsence]);
 
   const handleTemplateSelect = (templateId: string) => {
     const template = shiftTemplates.find(t => t.id === templateId);
