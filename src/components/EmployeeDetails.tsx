@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield, ClipboardCheck, AlertTriangle } from "lucide-react";
+import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield, ClipboardCheck, AlertTriangle, Calendar } from "lucide-react";
 import PayRateHistory from "@/components/PayRateHistory";
 import { supabase } from "@/integrations/supabase/client";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
@@ -17,6 +17,7 @@ import CareerHistoryForm from "@/components/CareerHistoryForm";
 import UserAccountManager from "@/components/UserAccountManager";
 import EmployeeComplianceTab from "@/components/EmployeeComplianceTab";
 import EmployeeReviewsTab from "@/components/EmployeeReviewsTab";
+import EmployeeAbsencesTab from "@/components/EmployeeAbsencesTab";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { toast } from "sonner";
@@ -229,10 +230,11 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
       </Card>
 
       <Tabs defaultValue={initialTab || "personal"} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="personal"><User className="w-4 h-4 mr-1 hidden sm:inline" /> Personal</TabsTrigger>
           <TabsTrigger value="compliance"><Shield className="w-4 h-4 mr-1 hidden sm:inline" /> Compliance</TabsTrigger>
           <TabsTrigger value="reviews"><ClipboardCheck className="w-4 h-4 mr-1 hidden sm:inline" /> Reviews</TabsTrigger>
+          <TabsTrigger value="absences"><Calendar className="w-4 h-4 mr-1 hidden sm:inline" /> Absences</TabsTrigger>
           <TabsTrigger value="address"><MapPin className="w-4 h-4 mr-1 hidden sm:inline" /> Address</TabsTrigger>
           <TabsTrigger value="employment" className="relative">
             <Briefcase className="w-4 h-4 mr-1 hidden sm:inline" /> Employment
@@ -543,6 +545,10 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
             }}
             onUpdate={() => {}}
           />
+        </TabsContent>
+
+        <TabsContent value="absences">
+          <EmployeeAbsencesTab employeeId={employeeId} />
         </TabsContent>
       </Tabs>
 
