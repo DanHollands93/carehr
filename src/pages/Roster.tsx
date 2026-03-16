@@ -924,7 +924,7 @@ const Roster = () => {
     }
   });
 
-
+  const getShiftStatusColor = (shift: ShiftWithTimeRecord) => {
     if (!shift.time_record) return null;
     
     switch (shift.time_record.status) {
