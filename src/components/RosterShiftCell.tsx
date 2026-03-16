@@ -232,6 +232,20 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
               {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
             </div>
 
+            {/* Absence pay indicator */}
+            {hasAbsence && (
+              <div className={cn(
+                "text-[9px] font-medium mb-1 px-1 py-0.5 rounded text-center",
+                (absencePayOverride === 'paid' || (absencePayOverride === null && shift.absence_pay_override === 'paid'))
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                  : (absencePayOverride === 'unpaid' || (absencePayOverride === null && shift.absence_pay_override === 'unpaid'))
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-muted text-muted-foreground"
+              )}>
+                {shift.absence_pay_override === 'paid' ? '💰 Paid' : shift.absence_pay_override === 'unpaid' ? 'Unpaid' : 'Default'}
+              </div>
+            )}
+
             {/* Visual timeline bar */}
             <div className="relative h-2.5 bg-muted rounded-full overflow-hidden">
               {/* Scheduled bar (background) */}
