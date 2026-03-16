@@ -2320,6 +2320,7 @@ export type Database = {
       }
       shifts: {
         Row: {
+          absence_pay_override: string | null
           actual_job_role_id: string | null
           company_id: string | null
           created_at: string
@@ -2336,6 +2337,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          absence_pay_override?: string | null
           actual_job_role_id?: string | null
           company_id?: string | null
           created_at?: string
@@ -2352,6 +2354,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          absence_pay_override?: string | null
           actual_job_role_id?: string | null
           company_id?: string | null
           created_at?: string
