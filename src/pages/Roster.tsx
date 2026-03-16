@@ -58,6 +58,7 @@ interface Shift {
   position: string;
   job_role_id: string;
   roster_template_id?: string;
+  absence_pay_override?: string | null;
 }
 
 interface ShiftWithTimeRecord extends Shift {
