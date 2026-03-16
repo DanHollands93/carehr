@@ -75,6 +75,7 @@ interface ShiftCreationPopupProps {
     position: string;
     job_role_id: string;
     pay_rate: number;
+    absence_pay_override?: string | null;
   }) => void;
   onDeleteShift?: () => void;
   onReviewDiscrepancy?: (shift: Shift) => void;
@@ -85,6 +86,8 @@ interface ShiftCreationPopupProps {
   employeeId?: string;
   date: string;
   existingShift?: Shift;
+  dayAbsence?: AbsenceWithType | null;
+  onUpdateAbsencePayOverride?: (shiftId: string, override: string | null) => void;
 }
 
 const ShiftCreationPopup = ({
