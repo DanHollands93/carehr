@@ -906,7 +906,25 @@ const Roster = () => {
     }
   });
 
-  const getShiftStatusColor = (shift: ShiftWithTimeRecord) => {
+  // Update absence pay override on a shift
+  const updateAbsencePayOverrideMutation = useMutation({
+    mutationFn: async ({ shiftId, override }: { shiftId: string; override: string | null }) => {
+      const { error } = await supabase
+        .from('shifts')
+        .update({ absence_pay_override: override })
+        .eq('id', shiftId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast({ title: "Pay override updated" });
+    },
+    onError: (error) => {
+      toast({ title: "Error updating pay override", description: error.message, variant: "destructive" });
+    }
+  });
+
+
     if (!shift.time_record) return null;
     
     switch (shift.time_record.status) {
