@@ -102,7 +102,9 @@ const ShiftCreationPopup = ({
   employeeName,
   employeeId,
   date,
-  existingShift
+  existingShift,
+  dayAbsence,
+  onUpdateAbsencePayOverride,
 }: ShiftCreationPopupProps) => {
   const { toast } = useToast();
   const { companyId } = useUserCompanyId();
