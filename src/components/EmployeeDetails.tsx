@@ -230,10 +230,11 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
       </Card>
 
       <Tabs defaultValue={initialTab || "personal"} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="personal"><User className="w-4 h-4 mr-1 hidden sm:inline" /> Personal</TabsTrigger>
           <TabsTrigger value="compliance"><Shield className="w-4 h-4 mr-1 hidden sm:inline" /> Compliance</TabsTrigger>
           <TabsTrigger value="reviews"><ClipboardCheck className="w-4 h-4 mr-1 hidden sm:inline" /> Reviews</TabsTrigger>
+          <TabsTrigger value="absences"><Calendar className="w-4 h-4 mr-1 hidden sm:inline" /> Absences</TabsTrigger>
           <TabsTrigger value="address"><MapPin className="w-4 h-4 mr-1 hidden sm:inline" /> Address</TabsTrigger>
           <TabsTrigger value="employment" className="relative">
             <Briefcase className="w-4 h-4 mr-1 hidden sm:inline" /> Employment
