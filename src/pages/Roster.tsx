@@ -580,7 +580,8 @@ const Roster = () => {
           job_role_id: shiftData.job_role_id,
           actual_job_role_id: shiftData.job_role_id,
           pay_rate: shiftData.pay_rate,
-          roster_template_id: selectedRosterTemplate?.id
+          roster_template_id: selectedRosterTemplate?.id,
+          absence_pay_override: shiftData.absence_pay_override || null,
         }])
         .select()
         .single();
