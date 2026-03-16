@@ -173,8 +173,8 @@ const HoursAnalysisReport = () => {
         .lte('start_date', endDate)
         .gte('end_date', startDate);
 
-      // Helper: check if a shift is covered by an unpaid absence
-      const isShiftUnpaidAbsence = (empId: string, shiftDate: string): { isAbsence: boolean; absenceName: string; isPayable: boolean } => {
+      // Helper: check if a shift is covered by an absence and determine pay based on override
+      const getShiftAbsencePayStatus = (empId: string, shiftDate: string, shiftAbsencePayOverride?: string | null): { isAbsence: boolean; absenceName: string; isPayable: boolean } => {
         if (!absencesData) return { isAbsence: false, absenceName: '', isPayable: true };
         const match = absencesData.find(a =>
           a.employee_id === empId &&
@@ -183,10 +183,21 @@ const HoursAnalysisReport = () => {
         );
         if (!match) return { isAbsence: false, absenceName: '', isPayable: true };
         const absenceType = match.absence_types as any;
+        
+        // Per-shift override takes priority over absence type default
+        let isPayable: boolean;
+        if (shiftAbsencePayOverride === 'paid') {
+          isPayable = true;
+        } else if (shiftAbsencePayOverride === 'unpaid') {
+          isPayable = false;
+        } else {
+          isPayable = absenceType?.is_payable ?? false;
+        }
+        
         return {
           isAbsence: true,
           absenceName: absenceType?.name || 'Absence',
-          isPayable: absenceType?.is_payable ?? false,
+          isPayable,
         };
       };
       
