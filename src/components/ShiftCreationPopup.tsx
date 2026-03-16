@@ -57,6 +57,7 @@ interface Shift {
   position: string;
   job_role_id: string;
   time_record?: TimeRecord | null;
+  absence_pay_override?: string | null;
 }
 
 interface JobRole {
