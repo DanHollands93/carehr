@@ -112,7 +112,7 @@ const ShiftCreationPopup = ({
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
   const [selectedCareerHistoryId, setSelectedCareerHistoryId] = useState<string>('');
-
+  const [absencePayOverride, setAbsencePayOverride] = useState<string | null>(null);
   // Use career history hook
   const { data: careerHistory, isLoading: careerLoading, error: careerError } = useCareerHistory(employeeId);
 
