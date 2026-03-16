@@ -289,7 +289,8 @@ const ShiftCreationPopup = ({
       end_time: endTime,
       position: selectedCareerEntry.job_title,
       job_role_id: matchingJobRole.id,
-      pay_rate: selectedCareerEntry.pay_rate || 0
+      pay_rate: selectedCareerEntry.pay_rate || 0,
+      absence_pay_override: dayAbsence ? absencePayOverride : null,
     };
     
     console.log('Creating shift with data:', shiftData);
