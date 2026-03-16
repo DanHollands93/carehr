@@ -1598,6 +1598,8 @@ const Roster = () => {
                                                 shift={shift}
                                                 canEdit={canEditRoster && !isFaded}
                                                 faded={isFaded}
+                                                hasAbsence={!!dayAbsence}
+                                                absencePayOverride={shift.absence_pay_override}
                                                 onEdit={() => {
                                                   if (isFaded) return;
                                                   setShiftPopup({
