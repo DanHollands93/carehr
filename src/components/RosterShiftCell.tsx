@@ -27,6 +27,7 @@ interface ShiftWithTimeRecord {
   job_role_id: string;
   roster_template_id?: string;
   time_record?: TimeRecord | null;
+  absence_pay_override?: string | null;
 }
 
 interface RosterShiftCellProps {
