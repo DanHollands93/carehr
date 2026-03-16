@@ -498,6 +498,68 @@ const ShiftCreationPopup = ({
                 </div>
               </div>
 
+              {/* Absence Pay Override */}
+              {dayAbsence && (
+                <div className="rounded-md border p-3 space-y-2" style={{ borderColor: dayAbsence.absence_types?.color || 'hsl(var(--border))' }}>
+                  <div className="flex items-center gap-2">
+                    <CalendarOff className="w-4 h-4" style={{ color: dayAbsence.absence_types?.color }} />
+                    <span className="text-sm font-medium">
+                      Absence: {dayAbsence.absence_types?.name}
+                      {dayAbsence.status === 'pending' && <Badge variant="outline" className="ml-2 text-[10px]">Pending</Badge>}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This shift falls during an absence. Choose how to handle payment:
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={absencePayOverride === 'paid' ? 'default' : 'outline'}
+                      className="flex-1 text-xs h-7"
+                      onClick={() => {
+                        setAbsencePayOverride('paid');
+                        if (existingShift && onUpdateAbsencePayOverride) {
+                          onUpdateAbsencePayOverride(existingShift.id, 'paid');
+                        }
+                      }}
+                    >
+                      Pay Shift
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={absencePayOverride === 'unpaid' ? 'default' : 'outline'}
+                      className="flex-1 text-xs h-7"
+                      onClick={() => {
+                        setAbsencePayOverride('unpaid');
+                        if (existingShift && onUpdateAbsencePayOverride) {
+                          onUpdateAbsencePayOverride(existingShift.id, 'unpaid');
+                        }
+                      }}
+                    >
+                      Don't Pay
+                    </Button>
+                    {existingShift && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={absencePayOverride === null ? 'default' : 'outline'}
+                        className="flex-1 text-xs h-7"
+                        onClick={() => {
+                          setAbsencePayOverride(null);
+                          if (onUpdateAbsencePayOverride) {
+                            onUpdateAbsencePayOverride(existingShift.id, null);
+                          }
+                        }}
+                      >
+                        Default ({dayAbsence.absence_types?.is_payable ? 'Paid' : 'Unpaid'})
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-between pt-4">
                 <div>
                   {existingShift && onDeleteShift && (
