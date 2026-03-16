@@ -38,6 +38,8 @@ interface RosterShiftCellProps {
   onDragStart?: (e: React.DragEvent) => void;
   shiftTemplateName?: string;
   faded?: boolean;
+  hasAbsence?: boolean;
+  absencePayOverride?: string | null;
 }
 
 const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
@@ -48,6 +50,8 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   onDragStart,
   shiftTemplateName,
   faded = false,
+  hasAbsence = false,
+  absencePayOverride,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
