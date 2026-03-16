@@ -546,6 +546,7 @@ const Roster = () => {
         position: string;
         job_role_id: string;
         pay_rate: number;
+        absence_pay_override?: string | null;
       };
     }) => {
       // Fresh DB check for overlapping shifts
