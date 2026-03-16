@@ -546,6 +546,10 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
             onUpdate={() => {}}
           />
         </TabsContent>
+
+        <TabsContent value="absences">
+          <EmployeeAbsencesTab employeeId={employeeId} />
+        </TabsContent>
       </Tabs>
 
       {showCareerForm && (
