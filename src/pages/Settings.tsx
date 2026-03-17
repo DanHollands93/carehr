@@ -15,6 +15,7 @@ import EmployeeFormConfigManager from "@/components/EmployeeFormConfigManager";
 import ReviewTypeManager from "@/components/ReviewTypeManager";
 import JobRolePayRateManager from "@/components/JobRolePayRateManager";
 import AbsenceTypeManager from "@/components/AbsenceTypeManager";
+import DiscrepancyReasonManager from "@/components/DiscrepancyReasonManager";
 
 const Settings = () => {
   const { toast } = useToast();
