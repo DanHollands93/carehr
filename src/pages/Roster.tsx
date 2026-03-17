@@ -1580,19 +1580,44 @@ const Roster = () => {
                                       !hasContent && !dayAbsence && canEditRoster && "border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer",
                                       !hasContent && !dayAbsence && !canEditRoster && "border border-dashed border-border/30"
                                     )}>
-                                      {/* Absence banner */}
-                                      {dayAbsence && (
-                                        <div
-                                          className="rounded px-1.5 py-1 mb-1 text-[10px] font-semibold text-white text-center truncate"
-                                          style={{ backgroundColor: dayAbsence.absence_types?.color || '#6366f1' }}
-                                          title={`${dayAbsence.absence_types?.name}${dayAbsence.status === 'pending' ? ' (Pending)' : ''}`}
-                                        >
-                                          {dayAbsence.absence_types?.name}
-                                          {dayAbsence.status === 'pending' && (
-                                            <span className="ml-1 opacity-75">⏳</span>
-                                          )}
-                                        </div>
-                                      )}
+                                      {/* Absence banner - spans across consecutive days */}
+                                      {dayAbsence && (() => {
+                                        // Determine position of this day within the absence span (within the visible week)
+                                        const absStart = dayAbsence.start_date;
+                                        const absEnd = dayAbsence.end_date;
+                                        const weekDayStrs = weekDays.map(d => format(d, 'yyyy-MM-dd'));
+                                        const dayIdx = weekDayStrs.indexOf(dateStr);
+                                        const prevDate = dayIdx > 0 ? weekDayStrs[dayIdx - 1] : null;
+                                        const nextDate = dayIdx < weekDayStrs.length - 1 ? weekDayStrs[dayIdx + 1] : null;
+                                        const isFirst = dateStr === absStart || dayIdx === 0 || !prevDate || prevDate < absStart;
+                                        const isLast = dateStr === absEnd || dayIdx === weekDayStrs.length - 1 || !nextDate || nextDate > absEnd;
+                                        const color = dayAbsence.absence_types?.color || '#6366f1';
+                                        
+                                        return (
+                                          <div
+                                            className={cn(
+                                              "px-1.5 py-1 mb-1 text-[10px] font-semibold text-white truncate",
+                                              isFirst && isLast && "rounded",
+                                              isFirst && !isLast && "rounded-l -mr-1.5",
+                                              !isFirst && isLast && "rounded-r -ml-1.5",
+                                              !isFirst && !isLast && "-mx-1.5"
+                                            )}
+                                            style={{ backgroundColor: color }}
+                                            title={`${dayAbsence.absence_types?.name}${dayAbsence.status === 'pending' ? ' (Pending)' : ''} — ${absStart} to ${absEnd}`}
+                                          >
+                                            {isFirst ? (
+                                              <>
+                                                {dayAbsence.absence_types?.name}
+                                                {dayAbsence.status === 'pending' && (
+                                                  <span className="ml-1 opacity-75">⏳</span>
+                                                )}
+                                              </>
+                                            ) : (
+                                              <span className="opacity-0">·</span>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
                                       {hasContent ? (
                                         <div className="space-y-1">
                                           {dayShifts.map((shift) => {
