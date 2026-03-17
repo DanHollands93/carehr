@@ -799,6 +799,9 @@ const Roster = () => {
             .single();
           if (shiftErr) throw shiftErr;
 
+          // Check if there's an active absence for this employee/date
+          const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, shift.employee_id, shift.date);
+
           const { error } = await supabase
             .from('time_clock_records')
             .insert({
@@ -810,6 +813,7 @@ const Roster = () => {
               clock_in_time: isoDateTime,
               status: 'clocked_in',
               notes: `Manual clock in by manager (${new Date().toISOString()})`,
+              absence_id: dayAbsence?.id || null,
             });
           if (error) throw error;
         }
