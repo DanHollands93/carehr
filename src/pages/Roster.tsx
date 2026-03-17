@@ -799,6 +799,9 @@ const Roster = () => {
             .single();
           if (shiftErr) throw shiftErr;
 
+          // Check if there's an active absence for this employee/date
+          const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, shift.employee_id, shift.date);
+
           const { error } = await supabase
             .from('time_clock_records')
             .insert({
@@ -810,6 +813,7 @@ const Roster = () => {
               clock_in_time: isoDateTime,
               status: 'clocked_in',
               notes: `Manual clock in by manager (${new Date().toISOString()})`,
+              absence_id: dayAbsence?.id || null,
             });
           if (error) throw error;
         }
@@ -969,17 +973,24 @@ const Roster = () => {
         .filter(s => (s.type === 'late_start' || s.type === 'early_end') && s.paid)
         .reduce((sum, s) => sum + s.durationMinutes, 0);
 
+      const updateData: Record<string, any> = {
+        approval_status: 'reviewed',
+        status: 'completed',
+        approved_by: user?.id,
+        early_minutes_paid: earlyMinutesPaid,
+        late_minutes_paid: lateMinutesPaid,
+        notes: result.notes || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Save discrepancy reason if provided
+      if (result.discrepancyReasonId) {
+        updateData.discrepancy_reason_id = result.discrepancyReasonId;
+      }
+
       const { error } = await supabase
         .from('time_clock_records')
-        .update({
-          approval_status: 'reviewed',
-          status: 'completed',
-          approved_by: user?.id,
-          early_minutes_paid: earlyMinutesPaid,
-          late_minutes_paid: lateMinutesPaid,
-          notes: result.notes || null,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', result.recordId);
       
       if (error) throw error;
@@ -1573,19 +1584,44 @@ const Roster = () => {
                                       !hasContent && !dayAbsence && canEditRoster && "border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer",
                                       !hasContent && !dayAbsence && !canEditRoster && "border border-dashed border-border/30"
                                     )}>
-                                      {/* Absence banner */}
-                                      {dayAbsence && (
-                                        <div
-                                          className="rounded px-1.5 py-1 mb-1 text-[10px] font-semibold text-white text-center truncate"
-                                          style={{ backgroundColor: dayAbsence.absence_types?.color || '#6366f1' }}
-                                          title={`${dayAbsence.absence_types?.name}${dayAbsence.status === 'pending' ? ' (Pending)' : ''}`}
-                                        >
-                                          {dayAbsence.absence_types?.name}
-                                          {dayAbsence.status === 'pending' && (
-                                            <span className="ml-1 opacity-75">⏳</span>
-                                          )}
-                                        </div>
-                                      )}
+                                      {/* Absence banner - spans across consecutive days */}
+                                      {dayAbsence && (() => {
+                                        // Determine position of this day within the absence span (within the visible week)
+                                        const absStart = dayAbsence.start_date;
+                                        const absEnd = dayAbsence.end_date;
+                                        const weekDayStrs = weekDays.map(d => format(d, 'yyyy-MM-dd'));
+                                        const dayIdx = weekDayStrs.indexOf(dateStr);
+                                        const prevDate = dayIdx > 0 ? weekDayStrs[dayIdx - 1] : null;
+                                        const nextDate = dayIdx < weekDayStrs.length - 1 ? weekDayStrs[dayIdx + 1] : null;
+                                        const isFirst = dateStr === absStart || dayIdx === 0 || !prevDate || prevDate < absStart;
+                                        const isLast = dateStr === absEnd || dayIdx === weekDayStrs.length - 1 || !nextDate || nextDate > absEnd;
+                                        const color = dayAbsence.absence_types?.color || '#6366f1';
+                                        
+                                        return (
+                                          <div
+                                            className={cn(
+                                              "px-1.5 py-1 mb-1 text-[10px] font-semibold text-white truncate",
+                                              isFirst && isLast && "rounded",
+                                              isFirst && !isLast && "rounded-l -mr-1.5",
+                                              !isFirst && isLast && "rounded-r -ml-1.5",
+                                              !isFirst && !isLast && "-mx-1.5"
+                                            )}
+                                            style={{ backgroundColor: color }}
+                                            title={`${dayAbsence.absence_types?.name}${dayAbsence.status === 'pending' ? ' (Pending)' : ''} — ${absStart} to ${absEnd}`}
+                                          >
+                                            {isFirst ? (
+                                              <>
+                                                {dayAbsence.absence_types?.name}
+                                                {dayAbsence.status === 'pending' && (
+                                                  <span className="ml-1 opacity-75">⏳</span>
+                                                )}
+                                              </>
+                                            ) : (
+                                              <span className="opacity-0">·</span>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
                                       {hasContent ? (
                                         <div className="space-y-1">
                                           {dayShifts.map((shift) => {

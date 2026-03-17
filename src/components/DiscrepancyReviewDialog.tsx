@@ -4,8 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Clock, Check, X, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useDiscrepancyReasons, getReasonsForSegment, type DiscrepancyReason } from '@/hooks/useDiscrepancyReasons';
 
 interface TimeRecord {
   id: string;
@@ -17,6 +19,7 @@ interface TimeRecord {
   early_minutes_paid?: number | null;
   late_minutes_paid?: number | null;
   notes?: string | null;
+  discrepancy_reason_id?: string | null;
 }
 
 interface ShiftWithTimeRecord {
@@ -38,12 +41,14 @@ export interface DiscrepancySegment {
   timeRange: string;
   durationMinutes: number;
   paid: boolean;
+  reasonId?: string | null;
 }
 
 export interface DiscrepancyReviewResult {
   recordId: string;
   segments: DiscrepancySegment[];
   notes: string;
+  discrepancyReasonId?: string | null;
 }
 
 interface DiscrepancyReviewDialogProps {
@@ -62,6 +67,7 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
   onSubmitReview,
 }) => {
   const [notes, setNotes] = useState('');
+  const { data: allReasons = [] } = useDiscrepancyReasons();
 
   const timeToMinutes = (time: string): number => {
     const [h, m] = time.split(':').map(Number);
@@ -100,16 +106,16 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
 
     const segments: DiscrepancySegment[] = [];
 
-    // No-show: entire shift is missing
     if (isNoShow) {
       const duration = scheduledEnd - scheduledStart;
       segments.push({
-        type: 'late_start', // treat as missing time
+        type: 'late_start',
         label: 'Did Not Clock In',
         description: `Employee did not clock in for the entire shift`,
         timeRange: `${minutesToTime(scheduledStart)} → ${minutesToTime(scheduledEnd)}`,
         durationMinutes: duration,
         paid: false,
+        reasonId: tr?.discrepancy_reason_id || null,
       });
       return segments;
     }
@@ -119,11 +125,9 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
     const actualStart = isoToMinutes(tr.clock_in_time);
     const actualEnd = tr.clock_out_time ? isoToMinutes(tr.clock_out_time) : scheduledEnd;
 
-    // Track consumed paid minutes to handle multi-segment scenarios
     let earlyPaidRemaining = earlyPaid;
     let latePaidRemaining = latePaid;
 
-    // Clocked in early (before scheduled start) → uses earlyPaid bucket
     if (actualStart < scheduledStart) {
       const duration = scheduledStart - actualStart;
       const segPaid = isReviewed && earlyPaidRemaining >= duration;
@@ -135,10 +139,10 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         timeRange: `${minutesToTime(actualStart)} → ${minutesToTime(scheduledStart)}`,
         durationMinutes: duration,
         paid: segPaid,
+        reasonId: null,
       });
     }
 
-    // Clocked in late (after scheduled start) → uses latePaid bucket
     if (actualStart > scheduledStart + 5) {
       const duration = actualStart - scheduledStart;
       const segPaid = isReviewed && latePaidRemaining >= duration;
@@ -150,10 +154,10 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         timeRange: `${minutesToTime(scheduledStart)} → ${minutesToTime(actualStart)}`,
         durationMinutes: duration,
         paid: segPaid,
+        reasonId: null,
       });
     }
 
-    // Clocked out early (before scheduled end) → uses latePaid bucket
     if (actualEnd < scheduledEnd - 5) {
       const duration = scheduledEnd - actualEnd;
       const segPaid = isReviewed && latePaidRemaining >= duration;
@@ -165,10 +169,10 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         timeRange: `${minutesToTime(actualEnd)} → ${minutesToTime(scheduledEnd)}`,
         durationMinutes: duration,
         paid: segPaid,
+        reasonId: null,
       });
     }
 
-    // Clocked out late (after scheduled end) → uses earlyPaid bucket
     if (actualEnd > scheduledEnd) {
       const duration = actualEnd - scheduledEnd;
       const segPaid = isReviewed && earlyPaidRemaining >= duration;
@@ -180,6 +184,7 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         timeRange: `${minutesToTime(scheduledEnd)} → ${minutesToTime(actualEnd)}`,
         durationMinutes: duration,
         paid: segPaid,
+        reasonId: null,
       });
     }
 
@@ -188,7 +193,6 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
 
   const [segments, setSegments] = useState<DiscrepancySegment[]>(initialSegments);
 
-  // Reset when dialog opens with new data
   React.useEffect(() => {
     setSegments(initialSegments);
     setNotes(tr?.notes || '');
@@ -200,12 +204,27 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
     ));
   };
 
+  const setSegmentReason = (index: number, reasonId: string | null) => {
+    setSegments(prev => prev.map((seg, i) => {
+      if (i !== index) return seg;
+      // When selecting a reason, auto-set paid based on the reason's is_paid
+      if (reasonId) {
+        const reason = allReasons.find(r => r.id === reasonId);
+        return { ...seg, reasonId, paid: reason?.is_paid ?? seg.paid };
+      }
+      return { ...seg, reasonId: null };
+    }));
+  };
+
   const handleSubmit = () => {
     if (!tr) return;
+    // Use the first segment's reason as the overall discrepancy reason
+    const primaryReasonId = segments.find(s => s.reasonId)?.reasonId || null;
     onSubmitReview({
       recordId: tr.id,
       segments,
       notes,
+      discrepancyReasonId: primaryReasonId,
     });
   };
 
@@ -218,7 +237,6 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
   const actualStart = tr.clock_in_time ? isoToMinutes(tr.clock_in_time) : scheduledStart;
   const actualEnd = tr.clock_out_time ? isoToMinutes(tr.clock_out_time) : scheduledEnd;
 
-  // For visual bar
   const windowStart = Math.min(scheduledStart, actualStart);
   const windowEnd = Math.max(scheduledEnd, actualEnd);
   const windowDuration = windowEnd - windowStart || 1;
@@ -267,21 +285,18 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Timeline</p>
             <div className="relative h-10 bg-muted rounded-lg overflow-hidden">
-              {/* Scheduled block */}
               <div
                 className="absolute top-1 h-3.5 bg-primary/25 rounded border border-primary/30"
                 style={{ left: `${pct(scheduledStart)}%`, width: `${pct(scheduledEnd) - pct(scheduledStart)}%` }}
               />
 
               {isNoShow ? (
-                /* No-show: entire shift missing */
                 <div
                   className="absolute top-5.5 h-3.5 bg-destructive/50 rounded border border-dashed border-destructive/60"
                   style={{ left: `${pct(scheduledStart)}%`, width: `${pct(scheduledEnd) - pct(scheduledStart)}%` }}
                 />
               ) : (
                 <>
-                  {/* Actual on-time block */}
                   <div
                     className="absolute top-5.5 h-3.5 bg-emerald-500/80 rounded"
                     style={{
@@ -290,7 +305,6 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
                     }}
                   />
 
-                  {/* Extra segments */}
                   {actualStart < scheduledStart && (
                     <div
                       className="absolute top-5.5 h-3.5 bg-amber-400/80 rounded-l"
@@ -316,7 +330,6 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
                     />
                   )}
 
-                  {/* Time labels */}
                   <span className="absolute -bottom-4 text-[9px] text-muted-foreground" style={{ left: `${pct(actualStart)}%` }}>
                     {minutesToTime(actualStart)}
                   </span>
@@ -327,7 +340,6 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
               )}
             </div>
 
-            {/* Legend */}
             <div className="flex gap-4 mt-5 text-[10px] text-muted-foreground">
               <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-primary/25 border border-primary/30" /> Scheduled</div>
               <div className="flex items-center gap-1"><div className="w-3 h-2 rounded bg-emerald-500/80" /> On Time</div>
@@ -336,46 +348,74 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
             </div>
           </div>
 
-          {/* Discrepancy Segments */}
+          {/* Discrepancy Segments with Reason Selection */}
           {segments.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Discrepancy Segments</p>
               <div className="space-y-2">
-                {segments.map((seg, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "flex items-center justify-between rounded-lg border p-3 transition-colors",
-                      seg.paid ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800" : "bg-card border-border"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn("p-1.5 rounded-md bg-muted", segmentTypeColor(seg.type))}>
-                        {segmentTypeIcon(seg.type)}
+                {segments.map((seg, i) => {
+                  const relevantReasons = getReasonsForSegment(allReasons, seg.type);
+
+                  return (
+                    <div
+                      key={i}
+                      className={cn(
+                        "rounded-lg border p-3 transition-colors space-y-2",
+                        seg.paid ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800" : "bg-card border-border"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("p-1.5 rounded-md bg-muted", segmentTypeColor(seg.type))}>
+                            {segmentTypeIcon(seg.type)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{seg.label}</p>
+                            <p className="text-xs text-muted-foreground">{seg.description}</p>
+                            <p className="text-xs font-mono text-muted-foreground mt-0.5">
+                              {seg.timeRange} ({formatDuration(seg.durationMinutes)})
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Label htmlFor={`pay-${i}`} className={cn(
+                            "text-xs font-medium",
+                            seg.paid ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"
+                          )}>
+                            {seg.paid ? 'Paid' : 'Unpaid'}
+                          </Label>
+                          <Switch
+                            id={`pay-${i}`}
+                            checked={seg.paid}
+                            onCheckedChange={() => togglePaid(i)}
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{seg.label}</p>
-                        <p className="text-xs text-muted-foreground">{seg.description}</p>
-                        <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                          {seg.timeRange} ({formatDuration(seg.durationMinutes)})
-                        </p>
-                      </div>
+                      
+                      {/* Reason selection */}
+                      {relevantReasons.length > 0 && (
+                        <div className="pl-10">
+                          <Select
+                            value={seg.reasonId || '_none'}
+                            onValueChange={(val) => setSegmentReason(i, val === '_none' ? null : val)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Select reason (optional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="_none">No reason selected</SelectItem>
+                              {relevantReasons.map(reason => (
+                                <SelectItem key={reason.id} value={reason.id}>
+                                  {reason.name} ({reason.is_paid ? 'Paid' : 'Unpaid'})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Label htmlFor={`pay-${i}`} className={cn(
-                        "text-xs font-medium",
-                        seg.paid ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"
-                      )}>
-                        {seg.paid ? 'Paid' : 'Unpaid'}
-                      </Label>
-                      <Switch
-                        id={`pay-${i}`}
-                        checked={seg.paid}
-                        onCheckedChange={() => togglePaid(i)}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -413,15 +453,6 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
       </DialogContent>
     </Dialog>
   );
-};
-
-// Helper used externally
-const formatDurationExt = (mins: number): string => {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h > 0 && m > 0) return `${h}h ${m}m`;
-  if (h > 0) return `${h}h`;
-  return `${m}m`;
 };
 
 export default DiscrepancyReviewDialog;

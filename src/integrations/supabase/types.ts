@@ -610,6 +610,50 @@ export type Database = {
           },
         ]
       }
+      discrepancy_reasons: {
+        Row: {
+          company_id: string | null
+          context: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_paid: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          context?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_paid?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          context?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_paid?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discrepancy_reasons_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_logs: {
         Row: {
           body: string | null
@@ -2527,6 +2571,7 @@ export type Database = {
       }
       time_clock_records: {
         Row: {
+          absence_id: string | null
           approval_status: string | null
           approved_by: string | null
           clock_in_accuracy: number | null
@@ -2541,6 +2586,7 @@ export type Database = {
           clock_out_time: string | null
           company_id: string | null
           created_at: string
+          discrepancy_reason_id: string | null
           discrepancy_type: string | null
           early_minutes_paid: number | null
           employee_id: string
@@ -2557,6 +2603,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          absence_id?: string | null
           approval_status?: string | null
           approved_by?: string | null
           clock_in_accuracy?: number | null
@@ -2571,6 +2618,7 @@ export type Database = {
           clock_out_time?: string | null
           company_id?: string | null
           created_at?: string
+          discrepancy_reason_id?: string | null
           discrepancy_type?: string | null
           early_minutes_paid?: number | null
           employee_id: string
@@ -2587,6 +2635,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          absence_id?: string | null
           approval_status?: string | null
           approved_by?: string | null
           clock_in_accuracy?: number | null
@@ -2601,6 +2650,7 @@ export type Database = {
           clock_out_time?: string | null
           company_id?: string | null
           created_at?: string
+          discrepancy_reason_id?: string | null
           discrepancy_type?: string | null
           early_minutes_paid?: number | null
           employee_id?: string
@@ -2618,10 +2668,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "time_clock_records_absence_id_fkey"
+            columns: ["absence_id"]
+            isOneToOne: false
+            referencedRelation: "absences"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "time_clock_records_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_clock_records_discrepancy_reason_id_fkey"
+            columns: ["discrepancy_reason_id"]
+            isOneToOne: false
+            referencedRelation: "discrepancy_reasons"
             referencedColumns: ["id"]
           },
           {

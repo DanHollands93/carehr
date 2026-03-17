@@ -15,6 +15,7 @@ import EmployeeFormConfigManager from "@/components/EmployeeFormConfigManager";
 import ReviewTypeManager from "@/components/ReviewTypeManager";
 import JobRolePayRateManager from "@/components/JobRolePayRateManager";
 import AbsenceTypeManager from "@/components/AbsenceTypeManager";
+import DiscrepancyReasonManager from "@/components/DiscrepancyReasonManager";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -103,7 +104,10 @@ const Settings = () => {
         </TabsContent>
 
         <TabsContent value="timeclock">
-          <AutoExceptionsSettings />
+          <div className="space-y-6">
+            <AutoExceptionsSettings />
+            <DiscrepancyReasonManager />
+          </div>
         </TabsContent>
 
         <TabsContent value="appearance">
