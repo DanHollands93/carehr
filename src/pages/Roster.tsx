@@ -969,17 +969,24 @@ const Roster = () => {
         .filter(s => (s.type === 'late_start' || s.type === 'early_end') && s.paid)
         .reduce((sum, s) => sum + s.durationMinutes, 0);
 
+      const updateData: Record<string, any> = {
+        approval_status: 'reviewed',
+        status: 'completed',
+        approved_by: user?.id,
+        early_minutes_paid: earlyMinutesPaid,
+        late_minutes_paid: lateMinutesPaid,
+        notes: result.notes || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Save discrepancy reason if provided
+      if (result.discrepancyReasonId) {
+        updateData.discrepancy_reason_id = result.discrepancyReasonId;
+      }
+
       const { error } = await supabase
         .from('time_clock_records')
-        .update({
-          approval_status: 'reviewed',
-          status: 'completed',
-          approved_by: user?.id,
-          early_minutes_paid: earlyMinutesPaid,
-          late_minutes_paid: lateMinutesPaid,
-          notes: result.notes || null,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', result.recordId);
       
       if (error) throw error;
