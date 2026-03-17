@@ -104,7 +104,10 @@ const Settings = () => {
         </TabsContent>
 
         <TabsContent value="timeclock">
-          <AutoExceptionsSettings />
+          <div className="space-y-6">
+            <AutoExceptionsSettings />
+            <DiscrepancyReasonManager />
+          </div>
         </TabsContent>
 
         <TabsContent value="appearance">
