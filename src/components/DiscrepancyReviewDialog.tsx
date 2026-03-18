@@ -462,7 +462,10 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={segments.length === 0}>
+          <Button onClick={handleSubmit} disabled={segments.length === 0 || segments.some(s => {
+            const reasons = getReasonsForSegment(allReasons, s.type);
+            return reasons.length > 0 && !s.reasonId;
+          })}>
             <Check className="w-4 h-4 mr-2" />
             {tr?.approval_status === 'reviewed' ? 'Update Review' : 'Approve & Save'}
           </Button>
