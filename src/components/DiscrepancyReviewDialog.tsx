@@ -418,10 +418,9 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
                             onValueChange={(val) => setSegmentReason(i, val === '_none' ? null : val)}
                           >
                             <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Select reason (optional)" />
+                              <SelectValue placeholder="Select reason *" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="_none">No reason selected</SelectItem>
                               {relevantReasons.map(reason => (
                                 <SelectItem key={reason.id} value={reason.id}>
                                   {reason.name} ({reason.is_paid ? 'Paid' : 'Unpaid'})
