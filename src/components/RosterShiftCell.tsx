@@ -55,10 +55,13 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   hasAbsence = false,
   absencePayOverride,
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
   const formatDiscrepancyType = (type: string | null | undefined) => {
     if (!type) return 'Review';
     return type.split(',').map(t => t.trim().replace(/_/g, ' ')).join(', ');
   };
+
 
   // Parse time string "HH:mm" to minutes from midnight
   const timeToMinutes = (time: string): number => {
