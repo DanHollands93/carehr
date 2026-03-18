@@ -15,6 +15,8 @@ interface TimeRecord {
   early_minutes_paid?: number | null;
   late_minutes_paid?: number | null;
   notes?: string | null;
+  discrepancy_reason_id?: string | null;
+  discrepancy_reasons?: { id: string; name: string; is_paid: boolean } | null;
 }
 
 interface ShiftWithTimeRecord {
@@ -54,6 +56,12 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   absencePayOverride,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+
+  const formatDiscrepancyType = (type: string | null | undefined) => {
+    if (!type) return 'Review';
+    return type.split(',').map(t => t.trim().replace(/_/g, ' ')).join(', ');
+  };
+
 
   // Parse time string "HH:mm" to minutes from midnight
   const timeToMinutes = (time: string): number => {
@@ -317,7 +325,7 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
                 size="sm"
                 variant="outline"
                 className={cn(
-                  "w-full mt-1.5 h-5 text-[9px]",
+                  "w-full mt-1.5 h-auto min-h-5 text-[9px] py-0.5",
                   tr?.approval_status === 'reviewed'
                     ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                     : "border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
@@ -327,16 +335,28 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
                   onReviewDiscrepancy(shift);
                 }}
               >
-                <AlertTriangle className="w-2.5 h-2.5 mr-1" />
-                {tr?.approval_status === 'reviewed' 
-                  ? (tr?.notes?.includes('Auto-approved') ? 'Auto ✓' : 'Reviewed ✓')
-                  : 'Review'}
+                <AlertTriangle className="w-2.5 h-2.5 mr-1 shrink-0" />
+                <span className="truncate">
+                  {tr?.approval_status === 'reviewed' 
+                    ? (tr?.notes?.includes('Auto-approved') 
+                        ? 'Auto ✓' 
+                        : tr?.discrepancy_reasons?.name 
+                          ? `${tr.discrepancy_reasons.name} ✓`
+                          : 'Reviewed ✓')
+                    : tr?.discrepancy_reasons?.name 
+                      ? tr.discrepancy_reasons.name
+                      : formatDiscrepancyType(tr?.discrepancy_type)}
+                </span>
               </Button>
             )}
             {/* Show reviewed badge for completed discrepancies without edit permission */}
             {(isDiscrepancy || hasDiscrepancyType) && !canEdit && tr?.approval_status === 'reviewed' && (
-              <div className="text-[9px] text-emerald-600 font-medium mt-1 text-center">
-                {tr?.notes?.includes('Auto-approved') ? 'Auto ✓' : 'Reviewed ✓'}
+              <div className="text-[9px] text-emerald-600 font-medium mt-1 text-center truncate">
+                {tr?.notes?.includes('Auto-approved') 
+                  ? 'Auto ✓' 
+                  : tr?.discrepancy_reasons?.name 
+                    ? `${tr.discrepancy_reasons.name} ✓`
+                    : 'Reviewed ✓'}
               </div>
             )}
           </div>
@@ -347,9 +367,11 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
             <p>Scheduled: {formatTime(shift.start_time)} – {formatTime(shift.end_time)}</p>
             {tr?.clock_in_time && <p>Clock In: {formatClockTime(tr.clock_in_time)}</p>}
             {tr?.clock_out_time && <p>Clock Out: {formatClockTime(tr.clock_out_time)}</p>}
-            {isDiscrepancy && tr?.discrepancy_type && (
+            {(isDiscrepancy || hasDiscrepancyType) && tr?.discrepancy_type && (
               <p className="text-destructive">
-                Discrepancy: {tr.discrepancy_type.replace(/_/g, ' ')}
+                {tr.discrepancy_reasons?.name 
+                  ? `${tr.discrepancy_reasons.name} (${tr.discrepancy_reasons.is_paid ? 'Paid' : 'Unpaid'})`
+                  : formatDiscrepancyType(tr.discrepancy_type)}
               </p>
             )}
           </div>
