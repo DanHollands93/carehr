@@ -367,9 +367,11 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
             <p>Scheduled: {formatTime(shift.start_time)} – {formatTime(shift.end_time)}</p>
             {tr?.clock_in_time && <p>Clock In: {formatClockTime(tr.clock_in_time)}</p>}
             {tr?.clock_out_time && <p>Clock Out: {formatClockTime(tr.clock_out_time)}</p>}
-            {isDiscrepancy && tr?.discrepancy_type && (
+            {(isDiscrepancy || hasDiscrepancyType) && tr?.discrepancy_type && (
               <p className="text-destructive">
-                Discrepancy: {tr.discrepancy_type.replace(/_/g, ' ')}
+                {tr.discrepancy_reasons?.name 
+                  ? `${tr.discrepancy_reasons.name} (${tr.discrepancy_reasons.is_paid ? 'Paid' : 'Unpaid'})`
+                  : formatDiscrepancyType(tr.discrepancy_type)}
               </p>
             )}
           </div>
