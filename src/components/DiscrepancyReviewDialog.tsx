@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Clock, Check, X, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -400,17 +399,14 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <Label htmlFor={`pay-${i}`} className={cn(
-                            "text-xs font-medium",
-                            seg.paid ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"
+                          <span className={cn(
+                            "text-xs font-medium px-2 py-0.5 rounded",
+                            seg.paid 
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" 
+                              : "bg-muted text-muted-foreground"
                           )}>
                             {seg.paid ? 'Paid' : 'Unpaid'}
-                          </Label>
-                          <Switch
-                            id={`pay-${i}`}
-                            checked={seg.paid}
-                            onCheckedChange={() => togglePaid(i)}
-                          />
+                          </span>
                         </div>
                       </div>
                       
@@ -422,10 +418,9 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
                             onValueChange={(val) => setSegmentReason(i, val === '_none' ? null : val)}
                           >
                             <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Select reason (optional)" />
+                              <SelectValue placeholder="Select reason *" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="_none">No reason selected</SelectItem>
                               {relevantReasons.map(reason => (
                                 <SelectItem key={reason.id} value={reason.id}>
                                   {reason.name} ({reason.is_paid ? 'Paid' : 'Unpaid'})
@@ -467,7 +462,10 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={segments.length === 0}>
+          <Button onClick={handleSubmit} disabled={segments.length === 0 || segments.some(s => {
+            const reasons = getReasonsForSegment(allReasons, s.type);
+            return reasons.length > 0 && !s.reasonId;
+          })}>
             <Check className="w-4 h-4 mr-2" />
             {tr?.approval_status === 'reviewed' ? 'Update Review' : 'Approve & Save'}
           </Button>
