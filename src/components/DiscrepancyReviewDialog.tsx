@@ -104,6 +104,18 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
     const earlyPaid = tr?.early_minutes_paid || 0;
     const latePaid = tr?.late_minutes_paid || 0;
     const isNoShow = tr?.discrepancy_type === 'did_not_clock_in' && !tr?.clock_in_time;
+    const savedReasonId = tr?.discrepancy_reason_id || null;
+
+    // Determine which segment type the saved reason belongs to based on its context
+    const savedReason = savedReasonId ? allReasons.find(r => r.id === savedReasonId) : null;
+    const savedReasonContextToSegment: Record<string, string> = {
+      'early_clock_in': 'early_start',
+      'late_clock_in': 'late_start',
+      'early_clock_out': 'early_end',
+      'late_clock_out': 'late_end',
+      'no_show': 'late_start',
+    };
+    const savedReasonSegmentType = savedReason ? savedReasonContextToSegment[savedReason.context] : null;
 
     const segments: DiscrepancySegment[] = [];
 
@@ -116,7 +128,7 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         timeRange: `${minutesToTime(scheduledStart)} → ${minutesToTime(scheduledEnd)}`,
         durationMinutes: duration,
         paid: false,
-        reasonId: tr?.discrepancy_reason_id || null,
+        reasonId: savedReasonId,
       });
       return segments;
     }
@@ -128,6 +140,15 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
 
     let earlyPaidRemaining = earlyPaid;
     let latePaidRemaining = latePaid;
+    let reasonAssigned = false;
+
+    const getReasonForSegment = (segType: string) => {
+      if (!reasonAssigned && savedReasonSegmentType === segType && savedReasonId) {
+        reasonAssigned = true;
+        return savedReasonId;
+      }
+      return null;
+    };
 
     if (actualStart < scheduledStart) {
       const duration = scheduledStart - actualStart;
@@ -140,7 +161,7 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         timeRange: `${minutesToTime(actualStart)} → ${minutesToTime(scheduledStart)}`,
         durationMinutes: duration,
         paid: segPaid,
-        reasonId: null,
+        reasonId: getReasonForSegment('early_start'),
       });
     }
 
@@ -155,7 +176,7 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         timeRange: `${minutesToTime(scheduledStart)} → ${minutesToTime(actualStart)}`,
         durationMinutes: duration,
         paid: segPaid,
-        reasonId: null,
+        reasonId: getReasonForSegment('late_start'),
       });
     }
 
@@ -170,7 +191,7 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         timeRange: `${minutesToTime(actualEnd)} → ${minutesToTime(scheduledEnd)}`,
         durationMinutes: duration,
         paid: segPaid,
-        reasonId: null,
+        reasonId: getReasonForSegment('early_end'),
       });
     }
 
@@ -185,12 +206,12 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
         timeRange: `${minutesToTime(scheduledEnd)} → ${minutesToTime(actualEnd)}`,
         durationMinutes: duration,
         paid: segPaid,
-        reasonId: null,
+        reasonId: getReasonForSegment('late_end'),
       });
     }
 
     return segments;
-  }, [shift, tr]);
+  }, [shift, tr, allReasons]);
 
   const [segments, setSegments] = useState<DiscrepancySegment[]>(initialSegments);
 
