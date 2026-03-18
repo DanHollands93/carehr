@@ -72,6 +72,8 @@ interface ShiftWithTimeRecord extends Shift {
     early_minutes_paid?: number | null;
     late_minutes_paid?: number | null;
     notes?: string | null;
+    discrepancy_reason_id?: string | null;
+    discrepancy_reasons?: { id: string; name: string; is_paid: boolean } | null;
   } | null;
 }
 
