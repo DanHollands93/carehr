@@ -319,7 +319,7 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
                 size="sm"
                 variant="outline"
                 className={cn(
-                  "w-full mt-1.5 h-5 text-[9px]",
+                  "w-full mt-1.5 h-auto min-h-5 text-[9px] py-0.5",
                   tr?.approval_status === 'reviewed'
                     ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                     : "border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
@@ -329,10 +329,18 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
                   onReviewDiscrepancy(shift);
                 }}
               >
-                <AlertTriangle className="w-2.5 h-2.5 mr-1" />
-                {tr?.approval_status === 'reviewed' 
-                  ? (tr?.notes?.includes('Auto-approved') ? 'Auto ✓' : 'Reviewed ✓')
-                  : 'Review'}
+                <AlertTriangle className="w-2.5 h-2.5 mr-1 shrink-0" />
+                <span className="truncate">
+                  {tr?.approval_status === 'reviewed' 
+                    ? (tr?.notes?.includes('Auto-approved') 
+                        ? 'Auto ✓' 
+                        : tr?.discrepancy_reasons?.name 
+                          ? `${tr.discrepancy_reasons.name} ✓`
+                          : 'Reviewed ✓')
+                    : tr?.discrepancy_reasons?.name 
+                      ? tr.discrepancy_reasons.name
+                      : formatDiscrepancyType(tr?.discrepancy_type)}
+                </span>
               </Button>
             )}
             {/* Show reviewed badge for completed discrepancies without edit permission */}
