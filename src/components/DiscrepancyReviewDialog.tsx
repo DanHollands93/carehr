@@ -400,17 +400,14 @@ const DiscrepancyReviewDialog: React.FC<DiscrepancyReviewDialogProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <Label htmlFor={`pay-${i}`} className={cn(
-                            "text-xs font-medium",
-                            seg.paid ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"
+                          <span className={cn(
+                            "text-xs font-medium px-2 py-0.5 rounded",
+                            seg.paid 
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" 
+                              : "bg-muted text-muted-foreground"
                           )}>
                             {seg.paid ? 'Paid' : 'Unpaid'}
-                          </Label>
-                          <Switch
-                            id={`pay-${i}`}
-                            checked={seg.paid}
-                            onCheckedChange={() => togglePaid(i)}
-                          />
+                          </span>
                         </div>
                       </div>
                       
