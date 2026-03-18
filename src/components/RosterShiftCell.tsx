@@ -345,8 +345,12 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
             )}
             {/* Show reviewed badge for completed discrepancies without edit permission */}
             {(isDiscrepancy || hasDiscrepancyType) && !canEdit && tr?.approval_status === 'reviewed' && (
-              <div className="text-[9px] text-emerald-600 font-medium mt-1 text-center">
-                {tr?.notes?.includes('Auto-approved') ? 'Auto ✓' : 'Reviewed ✓'}
+              <div className="text-[9px] text-emerald-600 font-medium mt-1 text-center truncate">
+                {tr?.notes?.includes('Auto-approved') 
+                  ? 'Auto ✓' 
+                  : tr?.discrepancy_reasons?.name 
+                    ? `${tr.discrepancy_reasons.name} ✓`
+                    : 'Reviewed ✓'}
               </div>
             )}
           </div>
