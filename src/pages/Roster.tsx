@@ -295,7 +295,9 @@ const Roster = () => {
             clock_in_accuracy,
             clock_out_latitude,
             clock_out_longitude,
-            clock_out_accuracy
+            clock_out_accuracy,
+            discrepancy_reason_id,
+            discrepancy_reasons(id, name, is_paid)
           )
         `)
         .gte('date', startDate)
