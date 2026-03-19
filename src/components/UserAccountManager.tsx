@@ -390,8 +390,8 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-blue-600" />
             <div className="text-sm text-blue-800">
-              <p className="font-medium">Password Reset Email Setup:</p>
-              <p>To send password reset emails, verify your domain at <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="underline">resend.com/domains</a></p>
+              <p className="font-medium">Password Reset:</p>
+              <p>Clicking "Send Password Reset" will email the user a link to set a new password.</p>
             </div>
           </div>
         </div>
