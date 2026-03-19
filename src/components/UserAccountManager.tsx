@@ -174,42 +174,18 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
 
       if (error) {
         console.error('Error sending password reset:', error);
-        
-        // Check if it's a domain validation error from Resend
-        if (error.message?.includes('validation_error') || 
-            error.message?.includes('domain') ||
-            error.message?.includes('verify')) {
-          toast({
-            title: "Email Configuration Required",
-            description: "To send password reset emails, you need to verify your domain in Resend. Currently only emails to your verified domain can be sent.",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: "Failed to send password reset email",
-            variant: "destructive"
-          });
-        }
+        toast({
+          title: "Error",
+          description: "Failed to send password reset email",
+          variant: "destructive"
+        });
       } else if (data?.error) {
         console.error('Server error sending password reset:', data.error);
-        
-        // Parse the server error for better user feedback
-        if (data.error.includes('validation_error') || 
-            data.error.includes('domain') ||
-            data.error.includes('verify')) {
-          toast({
-            title: "Domain Verification Required",
-            description: "Please verify your sending domain in Resend to send emails to this address.",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: data.error,
-            variant: "destructive"
-          });
-        }
+        toast({
+          title: "Error",
+          description: data.error,
+          variant: "destructive"
+        });
       } else {
         toast({
           title: "Success",
@@ -414,8 +390,8 @@ const UserAccountManager = ({ employee, onUpdate }: UserAccountManagerProps) => 
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-blue-600" />
             <div className="text-sm text-blue-800">
-              <p className="font-medium">Password Reset Email Setup:</p>
-              <p>To send password reset emails, verify your domain at <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="underline">resend.com/domains</a></p>
+              <p className="font-medium">Password Reset:</p>
+              <p>Clicking "Send Password Reset" will email the user a link to set a new password.</p>
             </div>
           </div>
         </div>

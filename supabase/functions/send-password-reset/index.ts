@@ -1,9 +1,5 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { Resend } from "npm:resend@2.0.0";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +29,7 @@ serve(async (req) => {
     );
 
     // Verify caller identity and role
-    const authHeader = req.headers.get('Authorization')
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -41,29 +37,27 @@ serve(async (req) => {
       );
     }
 
-    const token = authHeader.replace('Bearer ', '')
     const supabaseCaller = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
-    )
-    const { data: claimsData, error: claimsError } = await supabaseCaller.auth.getClaims(token)
-    if (claimsError || !claimsData?.claims) {
+    );
+
+    const { data: { user: caller }, error: callerError } = await supabaseCaller.auth.getUser();
+    if (callerError || !caller) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const callerId = claimsData.claims.sub
-
     // Check caller has admin or super_admin role
     const { data: roles } = await supabaseAdmin
       .from('user_roles')
       .select('role')
-      .eq('user_id', callerId)
+      .eq('user_id', caller.id);
 
-    const hasPrivilege = roles?.some((r: any) => ['admin', 'super_admin'].includes(r.role))
+    const hasPrivilege = roles?.some((r: any) => ['admin', 'super_admin'].includes(r.role));
     if (!hasPrivilege) {
       return new Response(
         JSON.stringify({ error: 'Forbidden: insufficient privileges' }),
@@ -79,6 +73,7 @@ serve(async (req) => {
     console.log('Sending password reset email to:', email);
     console.log('Redirect URL:', resetUrl);
 
+    // Generate the recovery link using the admin API
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email,
@@ -89,85 +84,62 @@ serve(async (req) => {
 
     if (error) {
       console.error('Error generating reset link:', error);
-      
-      await supabaseAdmin.from('email_logs').insert({
-        recipient_email: email,
-        subject: 'Reset Your Password',
-        email_type: 'password_reset',
-        status: 'failed',
-        email_service: 'resend',
-        error_message: error.message
-      });
-
       return new Response(
         JSON.stringify({ error: error.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Generated reset link:', data.properties.action_link);
+    const resetLink = data.properties.action_link;
+    console.log('Generated reset link successfully');
 
-    const emailResponse = await resend.emails.send({
-      from: "HR System <noreply@resend.dev>",
-      to: [email],
-      subject: "Reset Your Password",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Reset Your Password</h2>
-          <p>You've requested to reset your password for your HR System account.</p>
-          <p>Click the link below to reset your password:</p>
-          <div style="margin: 20px 0;">
-            <a href="${data.properties.action_link}" 
-               style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
-              Reset Password
-            </a>
-          </div>
-          <p style="color: #666; font-size: 14px;">
-            If you didn't request this password reset, you can safely ignore this email.
-            This link will expire in 1 hour.
-          </p>
-          <p style="color: #666; font-size: 14px;">
-            If the button doesn't work, you can copy and paste this link into your browser:<br>
-            <span style="word-break: break-all;">${data.properties.action_link}</span>
-          </p>
+    // Render the email HTML
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #333;">Reset Your Password</h2>
+        <p>You've received a request to reset your password for your CareHR account.</p>
+        <p>Click the button below to reset your password:</p>
+        <div style="margin: 24px 0;">
+          <a href="${resetLink}" 
+             style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 500;">
+            Reset Password
+          </a>
         </div>
-      `,
+        <p style="color: #666; font-size: 14px;">
+          If you didn't request this password reset, you can safely ignore this email.
+          This link will expire in 1 hour.
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          If the button doesn't work, copy and paste this link into your browser:<br>
+          <span style="word-break: break-all;">${resetLink}</span>
+        </p>
+      </div>
+    `;
+
+    // Enqueue via the email queue for reliable delivery
+    const { data: msgId, error: enqueueError } = await supabaseAdmin.rpc('enqueue_email', {
+      queue_name: 'transactional_emails',
+      payload: {
+        to: email,
+        subject: 'Reset Your Password',
+        html: emailHtml,
+      }
     });
 
-    if (emailResponse.error) {
-      console.error('Error sending email:', emailResponse.error);
-      
-      await supabaseAdmin.from('email_logs').insert({
-        recipient_email: email,
-        subject: 'Reset Your Password',
-        email_type: 'password_reset',
-        status: 'failed',
-        email_service: 'resend',
-        error_message: emailResponse.error.message
-      });
-
+    if (enqueueError) {
+      console.error('Error enqueuing email:', enqueueError);
       return new Response(
-        JSON.stringify({ error: 'Failed to send password reset email' }),
+        JSON.stringify({ error: 'Failed to queue password reset email' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Password reset email sent successfully:', emailResponse);
-
-    await supabaseAdmin.from('email_logs').insert({
-      recipient_email: email,
-      subject: 'Reset Your Password',
-      email_type: 'password_reset',
-      status: 'sent',
-      email_service: 'resend',
-      external_id: emailResponse.data?.id
-    });
+    console.log('Password reset email enqueued successfully, msgId:', msgId);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Password reset email sent successfully',
-        emailId: emailResponse.data?.id 
+        message: 'Password reset email sent successfully'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
