@@ -73,76 +73,31 @@ serve(async (req) => {
     console.log('Sending password reset email to:', email);
     console.log('Redirect URL:', resetUrl);
 
-    // Generate the recovery link using the admin API
-    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'recovery',
-      email: email,
-      options: {
-        redirectTo: resetUrl
+    // Hand off to the native auth recovery flow so the branded recovery template is used
+    const supabasePublic = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
       }
+    );
+
+    const { error } = await supabasePublic.auth.resetPasswordForEmail(email, {
+      redirectTo: resetUrl,
     });
 
     if (error) {
-      console.error('Error generating reset link:', error);
+      console.error('Error sending password reset email:', error);
       return new Response(
         JSON.stringify({ error: error.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const resetLink = data.properties.action_link;
-    console.log('Generated reset link successfully');
-
-    // Render the email HTML
-    const emailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #333;">Reset Your Password</h2>
-        <p>You've received a request to reset your password for your CareHR account.</p>
-        <p>Click the button below to reset your password:</p>
-        <div style="margin: 24px 0;">
-          <a href="${resetLink}" 
-             style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 500;">
-            Reset Password
-          </a>
-        </div>
-        <p style="color: #666; font-size: 14px;">
-          If you didn't request this password reset, you can safely ignore this email.
-          This link will expire in 1 hour.
-        </p>
-        <p style="color: #666; font-size: 14px;">
-          If the button doesn't work, copy and paste this link into your browser:<br>
-          <span style="word-break: break-all;">${resetLink}</span>
-        </p>
-      </div>
-    `;
-
-    // Enqueue via the email queue for reliable delivery
-    const messageId = crypto.randomUUID();
-    const { data: msgId, error: enqueueError } = await supabaseAdmin.rpc('enqueue_email', {
-      queue_name: 'transactional_emails',
-      payload: {
-        message_id: messageId,
-        to: email,
-        from: 'carehr <noreply@notify.demo.carehr.app>',
-        sender_domain: 'notify.demo.carehr.app',
-        subject: 'Reset Your Password',
-        html: emailHtml,
-        text: `Reset your password by visiting: ${resetLink}`,
-        purpose: 'transactional',
-        label: 'password-reset',
-        queued_at: new Date().toISOString(),
-      }
-    });
-
-    if (enqueueError) {
-      console.error('Error enqueuing email:', enqueueError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to queue password reset email' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('Password reset email enqueued successfully, msgId:', msgId);
+    console.log('Password reset email handed off to auth email flow');
 
     return new Response(
       JSON.stringify({ 
