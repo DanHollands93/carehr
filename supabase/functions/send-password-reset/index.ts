@@ -117,12 +117,20 @@ serve(async (req) => {
     `;
 
     // Enqueue via the email queue for reliable delivery
+    const messageId = crypto.randomUUID();
     const { data: msgId, error: enqueueError } = await supabaseAdmin.rpc('enqueue_email', {
       queue_name: 'transactional_emails',
       payload: {
+        message_id: messageId,
         to: email,
+        from: 'carehr <noreply@notify.demo.carehr.app>',
+        sender_domain: 'notify.demo.carehr.app',
         subject: 'Reset Your Password',
         html: emailHtml,
+        text: `Reset your password by visiting: ${resetLink}`,
+        purpose: 'transactional',
+        label: 'password-reset',
+        queued_at: new Date().toISOString(),
       }
     });
 
