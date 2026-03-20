@@ -117,10 +117,12 @@ serve(async (req) => {
     `;
 
     // Enqueue via the email queue for reliable delivery
+    const runId = crypto.randomUUID();
     const messageId = crypto.randomUUID();
     const { data: msgId, error: enqueueError } = await supabaseAdmin.rpc('enqueue_email', {
       queue_name: 'transactional_emails',
       payload: {
+        run_id: runId,
         message_id: messageId,
         to: email,
         from: 'carehr <noreply@notify.demo.carehr.app>',
