@@ -74,7 +74,18 @@ serve(async (req) => {
     console.log('Redirect URL:', resetUrl);
 
     // Hand off to the native auth recovery flow so the branded recovery template is used
-    const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+    const supabasePublic = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
+    const { error } = await supabasePublic.auth.resetPasswordForEmail(email, {
       redirectTo: resetUrl,
     });
 
