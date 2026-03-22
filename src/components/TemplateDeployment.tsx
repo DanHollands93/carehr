@@ -50,12 +50,12 @@ const TemplateDeployment = ({
     enabled: !!templateId
   });
 
-  const { data: templateAssignments } = useQuery({
-    queryKey: ['template-assignments', templateId],
+  const { data: templateShifts } = useQuery({
+    queryKey: ['template-shifts-for-deploy', templateId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('roster_template_assignments')
-        .select('*')
+        .from('template_shifts')
+        .select('*, shift_templates(start_time, end_time, position)')
         .eq('roster_template_id', templateId);
       
       if (error) throw error;
@@ -64,22 +64,10 @@ const TemplateDeployment = ({
     enabled: !!templateId
   });
 
-  const { data: shiftTemplates } = useQuery({
-    queryKey: ['shift-templates'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('shift_templates')
-        .select('*');
-      
-      if (error) throw error;
-      return data;
-    }
-  });
-
   const deployTemplateMutation = useMutation({
     mutationFn: async () => {
-      if (!templateAssignments || templateAssignments.length === 0) {
-        throw new Error("No template assignments found to deploy");
+      if (!templateShifts || templateShifts.length === 0) {
+        throw new Error("No template shifts found to deploy");
       }
 
       const startDate = parseISO(deploymentDate);
@@ -94,18 +82,18 @@ const TemplateDeployment = ({
 
       const endDate = format(addDays(startDate, periodDays - 1), 'yyyy-MM-dd');
 
-      // Create shifts for the period
-      const shiftsToCreate = templateAssignments.map((assignment: any) => {
-        const shiftDate = format(addDays(startDate, assignment.day_of_period || 0), 'yyyy-MM-dd');
-        const shiftTemplate = shiftTemplates?.find(st => st.id === assignment.shift_template_id);
+      // Create shifts from template_shifts (which has day_index and actual shift data)
+      const shiftsToCreate = templateShifts.map((ts: any) => {
+        const shiftDate = format(addDays(startDate, ts.day_index || 0), 'yyyy-MM-dd');
+        const st = ts.shift_templates;
         
         return {
-          employee_id: assignment.employee_id,
+          employee_id: ts.employee_id,
           date: shiftDate,
-          start_time: shiftTemplate?.start_time || '09:00',
-          end_time: shiftTemplate?.end_time || '17:00',
-          position: shiftTemplate?.position || 'General',
-          job_role_id: null,
+          start_time: st?.start_time || '09:00',
+          end_time: st?.end_time || '17:00',
+          position: st?.position || 'General',
+          job_role_id: ts.job_role_id || null,
           roster_template_id: templateId,
         };
       });
@@ -212,16 +200,16 @@ const TemplateDeployment = ({
               value={deploymentDate}
               onChange={(e) => setDeploymentDate(e.target.value)}
             />
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Template will be deployed from {deploymentDate} to {' '}
               {format(addDays(parseISO(deploymentDate), getPeriodDays() - 1), 'yyyy-MM-dd')}
             </p>
           </div>
 
-          {templateAssignments && (
-            <div className="bg-gray-50 p-3 rounded">
-              <p className="text-sm text-gray-600">
-                This template contains {templateAssignments.length} shift assignments.
+          {templateShifts && (
+            <div className="bg-muted p-3 rounded">
+              <p className="text-sm text-muted-foreground">
+                This template contains {templateShifts.length} shift entries across the period.
                 Any existing shifts for the same employee on the same day will be skipped.
               </p>
             </div>
