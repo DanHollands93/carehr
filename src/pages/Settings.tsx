@@ -51,6 +51,7 @@ const Settings = () => {
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="job-roles">Position Pay Rates</TabsTrigger>
           <TabsTrigger value="absences">Absences</TabsTrigger>
+          <TabsTrigger value="demo">Demo Data</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
