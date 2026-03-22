@@ -16,6 +16,7 @@ import ReviewTypeManager from "@/components/ReviewTypeManager";
 import JobRolePayRateManager from "@/components/JobRolePayRateManager";
 import AbsenceTypeManager from "@/components/AbsenceTypeManager";
 import DiscrepancyReasonManager from "@/components/DiscrepancyReasonManager";
+import DemoDataGenerator from "@/components/DemoDataGenerator";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -50,6 +51,7 @@ const Settings = () => {
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="job-roles">Position Pay Rates</TabsTrigger>
           <TabsTrigger value="absences">Absences</TabsTrigger>
+          <TabsTrigger value="demo">Demo Data</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -246,6 +248,10 @@ const Settings = () => {
 
         <TabsContent value="absences">
           <AbsenceTypeManager />
+        </TabsContent>
+
+        <TabsContent value="demo">
+          <DemoDataGenerator />
         </TabsContent>
       </Tabs>
     </div>
