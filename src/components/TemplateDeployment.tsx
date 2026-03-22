@@ -66,8 +66,8 @@ const TemplateDeployment = ({
 
   const deployTemplateMutation = useMutation({
     mutationFn: async () => {
-      if (!templateAssignments || templateAssignments.length === 0) {
-        throw new Error("No template assignments found to deploy");
+      if (!templateShifts || templateShifts.length === 0) {
+        throw new Error("No template shifts found to deploy");
       }
 
       const startDate = parseISO(deploymentDate);
@@ -82,18 +82,18 @@ const TemplateDeployment = ({
 
       const endDate = format(addDays(startDate, periodDays - 1), 'yyyy-MM-dd');
 
-      // Create shifts for the period
-      const shiftsToCreate = templateAssignments.map((assignment: any) => {
-        const shiftDate = format(addDays(startDate, assignment.day_of_period || 0), 'yyyy-MM-dd');
-        const shiftTemplate = shiftTemplates?.find(st => st.id === assignment.shift_template_id);
+      // Create shifts from template_shifts (which has day_index and actual shift data)
+      const shiftsToCreate = templateShifts.map((ts: any) => {
+        const shiftDate = format(addDays(startDate, ts.day_index || 0), 'yyyy-MM-dd');
+        const st = ts.shift_templates;
         
         return {
-          employee_id: assignment.employee_id,
+          employee_id: ts.employee_id,
           date: shiftDate,
-          start_time: shiftTemplate?.start_time || '09:00',
-          end_time: shiftTemplate?.end_time || '17:00',
-          position: shiftTemplate?.position || 'General',
-          job_role_id: null,
+          start_time: st?.start_time || '09:00',
+          end_time: st?.end_time || '17:00',
+          position: st?.position || 'General',
+          job_role_id: ts.job_role_id || null,
           roster_template_id: templateId,
         };
       });
