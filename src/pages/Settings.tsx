@@ -249,6 +249,10 @@ const Settings = () => {
         <TabsContent value="absences">
           <AbsenceTypeManager />
         </TabsContent>
+
+        <TabsContent value="demo">
+          <DemoDataGenerator />
+        </TabsContent>
       </Tabs>
     </div>
   );
