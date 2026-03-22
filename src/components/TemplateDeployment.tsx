@@ -50,30 +50,18 @@ const TemplateDeployment = ({
     enabled: !!templateId
   });
 
-  const { data: templateAssignments } = useQuery({
-    queryKey: ['template-assignments', templateId],
+  const { data: templateShifts } = useQuery({
+    queryKey: ['template-shifts-for-deploy', templateId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('roster_template_assignments')
-        .select('*')
+        .from('template_shifts')
+        .select('*, shift_templates(start_time, end_time, position)')
         .eq('roster_template_id', templateId);
       
       if (error) throw error;
       return data;
     },
     enabled: !!templateId
-  });
-
-  const { data: shiftTemplates } = useQuery({
-    queryKey: ['shift-templates'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('shift_templates')
-        .select('*');
-      
-      if (error) throw error;
-      return data;
-    }
   });
 
   const deployTemplateMutation = useMutation({
