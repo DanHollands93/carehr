@@ -16,6 +16,7 @@ import ReviewTypeManager from "@/components/ReviewTypeManager";
 import JobRolePayRateManager from "@/components/JobRolePayRateManager";
 import AbsenceTypeManager from "@/components/AbsenceTypeManager";
 import DiscrepancyReasonManager from "@/components/DiscrepancyReasonManager";
+import DemoDataGenerator from "@/components/DemoDataGenerator";
 
 const Settings = () => {
   const { toast } = useToast();
