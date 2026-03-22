@@ -206,10 +206,10 @@ const TemplateDeployment = ({
             </p>
           </div>
 
-          {templateAssignments && (
-            <div className="bg-gray-50 p-3 rounded">
-              <p className="text-sm text-gray-600">
-                This template contains {templateAssignments.length} shift assignments.
+          {templateShifts && (
+            <div className="bg-muted p-3 rounded">
+              <p className="text-sm text-muted-foreground">
+                This template contains {templateShifts.length} shift entries across the period.
                 Any existing shifts for the same employee on the same day will be skipped.
               </p>
             </div>
