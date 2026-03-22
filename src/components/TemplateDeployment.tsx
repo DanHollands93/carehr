@@ -200,7 +200,7 @@ const TemplateDeployment = ({
               value={deploymentDate}
               onChange={(e) => setDeploymentDate(e.target.value)}
             />
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Template will be deployed from {deploymentDate} to {' '}
               {format(addDays(parseISO(deploymentDate), getPeriodDays() - 1), 'yyyy-MM-dd')}
             </p>
