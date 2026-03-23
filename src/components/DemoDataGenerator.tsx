@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { useToast } from "@/hooks/use-toast";
-import { format, addDays, subDays, subMinutes, addMinutes } from "date-fns";
+import { addMinutes, subMinutes } from "date-fns";
 import { Loader2, Database, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -22,87 +22,64 @@ const DemoDataGenerator = () => {
 
     setIsGenerating(true);
     try {
-      // Fetch employees for this company
-      const { data: employees, error: empError } = await supabase
-        .from("employees")
-        .select("id, first_name, last_name")
+      // Find existing shifts for this company (from deployed templates or manual)
+      const today = new Date();
+      const { data: existingShifts, error: shiftError } = await supabase
+        .from("shifts")
+        .select("id, employee_id, date, start_time, end_time, position, company_id")
         .eq("company_id", companyId)
-        .limit(10);
+        .order("date");
 
-      if (empError) throw empError;
-      if (!employees || employees.length === 0) {
-        toast({ title: "No employees found", variant: "destructive" });
+      if (shiftError) throw shiftError;
+
+      if (!existingShifts || existingShifts.length === 0) {
+        toast({ 
+          title: "No shifts found", 
+          description: "Deploy a roster template first, then generate demo clock data.",
+          variant: "destructive" 
+        });
         return;
       }
 
-      // Fetch job roles
-      const { data: jobRoles } = await supabase
-        .from("job_roles")
-        .select("id, title")
-        .eq("company_id", companyId)
-        .limit(5);
+      // Filter to past shifts and today's shifts only for time records
+      const todayStr = today.toISOString().split('T')[0];
+      const pastAndTodayShifts = existingShifts.filter(s => s.date <= todayStr);
 
-      const defaultJobRoleId = jobRoles?.[0]?.id || null;
+      if (pastAndTodayShifts.length === 0) {
+        toast({ 
+          title: "No past shifts found", 
+          description: "Deploy a roster template with dates in the past to generate clock data.",
+          variant: "destructive" 
+        });
+        return;
+      }
 
-      const today = new Date();
-      const shifts: any[] = [];
+      // Check which shifts already have time records
+      const shiftIds = pastAndTodayShifts.map(s => s.id);
+      const { data: existingRecords } = await supabase
+        .from("time_clock_records")
+        .select("shift_id")
+        .in("shift_id", shiftIds.slice(0, 100));
+
+      const existingShiftIds = new Set((existingRecords || []).map(r => r.shift_id));
+      const shiftsNeedingRecords = pastAndTodayShifts.filter(s => !existingShiftIds.has(s.id));
+
+      if (shiftsNeedingRecords.length === 0) {
+        toast({ 
+          title: "All shifts already have time records", 
+          description: "Clear demo data first if you want to regenerate.",
+        });
+        return;
+      }
+
       const timeRecords: any[] = [];
 
-      // Generate shifts for the past 7 days and next 7 days
-      for (let dayOffset = -7; dayOffset <= 7; dayOffset++) {
-        const date = addDays(today, dayOffset);
-        const dateStr = format(date, "yyyy-MM-dd");
-        const dow = date.getDay();
-        if (dow === 0) continue; // skip Sundays
-
-        // Assign shifts to employees
-        for (let i = 0; i < Math.min(employees.length, 8); i++) {
-          const emp = employees[i];
-
-          // Vary shift times
-          const shiftPatterns = [
-            { start: "07:00", end: "15:00", position: "Morning" },
-            { start: "09:00", end: "17:00", position: "Day" },
-            { start: "14:00", end: "22:00", position: "Afternoon" },
-            { start: "08:00", end: "16:00", position: "Standard" },
-          ];
-          const pattern = shiftPatterns[i % shiftPatterns.length];
-
-          const shiftId = crypto.randomUUID();
-          shifts.push({
-            id: shiftId,
-            employee_id: emp.id,
-            date: dateStr,
-            start_time: pattern.start,
-            end_time: pattern.end,
-            position: pattern.position,
-            company_id: companyId,
-            job_role_id: defaultJobRoleId,
-          });
-
-          // Only create time records for past days and today
-          if (dayOffset <= 0) {
-            const record = createTimeRecord(
-              shiftId,
-              emp.id,
-              dateStr,
-              pattern.start,
-              pattern.end,
-              companyId,
-              i,
-              dayOffset
-            );
-            if (record) timeRecords.push(record);
-          }
-        }
-      }
-
-      // Insert shifts in batches
-      for (let i = 0; i < shifts.length; i += 50) {
-        const batch = shifts.slice(i, i + 50);
-        const { error } = await supabase.from("shifts").insert(batch);
-        if (error) throw error;
-      }
+      shiftsNeedingRecords.forEach((shift, index) => {
+        const isToday = shift.date === todayStr;
+        const isPast = shift.date < todayStr;
+        const record = createTimeRecord(shift, index, isToday, isPast);
+        if (record) timeRecords.push(record);
+      });
 
       // Insert time records in batches
       for (let i = 0; i < timeRecords.length; i += 50) {
@@ -112,8 +89,8 @@ const DemoDataGenerator = () => {
       }
 
       toast({
-        title: "Demo data created!",
-        description: `Generated ${shifts.length} shifts and ${timeRecords.length} time records`,
+        title: "Demo clock data created!",
+        description: `Generated ${timeRecords.length} time records for ${existingShifts.length} total shifts`,
       });
     } catch (error: any) {
       console.error("Error generating demo data:", error);
@@ -131,24 +108,15 @@ const DemoDataGenerator = () => {
     if (!companyId) return;
     setIsClearing(true);
     try {
-      // Delete time clock records first (FK dependency)
       const { error: tcrError } = await supabase
         .from("time_clock_records")
         .delete()
         .eq("company_id", companyId)
         .like("notes", "%demo%");
 
-      // Delete all shifts for this company that have no roster_template_id (demo shifts)
-      const { error: shiftError } = await supabase
-        .from("shifts")
-        .delete()
-        .eq("company_id", companyId)
-        .is("roster_template_id", null);
-
       if (tcrError) throw tcrError;
-      if (shiftError) throw shiftError;
 
-      toast({ title: "Demo data cleared" });
+      toast({ title: "Demo clock data cleared" });
     } catch (error: any) {
       toast({ title: "Error clearing data", description: error.message, variant: "destructive" });
     } finally {
@@ -164,18 +132,20 @@ const DemoDataGenerator = () => {
           Demo Data Generator
         </CardTitle>
         <CardDescription>
-          Generate sample roster shifts and time clock records with various statuses
-          (on-time, early, late, discrepancies, no-shows, etc.) for demonstration purposes.
+          Generate sample time clock records with various statuses for existing deployed roster shifts.
+          Deploy a roster template first, then use this to populate clock-in/out data.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="text-sm text-muted-foreground space-y-1">
-          <p>This will create:</p>
+          <p>This will create time records for your deployed roster shifts including:</p>
           <ul className="list-disc list-inside ml-2 space-y-0.5">
-            <li>Shifts for the past 7 days and next 7 days</li>
-            <li>Time records with: on-time clock in/out, early/late clock in, early/late clock out</li>
-            <li>Discrepancy records, completed shifts, and scheduled (future) shifts</li>
-            <li>Ad-hoc (unrostered) clock-ins</li>
+            <li>On-time clock in/out (perfect attendance)</li>
+            <li>Early/late clock in (25-30 min variance)</li>
+            <li>Early/late clock out (35-45 min variance)</li>
+            <li>Double discrepancies (late in + early out)</li>
+            <li>Currently clocked in (for today's shifts)</li>
+            <li>No-shows (scheduled but never clocked in)</li>
           </ul>
         </div>
 
@@ -187,7 +157,7 @@ const DemoDataGenerator = () => {
                 Generating...
               </>
             ) : (
-              "Generate Demo Data"
+              "Generate Demo Clock Data"
             )}
           </Button>
 
@@ -206,7 +176,7 @@ const DemoDataGenerator = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle>Clear demo data?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will remove demo time records and non-template shifts. Template-deployed shifts will not be affected.
+                  This will remove all demo time clock records. Deployed shifts will not be affected.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -221,68 +191,80 @@ const DemoDataGenerator = () => {
   );
 };
 
-function createTimeRecord(
-  shiftId: string,
-  employeeId: string,
-  dateStr: string,
-  startTime: string,
-  endTime: string,
-  companyId: string,
-  employeeIndex: number,
-  dayOffset: number
-): any | null {
-  // Use employee index + dayOffset to deterministically vary the scenario
-  const scenario = Math.abs((employeeIndex * 7 + dayOffset * 3) % 8);
+interface ShiftData {
+  id: string;
+  employee_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  position: string | null;
+  company_id: string;
+}
 
-  const [startH, startM] = startTime.split(":").map(Number);
-  const [endH, endM] = endTime.split(":").map(Number);
-  const shiftStart = new Date(`${dateStr}T${startTime}:00`);
-  const shiftEnd = new Date(`${dateStr}T${endTime}:00`);
+function createTimeRecord(
+  shift: ShiftData,
+  index: number,
+  isToday: boolean,
+  isPast: boolean
+): any | null {
+  const scenario = Math.abs(index % 8);
+
+  const shiftStart = new Date(`${shift.date}T${shift.start_time}:00`);
+  const shiftEnd = new Date(`${shift.date}T${shift.end_time}:00`);
 
   const base: any = {
-    employee_id: employeeId,
-    shift_id: shiftId,
-    shift_date: dateStr,
-    shift_start_time: startTime,
-    shift_end_time: endTime,
-    company_id: companyId,
+    employee_id: shift.employee_id,
+    shift_id: shift.id,
+    shift_date: shift.date,
+    shift_start_time: shift.start_time,
+    shift_end_time: shift.end_time,
+    company_id: shift.company_id,
     approval_status: "pending",
     notes: "demo",
   };
 
   switch (scenario) {
     case 0:
-      // Perfect on-time clock in and out
+      // Perfect on-time
       return {
         ...base,
         clock_in_time: addMinutes(shiftStart, 2).toISOString(),
-        clock_out_time: addMinutes(shiftEnd, -1).toISOString(),
-        status: "completed",
+        clock_out_time: isToday ? null : addMinutes(shiftEnd, -1).toISOString(),
+        status: isToday ? "clocked_in" : "completed",
         discrepancy_type: null,
       };
 
     case 1:
-      // Early clock in (30 min early) - discrepancy
+      // Early clock in (30 min early)
       return {
         ...base,
         clock_in_time: subMinutes(shiftStart, 30).toISOString(),
-        clock_out_time: addMinutes(shiftEnd, 3).toISOString(),
-        status: "discrepancy",
-        discrepancy_type: "early_clock_in",
+        clock_out_time: isToday ? null : addMinutes(shiftEnd, 3).toISOString(),
+        status: isToday ? "clocked_in" : "discrepancy",
+        discrepancy_type: isToday ? null : "early_clock_in",
       };
 
     case 2:
-      // Late clock in (25 min late) - discrepancy
+      // Late clock in (25 min late)
       return {
         ...base,
         clock_in_time: addMinutes(shiftStart, 25).toISOString(),
-        clock_out_time: addMinutes(shiftEnd, 5).toISOString(),
-        status: "discrepancy",
-        discrepancy_type: "late_clock_in",
+        clock_out_time: isToday ? null : addMinutes(shiftEnd, 5).toISOString(),
+        status: isToday ? "clocked_in" : "discrepancy",
+        discrepancy_type: isToday ? null : "late_clock_in",
       };
 
     case 3:
-      // Early clock out (45 min early) - discrepancy
+      // Early clock out (45 min early)
+      if (isToday) {
+        return {
+          ...base,
+          clock_in_time: addMinutes(shiftStart, 1).toISOString(),
+          clock_out_time: null,
+          status: "clocked_in",
+          discrepancy_type: null,
+        };
+      }
       return {
         ...base,
         clock_in_time: addMinutes(shiftStart, 1).toISOString(),
@@ -292,17 +274,26 @@ function createTimeRecord(
       };
 
     case 4:
-      // Late clock out (40 min late) - discrepancy
+      // Late clock out (40 min late)
       return {
         ...base,
         clock_in_time: addMinutes(shiftStart, -3).toISOString(),
-        clock_out_time: addMinutes(shiftEnd, 40).toISOString(),
-        status: "discrepancy",
-        discrepancy_type: "late_clock_out",
+        clock_out_time: isToday ? null : addMinutes(shiftEnd, 40).toISOString(),
+        status: isToday ? "clocked_in" : "discrepancy",
+        discrepancy_type: isToday ? null : "late_clock_out",
       };
 
     case 5:
       // Double discrepancy: late in + early out
+      if (isToday) {
+        return {
+          ...base,
+          clock_in_time: addMinutes(shiftStart, 20).toISOString(),
+          clock_out_time: null,
+          status: "clocked_in",
+          discrepancy_type: null,
+        };
+      }
       return {
         ...base,
         clock_in_time: addMinutes(shiftStart, 20).toISOString(),
@@ -312,8 +303,8 @@ function createTimeRecord(
       };
 
     case 6:
-      // Clocked in but not yet out (only for today)
-      if (dayOffset === 0) {
+      // Clocked in but not yet out (today) or completed (past)
+      if (isToday) {
         return {
           ...base,
           clock_in_time: addMinutes(shiftStart, 5).toISOString(),
@@ -322,7 +313,6 @@ function createTimeRecord(
           discrepancy_type: null,
         };
       }
-      // Past day - completed on time
       return {
         ...base,
         clock_in_time: addMinutes(shiftStart, 0).toISOString(),
@@ -332,8 +322,8 @@ function createTimeRecord(
       };
 
     case 7:
-      // No-show: scheduled but never clocked in (only meaningful for past)
-      if (dayOffset < 0) {
+      // No-show: scheduled but never clocked in
+      if (isPast) {
         return {
           ...base,
           clock_in_time: null,
@@ -342,7 +332,6 @@ function createTimeRecord(
           discrepancy_type: null,
         };
       }
-      // Today/future - just scheduled
       return {
         ...base,
         clock_in_time: null,
