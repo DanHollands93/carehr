@@ -823,21 +823,55 @@ const Roster = () => {
         }
       } else {
         if (!recordId) throw new Error('Cannot clock out without existing record');
-        // Get existing notes to append
+        // Get existing record to check for discrepancies
         const { data: existing } = await supabase
           .from('time_clock_records')
-          .select('notes')
+          .select('notes, clock_in_time, discrepancy_type, shift_start_time, shift_end_time')
           .eq('id', recordId)
           .single();
         const existingNotes = existing?.notes || '';
         const newNote = `Manual clock out by manager (${new Date().toISOString()})`;
         const combinedNotes = existingNotes ? `${existingNotes}, ${newNote}` : newNote;
 
+        // Get shift times to detect discrepancies
+        const { data: shiftData } = await supabase
+          .from('shifts')
+          .select('start_time, end_time')
+          .eq('id', shiftId)
+          .single();
+
+        let newStatus: string = 'completed';
+        let discrepancyType = existing?.discrepancy_type || null;
+        const clockOutDate = new Date(isoDateTime);
+        const clockOutMinutes = clockOutDate.getHours() * 60 + clockOutDate.getMinutes();
+
+        if (shiftData) {
+          const [endH, endM] = shiftData.end_time.split(':').map(Number);
+          const scheduledEndMinutes = endH * 60 + endM;
+          const diffMinutes = clockOutMinutes - scheduledEndMinutes;
+
+          // Check for early clock-out (more than 5 min early)
+          if (diffMinutes < -5) {
+            newStatus = 'discrepancy';
+            discrepancyType = discrepancyType
+              ? `${discrepancyType},early_clock_out`
+              : 'early_clock_out';
+          }
+          // Check for late clock-out (more than 5 min late)
+          else if (diffMinutes > 5) {
+            newStatus = 'discrepancy';
+            discrepancyType = discrepancyType
+              ? `${discrepancyType},late_clock_out`
+              : 'late_clock_out';
+          }
+        }
+
         const { error } = await supabase
           .from('time_clock_records')
           .update({
             clock_out_time: isoDateTime,
-            status: 'completed',
+            status: newStatus,
+            discrepancy_type: discrepancyType,
             notes: combinedNotes,
             updated_at: new Date().toISOString(),
           })
