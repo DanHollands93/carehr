@@ -784,38 +784,57 @@ const Roster = () => {
       const isoDateTime = new Date(dateTime).toISOString();
 
       if (type === 'clock_in') {
+        // Detect clock-in discrepancy
+        const { data: shiftInfo } = await supabase
+          .from('shifts')
+          .select('employee_id, date, start_time, end_time')
+          .eq('id', shiftId)
+          .single();
+
+        let clockInDiscrepancy: string | null = null;
+        if (shiftInfo) {
+          const clockInDate = new Date(isoDateTime);
+          const clockInMinutes = clockInDate.getHours() * 60 + clockInDate.getMinutes();
+          const [startH, startM] = shiftInfo.start_time.split(':').map(Number);
+          const scheduledStartMinutes = startH * 60 + startM;
+          const diffMinutes = clockInMinutes - scheduledStartMinutes;
+
+          if (diffMinutes < -5) {
+            clockInDiscrepancy = 'early_clock_in';
+          } else if (diffMinutes > 5) {
+            clockInDiscrepancy = 'late_clock_in';
+          }
+        }
+
+        const clockInStatus = clockInDiscrepancy ? 'discrepancy' : 'clocked_in';
+
         if (recordId) {
           const { error } = await supabase
             .from('time_clock_records')
             .update({
               clock_in_time: isoDateTime,
-              status: 'clocked_in',
+              status: clockInStatus,
+              discrepancy_type: clockInDiscrepancy,
               notes: `Manual clock in by manager (${new Date().toISOString()})`,
               updated_at: new Date().toISOString(),
             })
             .eq('id', recordId);
           if (error) throw error;
         } else {
-          const { data: shift, error: shiftErr } = await supabase
-            .from('shifts')
-            .select('employee_id, date, start_time, end_time')
-            .eq('id', shiftId)
-            .single();
-          if (shiftErr) throw shiftErr;
-
           // Check if there's an active absence for this employee/date
-          const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, shift.employee_id, shift.date);
+          const dayAbsence = shiftInfo ? getAbsenceForEmployeeDate(weekAbsences, shiftInfo.employee_id, shiftInfo.date) : null;
 
           const { error } = await supabase
             .from('time_clock_records')
             .insert({
-              employee_id: shift.employee_id,
+              employee_id: shiftInfo!.employee_id,
               shift_id: shiftId,
-              shift_date: shift.date,
-              shift_start_time: shift.start_time,
-              shift_end_time: shift.end_time,
+              shift_date: shiftInfo!.date,
+              shift_start_time: shiftInfo!.start_time,
+              shift_end_time: shiftInfo!.end_time,
               clock_in_time: isoDateTime,
-              status: 'clocked_in',
+              status: clockInStatus,
+              discrepancy_type: clockInDiscrepancy,
               notes: `Manual clock in by manager (${new Date().toISOString()})`,
               absence_id: dayAbsence?.id || null,
             });
