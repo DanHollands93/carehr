@@ -373,6 +373,10 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
                 ))}
               </div>
 
+              <div className="mt-6">
+                <EmployeeLocationManager employeeId={employee.id} editable={isEditing || canEdit} />
+              </div>
+
               {(employee.emergency_contact || isEditing) && (
                 <div className="mt-6">
                   <h3 className="text-lg font-medium mb-4">Emergency Contact</h3>
