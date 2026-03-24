@@ -49,6 +49,7 @@ const EmployeeAbsencesTab = ({ employeeId }: EmployeeAbsencesTabProps) => {
       const { data, error } = await supabase
         .from('absence_types')
         .select('*')
+        .eq('company_id', companyId!)
         .eq('is_active', true)
         .order('sort_order');
       if (error) throw error;
