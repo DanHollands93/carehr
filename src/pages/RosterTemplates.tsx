@@ -188,7 +188,8 @@ const RosterTemplates = () => {
     
     const submitData = {
       ...formData,
-      is_active: true
+      is_active: true,
+      location: formData.location || null,
     };
     
     if (editingTemplate) {
