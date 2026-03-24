@@ -18,6 +18,7 @@ interface RosterTemplate {
   repeat_interval: number;
   end_date: string | null;
   is_active: boolean;
+  location: string | null;
 }
 
 interface ActiveRosterTemplatesProps {
