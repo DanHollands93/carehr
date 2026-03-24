@@ -30,6 +30,7 @@ interface RosterTemplate {
   created_at: string;
   end_date: string | null;
   allow_allocations: boolean;
+  location: string | null;
 }
 
 const RosterTemplates = () => {
