@@ -87,9 +87,9 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
           )}
         </div>
         <div className="flex items-center gap-2">
-          {activeTemplates && (
+          {filteredTemplates && (
             <Badge variant="outline" className="text-xs">
-              {activeTemplates.length}
+              {filteredTemplates.length}
             </Badge>
           )}
           {isExpanded ? (
