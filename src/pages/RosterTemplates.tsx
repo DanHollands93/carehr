@@ -409,7 +409,7 @@ const RosterTemplates = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Period</TableHead>
                   <TableHead>End Date</TableHead>
                   <TableHead>Status</TableHead>
@@ -419,8 +419,24 @@ const RosterTemplates = () => {
               <TableBody>
                 {rosterTemplates?.map((template) => (
                   <TableRow key={template.id}>
-                    <TableCell className="font-medium">{template.name}</TableCell>
-                    <TableCell>{template.description || '-'}</TableCell>
+                    <TableCell>
+                      <div>
+                        <span className="font-medium">{template.name}</span>
+                        {template.description && (
+                          <p className="text-xs text-muted-foreground">{template.description}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {template.location ? (
+                        <Badge variant="outline" className="gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {template.location}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {getRepeatTypeLabel(template.repeat_type, template.repeat_interval)}
                     </TableCell>
