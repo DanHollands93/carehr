@@ -111,9 +111,9 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
           <CardContent className="pt-0 pb-3 px-4">
             {isLoading ? (
               <div className="text-center py-4 text-sm text-muted-foreground">Loading rosters...</div>
-            ) : activeTemplates && activeTemplates.length > 0 ? (
+            ) : filteredTemplates && filteredTemplates.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {activeTemplates.map((template) => (
+                {filteredTemplates.map((template) => (
                   <Button
                     key={template.id}
                     variant={selectedId === template.id ? "default" : "outline"}
