@@ -301,6 +301,27 @@ const RosterTemplates = () => {
                   placeholder="Describe this roster pattern..."
                 />
               </div>
+
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <Select 
+                  value={formData.location} 
+                  onValueChange={(value) => setFormData({ ...formData, location: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a location (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No specific location</SelectItem>
+                    {locations.map(loc => (
+                      <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Assign this roster to a specific location for access control
+                </p>
+              </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
