@@ -144,8 +144,8 @@ const Employees = () => {
     const urlId = searchParams.get('id');
     const urlTab = searchParams.get('tab');
     const urlReview = searchParams.get('reviewId');
-    if (urlId && employeePositions.length > 0 && !selectedEmployee) {
-      const emp = employeePositions.find(e => e.employee_id === urlId);
+    if (urlId && filteredEmployeePositions.length > 0 && !selectedEmployee) {
+      const emp = filteredEmployeePositions.find(e => e.employee_id === urlId);
       if (emp) {
         setSelectedEmployee({
           id: emp.employee_id,
