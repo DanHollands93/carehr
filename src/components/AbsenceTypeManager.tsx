@@ -31,19 +31,22 @@ const DEFAULT_COLORS = [
 const AbsenceTypeManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { companyId } = useUserCompanyId();
   const [editDialog, setEditDialog] = useState<{ open: boolean; item?: AbsenceType }>({ open: false });
   const [form, setForm] = useState({ name: '', color: '#6366f1', is_requestable: true, is_payable: false });
 
   const { data: absenceTypes = [], isLoading } = useQuery({
-    queryKey: ['absence-types'],
+    queryKey: ['absence-types', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('absence_types')
         .select('*')
+        .eq('company_id', companyId!)
         .order('sort_order', { ascending: true });
       if (error) throw error;
       return data as AbsenceType[];
-    }
+    },
+    enabled: !!companyId,
   });
 
   const upsertMutation = useMutation({
