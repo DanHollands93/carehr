@@ -72,7 +72,7 @@ const AbsenceTypeManager = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['absence-types'] });
+      queryClient.invalidateQueries({ queryKey: ['absence-types', companyId] });
       setEditDialog({ open: false });
       toast({ title: "Absence type saved" });
     },
