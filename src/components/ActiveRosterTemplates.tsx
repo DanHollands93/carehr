@@ -27,6 +27,7 @@ interface ActiveRosterTemplatesProps {
 
 const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) => {
   const { companyId } = useUserCompanyId();
+  const { filterByLocation } = useUserLocationAccess();
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -46,6 +47,9 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
     },
     enabled: !!companyId
   });
+
+  // Filter templates by user's location access
+  const filteredTemplates = filterByLocation(activeTemplates || []);
 
   const getRepeatTypeLabel = (type: string, interval: number) => {
     switch (type) {
