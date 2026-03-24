@@ -5,8 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Calendar, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, ChevronDown, ChevronUp, MapPin } from "lucide-react";
 import { useUserCompanyId } from "@/hooks/useUserCompanyId";
+import { useUserLocationAccess } from "@/hooks/useUserLocationAccess";
 import { cn } from "@/lib/utils";
 
 interface RosterTemplate {
@@ -17,6 +18,7 @@ interface RosterTemplate {
   repeat_interval: number;
   end_date: string | null;
   is_active: boolean;
+  location: string | null;
 }
 
 interface ActiveRosterTemplatesProps {
@@ -25,6 +27,7 @@ interface ActiveRosterTemplatesProps {
 
 const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) => {
   const { companyId } = useUserCompanyId();
+  const { filterByLocation } = useUserLocationAccess();
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -45,6 +48,9 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
     enabled: !!companyId
   });
 
+  // Filter templates by user's location access
+  const filteredTemplates = filterByLocation(activeTemplates || []);
+
   const getRepeatTypeLabel = (type: string, interval: number) => {
     switch (type) {
       case 'weekly': return 'Weekly';
@@ -62,7 +68,7 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
     onSelectRoster(template);
   };
 
-  const selectedTemplate = activeTemplates?.find(t => t.id === selectedId);
+  const selectedTemplate = filteredTemplates?.find(t => t.id === selectedId);
 
   return (
     <Card className="overflow-hidden">
@@ -81,9 +87,9 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
           )}
         </div>
         <div className="flex items-center gap-2">
-          {activeTemplates && (
+          {filteredTemplates && (
             <Badge variant="outline" className="text-xs">
-              {activeTemplates.length}
+              {filteredTemplates.length}
             </Badge>
           )}
           {isExpanded ? (
@@ -105,9 +111,9 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
           <CardContent className="pt-0 pb-3 px-4">
             {isLoading ? (
               <div className="text-center py-4 text-sm text-muted-foreground">Loading rosters...</div>
-            ) : activeTemplates && activeTemplates.length > 0 ? (
+            ) : filteredTemplates && filteredTemplates.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {activeTemplates.map((template) => (
+                {filteredTemplates.map((template) => (
                   <Button
                     key={template.id}
                     variant={selectedId === template.id ? "default" : "outline"}
@@ -126,8 +132,14 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
                         {getRepeatTypeLabel(template.repeat_type, template.repeat_interval)}
                       </Badge>
                     </div>
+                    {template.location && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                        <MapPin className="w-3 h-3" />
+                        {template.location}
+                      </div>
+                    )}
                     {template.end_date && (
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         Expires: {new Date(template.end_date).toLocaleDateString()}
                       </p>
                     )}

@@ -87,6 +87,7 @@ interface RosterTemplate {
   is_active: boolean;
   category_id?: string;
   allow_allocations?: boolean;
+  location?: string | null;
 }
 
 const Roster = () => {

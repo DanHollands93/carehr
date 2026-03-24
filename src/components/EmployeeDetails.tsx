@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, User, MapPin, Briefcase, Pencil, Save, X, Shield, ClipboardCheck, AlertTriangle, Calendar } from "lucide-react";
 import PayRateHistory from "@/components/PayRateHistory";
+import EmployeeLocationManager from "@/components/EmployeeLocationManager";
 import { supabase } from "@/integrations/supabase/client";
 import { useCareerHistory } from "@/hooks/useCareerHistory";
 import { usePayRates } from "@/hooks/usePayRates";
@@ -370,6 +371,10 @@ const EmployeeDetails = ({ employeeId, initialTab, initialReviewId }: EmployeeDe
                     )}
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-6">
+                <EmployeeLocationManager employeeId={employee.id} editable={isEditing || canEdit} />
               </div>
 
               {(employee.emergency_contact || isEditing) && (

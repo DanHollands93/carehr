@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserCompanyId } from "@/hooks/useUserCompanyId";
-import { Plus, Edit, Trash2, Calendar, Play, Copy } from "lucide-react";
+import { Plus, Edit, Trash2, Calendar, Play, Copy, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TemplateRosterBuilder from "@/components/TemplateRosterBuilder";
 import TemplateDeployment from "@/components/TemplateDeployment";
@@ -30,6 +30,7 @@ interface RosterTemplate {
   created_at: string;
   end_date: string | null;
   allow_allocations: boolean;
+  location: string | null;
 }
 
 const RosterTemplates = () => {
@@ -48,7 +49,25 @@ const RosterTemplates = () => {
     repeat_type: "weekly" as RepeatType,
     repeat_interval: 1,
     end_date: "",
-    allow_allocations: false
+    allow_allocations: false,
+    location: "" as string
+  });
+
+  // Fetch locations from lookup lists
+  const { data: locations = [] } = useQuery({
+    queryKey: ['lookup-locations', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lookup_lists')
+        .select('value')
+        .eq('category', 'locations')
+        .eq('is_active', true)
+        .eq('company_id', companyId!)
+        .order('value');
+      if (error) throw error;
+      return data.map(d => d.value);
+    },
+    enabled: !!companyId,
   });
 
   const { data: rosterTemplates, isLoading } = useQuery({
@@ -158,7 +177,8 @@ const RosterTemplates = () => {
       repeat_type: "weekly",
       repeat_interval: 1,
       end_date: "",
-      allow_allocations: false
+      allow_allocations: false,
+      location: ""
     });
     setEditingTemplate(null);
   };
@@ -168,7 +188,8 @@ const RosterTemplates = () => {
     
     const submitData = {
       ...formData,
-      is_active: true
+      is_active: true,
+      location: formData.location || null,
     };
     
     if (editingTemplate) {
@@ -186,7 +207,8 @@ const RosterTemplates = () => {
       repeat_type: template.repeat_type,
       repeat_interval: template.repeat_interval,
       end_date: template.end_date || "",
-      allow_allocations: template.allow_allocations || false
+      allow_allocations: template.allow_allocations || false,
+      location: template.location || ""
     });
     setIsDialogOpen(true);
   };
@@ -279,6 +301,27 @@ const RosterTemplates = () => {
                   placeholder="Describe this roster pattern..."
                 />
               </div>
+
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <Select 
+                  value={formData.location} 
+                  onValueChange={(value) => setFormData({ ...formData, location: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a location (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No specific location</SelectItem>
+                    {locations.map(loc => (
+                      <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Assign this roster to a specific location for access control
+                </p>
+              </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -366,7 +409,7 @@ const RosterTemplates = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Period</TableHead>
                   <TableHead>End Date</TableHead>
                   <TableHead>Status</TableHead>
@@ -376,8 +419,24 @@ const RosterTemplates = () => {
               <TableBody>
                 {rosterTemplates?.map((template) => (
                   <TableRow key={template.id}>
-                    <TableCell className="font-medium">{template.name}</TableCell>
-                    <TableCell>{template.description || '-'}</TableCell>
+                    <TableCell>
+                      <div>
+                        <span className="font-medium">{template.name}</span>
+                        {template.description && (
+                          <p className="text-xs text-muted-foreground">{template.description}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {template.location ? (
+                        <Badge variant="outline" className="gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {template.location}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {getRepeatTypeLabel(template.repeat_type, template.repeat_interval)}
                     </TableCell>

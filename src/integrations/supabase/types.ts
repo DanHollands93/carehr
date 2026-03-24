@@ -989,6 +989,48 @@ export type Database = {
           },
         ]
       }
+      employee_locations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          is_primary: boolean
+          location: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          is_primary?: boolean
+          location: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          is_primary?: boolean
+          location?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_locations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_locations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_reviews: {
         Row: {
           career_history_id: string | null
@@ -2347,6 +2389,7 @@ export type Database = {
           end_date: string | null
           id: string
           is_active: boolean | null
+          location: string | null
           name: string
           repeat_interval: number | null
           repeat_type: string | null
@@ -2363,6 +2406,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           is_active?: boolean | null
+          location?: string | null
           name: string
           repeat_interval?: number | null
           repeat_type?: string | null
@@ -2379,6 +2423,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           is_active?: boolean | null
+          location?: string | null
           name?: string
           repeat_interval?: number | null
           repeat_type?: string | null
