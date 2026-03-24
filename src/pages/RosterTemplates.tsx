@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserCompanyId } from "@/hooks/useUserCompanyId";
-import { Plus, Edit, Trash2, Calendar, Play, Copy } from "lucide-react";
+import { Plus, Edit, Trash2, Calendar, Play, Copy, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TemplateRosterBuilder from "@/components/TemplateRosterBuilder";
 import TemplateDeployment from "@/components/TemplateDeployment";
