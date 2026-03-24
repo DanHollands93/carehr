@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 
 interface RequestAbsenceDialogProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface RequestAbsenceDialogProps {
 const RequestAbsenceDialog = ({ isOpen, onClose, employeeId }: RequestAbsenceDialogProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { companyId } = useUserCompanyId();
   const [form, setForm] = useState({
     absence_type_id: '',
     start_date: '',
@@ -30,18 +32,19 @@ const RequestAbsenceDialog = ({ isOpen, onClose, employeeId }: RequestAbsenceDia
   });
 
   const { data: absenceTypes = [] } = useQuery({
-    queryKey: ['absence-types-requestable'],
+    queryKey: ['absence-types-requestable', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('absence_types')
         .select('*')
+        .eq('company_id', companyId!)
         .eq('is_active', true)
         .eq('is_requestable', true)
         .order('sort_order');
       if (error) throw error;
       return data;
     },
-    enabled: isOpen,
+    enabled: isOpen && !!companyId,
   });
 
   const submitMutation = useMutation({

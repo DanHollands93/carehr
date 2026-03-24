@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 interface AbsenceType {
@@ -30,19 +31,22 @@ const DEFAULT_COLORS = [
 const AbsenceTypeManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { companyId } = useUserCompanyId();
   const [editDialog, setEditDialog] = useState<{ open: boolean; item?: AbsenceType }>({ open: false });
   const [form, setForm] = useState({ name: '', color: '#6366f1', is_requestable: true, is_payable: false });
 
   const { data: absenceTypes = [], isLoading } = useQuery({
-    queryKey: ['absence-types'],
+    queryKey: ['absence-types', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('absence_types')
         .select('*')
+        .eq('company_id', companyId!)
         .order('sort_order', { ascending: true });
       if (error) throw error;
       return data as AbsenceType[];
-    }
+    },
+    enabled: !!companyId,
   });
 
   const upsertMutation = useMutation({
@@ -62,12 +66,13 @@ const AbsenceTypeManager = () => {
           is_requestable: values.is_requestable,
           is_payable: values.is_payable,
           sort_order: absenceTypes.length,
+          company_id: companyId,
         }]);
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['absence-types'] });
+      queryClient.invalidateQueries({ queryKey: ['absence-types', companyId] });
       setEditDialog({ open: false });
       toast({ title: "Absence type saved" });
     },
@@ -82,7 +87,7 @@ const AbsenceTypeManager = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['absence-types'] });
+      queryClient.invalidateQueries({ queryKey: ['absence-types', companyId] });
     }
   });
 
