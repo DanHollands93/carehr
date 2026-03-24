@@ -68,7 +68,7 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
     onSelectRoster(template);
   };
 
-  const selectedTemplate = activeTemplates?.find(t => t.id === selectedId);
+  const selectedTemplate = filteredTemplates?.find(t => t.id === selectedId);
 
   return (
     <Card className="overflow-hidden">
