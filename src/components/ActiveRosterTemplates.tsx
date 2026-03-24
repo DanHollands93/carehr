@@ -132,8 +132,14 @@ const ActiveRosterTemplates = ({ onSelectRoster }: ActiveRosterTemplatesProps) =
                         {getRepeatTypeLabel(template.repeat_type, template.repeat_interval)}
                       </Badge>
                     </div>
+                    {template.location && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                        <MapPin className="w-3 h-3" />
+                        {template.location}
+                      </div>
+                    )}
                     {template.end_date && (
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         Expires: {new Date(template.end_date).toLocaleDateString()}
                       </p>
                     )}
