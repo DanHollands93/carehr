@@ -49,7 +49,25 @@ const RosterTemplates = () => {
     repeat_type: "weekly" as RepeatType,
     repeat_interval: 1,
     end_date: "",
-    allow_allocations: false
+    allow_allocations: false,
+    location: "" as string
+  });
+
+  // Fetch locations from lookup lists
+  const { data: locations = [] } = useQuery({
+    queryKey: ['lookup-locations', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lookup_lists')
+        .select('value')
+        .eq('category', 'locations')
+        .eq('is_active', true)
+        .eq('company_id', companyId!)
+        .order('value');
+      if (error) throw error;
+      return data.map(d => d.value);
+    },
+    enabled: !!companyId,
   });
 
   const { data: rosterTemplates, isLoading } = useQuery({
