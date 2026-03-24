@@ -66,6 +66,7 @@ const AbsenceTypeManager = () => {
           is_requestable: values.is_requestable,
           is_payable: values.is_payable,
           sort_order: absenceTypes.length,
+          company_id: companyId,
         }]);
         if (error) throw error;
       }
