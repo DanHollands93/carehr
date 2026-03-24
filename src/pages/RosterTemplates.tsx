@@ -207,7 +207,8 @@ const RosterTemplates = () => {
       repeat_type: template.repeat_type,
       repeat_interval: template.repeat_interval,
       end_date: template.end_date || "",
-      allow_allocations: template.allow_allocations || false
+      allow_allocations: template.allow_allocations || false,
+      location: template.location || ""
     });
     setIsDialogOpen(true);
   };
