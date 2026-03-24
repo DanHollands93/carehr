@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 
 export interface PositionPayRate {
   id: string;
@@ -15,12 +16,14 @@ export interface PositionPayRate {
 }
 
 export const usePositionPayRates = (position?: string) => {
+  const { companyId } = useUserCompanyId();
   return useQuery({
-    queryKey: ['position-pay-rates', position],
+    queryKey: ['position-pay-rates', companyId, position],
     queryFn: async () => {
       let query = supabase
         .from('position_pay_rates')
         .select('*')
+        .eq('company_id', companyId!)
         .eq('is_active', true)
         .order('position')
         .order('name');
@@ -33,21 +36,25 @@ export const usePositionPayRates = (position?: string) => {
       if (error) throw error;
       return (data || []) as PositionPayRate[];
     },
+    enabled: !!companyId,
   });
 };
 
 export const useAllPositionPayRates = () => {
+  const { companyId } = useUserCompanyId();
   return useQuery({
-    queryKey: ['position-pay-rates-all'],
+    queryKey: ['position-pay-rates-all', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('position_pay_rates')
         .select('*')
+        .eq('company_id', companyId!)
         .order('position')
         .order('name');
       if (error) throw error;
       return (data || []) as PositionPayRate[];
     },
+    enabled: !!companyId,
   });
 };
 
