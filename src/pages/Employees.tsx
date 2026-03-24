@@ -62,6 +62,7 @@ interface GroupedEmployee {
 
 const Employees = () => {
   const { companyId } = useUserCompanyId();
+  const { filterByLocation, shouldFilterByLocation, locationPermissions } = useUserLocationAccess();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -69,6 +70,25 @@ const Employees = () => {
   const [activeTab, setActiveTab] = useState("list");
   const [urlInitialTab, setUrlInitialTab] = useState<string | undefined>();
   const [urlReviewId, setUrlReviewId] = useState<string | undefined>();
+
+  // Fetch employee locations for filtering
+  const { data: employeeLocationMap = {} } = useQuery({
+    queryKey: ['employee-locations-map', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employee_locations')
+        .select('employee_id, location')
+        .eq('company_id', companyId!);
+      if (error) throw error;
+      const map: Record<string, string[]> = {};
+      (data || []).forEach(el => {
+        if (!map[el.employee_id]) map[el.employee_id] = [];
+        map[el.employee_id].push(el.location);
+      });
+      return map;
+    },
+    enabled: !!companyId && shouldFilterByLocation,
+  });
 
   const { data: employeePositions = [], isLoading, refetch } = useQuery({
     queryKey: ['employee-positions', companyId],
@@ -101,6 +121,23 @@ const Employees = () => {
     },
     enabled: !!companyId
   });
+
+  // Filter employees by user's location access
+  const filteredEmployeePositions = useMemo(() => {
+    if (!shouldFilterByLocation) return employeePositions;
+    return employeePositions.filter(emp => {
+      // Check employee_locations table first
+      const empLocations = employeeLocationMap[emp.employee_id];
+      if (empLocations && empLocations.length > 0) {
+        return empLocations.some(loc => locationPermissions.includes(loc));
+      }
+      // Fallback to employee.location field
+      if (emp.location) {
+        return locationPermissions.includes(emp.location);
+      }
+      return true; // No location = visible
+    });
+  }, [employeePositions, shouldFilterByLocation, locationPermissions, employeeLocationMap]);
 
   // Handle URL params to auto-open an employee and tab
   useEffect(() => {
