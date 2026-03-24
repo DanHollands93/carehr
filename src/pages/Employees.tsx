@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import EmployeeForm from "@/components/EmployeeForm";
 import EmployeeDetails from "@/components/EmployeeDetails";
 import { useUserCompanyId } from "@/hooks/useUserCompanyId";
+import { useUserLocationAccess } from "@/hooks/useUserLocationAccess";
 
 interface Employee {
   id: string;
