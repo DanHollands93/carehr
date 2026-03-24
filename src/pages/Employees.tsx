@@ -169,10 +169,10 @@ const Employees = () => {
         setSearchParams({}, { replace: true });
       }
     }
-  }, [searchParams, employeePositions, selectedEmployee]);
+  }, [searchParams, filteredEmployeePositions, selectedEmployee]);
 
 
-  const groupedEmployees = employeePositions.reduce((acc, position) => {
+  const groupedEmployees = filteredEmployeePositions.reduce((acc, position) => {
     const employeeKey = position.employee_id;
     
     if (!acc[employeeKey]) {
