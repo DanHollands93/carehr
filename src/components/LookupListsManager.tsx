@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Eye, EyeOff } from "lucide-react";
+import { Plus, Eye, EyeOff, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useUserCompanyId } from "@/hooks/useUserCompanyId";
+import { useHiddenDefaults } from "@/hooks/useSystemDefaults";
 
 interface LookupList {
   id: string;
@@ -19,6 +20,7 @@ interface LookupList {
   value: string;
   is_active: boolean;
   created_at: string;
+  company_id: string | null;
 }
 
 const LOOKUP_CATEGORIES = [
@@ -38,8 +40,10 @@ const LookupListsManager = ({ companyId: propCompanyId }: { companyId?: string }
   const [newValue, setNewValue] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { hiddenIds, toggleHidden } = useHiddenDefaults('lookup_lists');
 
-  const { data: lookupItems = [], isLoading } = useQuery({
+  // Company-specific items
+  const { data: companyItems = [], isLoading: loadingCompany } = useQuery({
     queryKey: ['lookup-items', selectedCategory, companyId],
     queryFn: async () => {
       let query = supabase
@@ -57,6 +61,27 @@ const LookupListsManager = ({ companyId: propCompanyId }: { companyId?: string }
     }
   });
 
+  // System defaults (company_id IS NULL)
+  const { data: systemItems = [], isLoading: loadingSystem } = useQuery({
+    queryKey: ['lookup-items-system', selectedCategory],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lookup_lists')
+        .select('*')
+        .eq('category', selectedCategory)
+        .is('company_id', null)
+        .order('sort_order');
+      if (error) throw error;
+      return data as LookupList[];
+    }
+  });
+
+  const isLoading = loadingCompany || loadingSystem;
+
+  const visibleSystemItems = systemItems.filter(item => !hiddenIds.includes(item.id));
+  const hiddenSystemItems = systemItems.filter(item => hiddenIds.includes(item.id));
+  const allItems = [...visibleSystemItems, ...companyItems];
+
   const addItemMutation = useMutation({
     mutationFn: async (value: string) => {
       const insertData: any = { category: selectedCategory, value: value.trim(), is_active: true };
@@ -70,22 +95,14 @@ const LookupListsManager = ({ companyId: propCompanyId }: { companyId?: string }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lookup-items', selectedCategory, companyId] });
-      // Also invalidate positions query used by shift templates
       if (selectedCategory === 'positions') {
         queryClient.invalidateQueries({ queryKey: ['lookup-positions'] });
       }
       setNewValue("");
-      toast({
-        title: "Item added",
-        description: "New lookup item has been added successfully"
-      });
+      toast({ title: "Item added", description: "New lookup item has been added successfully" });
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add item",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: error.message || "Failed to add item", variant: "destructive" });
     }
   });
 
@@ -101,58 +118,41 @@ const LookupListsManager = ({ companyId: propCompanyId }: { companyId?: string }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lookup-items', selectedCategory, companyId] });
-      // Also invalidate positions query used by shift templates
       if (selectedCategory === 'positions') {
         queryClient.invalidateQueries({ queryKey: ['lookup-positions'] });
       }
-      toast({
-        title: "Item updated",
-        description: "Item status has been updated successfully"
-      });
+      toast({ title: "Item updated" });
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update item",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: error.message || "Failed to update item", variant: "destructive" });
     }
   });
 
   const handleAddItem = () => {
     if (!newValue.trim()) return;
     
-    // Check for duplicates
-    const exists = lookupItems.some(item => 
+    const exists = allItems.some(item => 
       item.value.toLowerCase() === newValue.trim().toLowerCase()
     );
     
     if (exists) {
-      toast({
-        title: "Duplicate item",
-        description: "This item already exists in the list",
-        variant: "destructive"
-      });
+      toast({ title: "Duplicate item", description: "This item already exists in the list", variant: "destructive" });
       return;
     }
     
     addItemMutation.mutate(newValue);
   };
 
-  const handleToggleActive = (id: string, isActive: boolean) => {
-    toggleActiveMutation.mutate({ id, isActive });
-  };
-
   const selectedCategoryInfo = LOOKUP_CATEGORIES.find(cat => cat.key === selectedCategory);
-  const activeItems = lookupItems.filter(item => item.is_active);
-  const inactiveItems = lookupItems.filter(item => !item.is_active);
+  const activeItems = allItems.filter(item => item.is_active !== false);
+  const inactiveCompanyItems = companyItems.filter(item => !item.is_active);
 
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-medium">Lookup Lists Management</h3>
         <p className="text-sm text-muted-foreground">
-          Manage dropdown options used throughout the application
+          Manage dropdown options used throughout the application. System defaults are shared across all companies.
         </p>
       </div>
 
@@ -176,7 +176,7 @@ const LookupListsManager = ({ companyId: propCompanyId }: { companyId?: string }
                 {/* Add new item */}
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <Label htmlFor="new-value">Add New Item</Label>
+                    <Label htmlFor="new-value">Add Custom Item</Label>
                     <Input
                       id="new-value"
                       value={newValue}
@@ -196,12 +196,10 @@ const LookupListsManager = ({ companyId: propCompanyId }: { companyId?: string }
                   </div>
                 </div>
 
-                {/* Items list */}
                 {isLoading ? (
                   <div>Loading items...</div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Active items */}
                     {activeItems.length > 0 && (
                       <div>
                         <h4 className="font-medium text-green-700 mb-2 flex items-center">
@@ -209,44 +207,56 @@ const LookupListsManager = ({ companyId: propCompanyId }: { companyId?: string }
                           Active Items ({activeItems.length})
                         </h4>
                         <div className="grid gap-2">
-                          {activeItems.map(item => (
-                            <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
-                              <div className="flex items-center gap-2">
-                                <span>{item.value}</span>
-                                <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                  Active
-                                </Badge>
+                          {activeItems.map(item => {
+                            const isSystem = item.company_id === null;
+                            return (
+                              <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
+                                <div className="flex items-center gap-2">
+                                  <span>{item.value}</span>
+                                  {isSystem && (
+                                    <Badge variant="outline" className="text-[10px] gap-1">
+                                      <Globe className="w-2.5 h-2.5" />
+                                      Default
+                                    </Badge>
+                                  )}
+                                </div>
+                                {isSystem ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs h-7"
+                                    onClick={() => toggleHidden({ recordId: item.id, hide: true })}
+                                  >
+                                    Hide
+                                  </Button>
+                                ) : (
+                                  <Switch
+                                    checked={item.is_active !== false}
+                                    onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: item.id, isActive: checked })}
+                                    disabled={toggleActiveMutation.isPending}
+                                  />
+                                )}
                               </div>
-                              <Switch
-                                checked={item.is_active}
-                                onCheckedChange={(checked) => handleToggleActive(item.id, checked)}
-                                disabled={toggleActiveMutation.isPending}
-                              />
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
 
-                    {/* Inactive items */}
-                    {inactiveItems.length > 0 && (
+                    {/* Inactive company items */}
+                    {inactiveCompanyItems.length > 0 && (
                       <div>
-                        <h4 className="font-medium text-gray-600 mb-2 flex items-center">
+                        <h4 className="font-medium text-muted-foreground mb-2 flex items-center">
                           <EyeOff className="w-4 h-4 mr-2" />
-                          Inactive Items ({inactiveItems.length})
+                          Inactive Items ({inactiveCompanyItems.length})
                         </h4>
                         <div className="grid gap-2">
-                          {inactiveItems.map(item => (
-                            <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-600">{item.value}</span>
-                                <Badge variant="outline" className="text-gray-600">
-                                  Inactive
-                                </Badge>
-                              </div>
+                          {inactiveCompanyItems.map(item => (
+                            <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                              <span className="text-muted-foreground">{item.value}</span>
                               <Switch
-                                checked={item.is_active}
-                                onCheckedChange={(checked) => handleToggleActive(item.id, checked)}
+                                checked={false}
+                                onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: item.id, isActive: checked })}
                                 disabled={toggleActiveMutation.isPending}
                               />
                             </div>
@@ -255,7 +265,27 @@ const LookupListsManager = ({ companyId: propCompanyId }: { companyId?: string }
                       </div>
                     )}
 
-                    {lookupItems.length === 0 && (
+                    {/* Hidden system defaults */}
+                    {hiddenSystemItems.length > 0 && (
+                      <div className="pt-2 border-t">
+                        <p className="text-sm font-medium text-muted-foreground mb-2">Hidden Defaults ({hiddenSystemItems.length})</p>
+                        <div className="flex flex-wrap gap-2">
+                          {hiddenSystemItems.map(item => (
+                            <Button
+                              key={item.id}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7"
+                              onClick={() => toggleHidden({ recordId: item.id, hide: false })}
+                            >
+                              {item.value} <span className="text-muted-foreground ml-1">+ Show</span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {allItems.length === 0 && (
                       <div className="text-center py-8 text-muted-foreground">
                         No items found. Add your first item above.
                       </div>
