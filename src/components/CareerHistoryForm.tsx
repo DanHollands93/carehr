@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { toast } from "sonner";
 
 interface CareerHistoryFormData {
@@ -47,6 +48,7 @@ interface CareerHistoryFormProps {
 }
 
 const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHistoryFormProps) => {
+  const { companyId } = useUserCompanyId();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CareerHistoryFormData>();
   const isEditMode = !!record;
@@ -56,19 +58,22 @@ const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHis
   const employmentType = watch('employment_type');
   const contractType = watch('contract_type');
 
-  // Fetch lookup lists from settings
+  // Fetch lookup lists: company-specific + system defaults, excluding hidden
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
-    queryKey: ['lookup-lists-all'],
+    queryKey: ['lookup-lists-all', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lookup_lists')
-        .select('*')
-        .eq('is_active', true)
-        .order('category, value');
-      
-      if (error) throw error;
-      return data;
-    }
+      const [companyRes, systemRes, hiddenRes] = await Promise.all([
+        supabase.from('lookup_lists').select('*').eq('is_active', true).eq('company_id', companyId!).order('category, value'),
+        supabase.from('lookup_lists').select('*').eq('is_active', true).is('company_id', null).order('category, value'),
+        supabase.from('company_hidden_defaults').select('record_id').eq('company_id', companyId!).eq('table_name', 'lookup_lists'),
+      ]);
+      if (companyRes.error) throw companyRes.error;
+      if (systemRes.error) throw systemRes.error;
+      const hiddenIds = (hiddenRes.data || []).map(d => d.record_id);
+      const visibleSystem = (systemRes.data || []).filter(i => !hiddenIds.includes(i.id));
+      return [...visibleSystem, ...(companyRes.data || [])];
+    },
+    enabled: !!companyId,
   });
 
   // Group lookup lists by category
@@ -319,18 +324,22 @@ export const CareerHistoryEditForm = ({
 }) => {
   const [formData, setFormData] = useState<CareerHistoryRecord>(entry);
 
+  const { companyId } = useUserCompanyId();
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
-    queryKey: ['lookup-lists-all'],
+    queryKey: ['lookup-lists-all', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lookup_lists')
-        .select('*')
-        .eq('is_active', true)
-        .order('category, value');
-      
-      if (error) throw error;
-      return data;
-    }
+      const [companyRes, systemRes, hiddenRes] = await Promise.all([
+        supabase.from('lookup_lists').select('*').eq('is_active', true).eq('company_id', companyId!).order('category, value'),
+        supabase.from('lookup_lists').select('*').eq('is_active', true).is('company_id', null).order('category, value'),
+        supabase.from('company_hidden_defaults').select('record_id').eq('company_id', companyId!).eq('table_name', 'lookup_lists'),
+      ]);
+      if (companyRes.error) throw companyRes.error;
+      if (systemRes.error) throw systemRes.error;
+      const hiddenIds = (hiddenRes.data || []).map(d => d.record_id);
+      const visibleSystem = (systemRes.data || []).filter(i => !hiddenIds.includes(i.id));
+      return [...visibleSystem, ...(companyRes.data || [])];
+    },
+    enabled: !!companyId,
   });
 
   const lookupsByCategory = lookupLists.reduce((acc, item) => {

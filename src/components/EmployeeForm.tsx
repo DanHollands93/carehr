@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { toast } from "sonner";
 
 interface EmployeeFormData {
@@ -181,19 +182,23 @@ const EmployeeForm = ({ onClose, onSuccess, employee }: EmployeeFormProps) => {
     }
   }, [isEditMode, fullEmployee, currentCareer, setValue]);
 
-  // Fetch lookup lists from settings
+  // Fetch lookup lists: company-specific + system defaults, excluding hidden
+  const { companyId: lookupCompanyId } = useUserCompanyId();
   const { data: lookupLists = [], isLoading: isLoadingLookups } = useQuery({
-    queryKey: ['lookup-lists-all'],
+    queryKey: ['lookup-lists-all', lookupCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lookup_lists')
-        .select('*')
-        .eq('is_active', true)
-        .order('category, value');
-      
-      if (error) throw error;
-      return data;
-    }
+      const [companyRes, systemRes, hiddenRes] = await Promise.all([
+        supabase.from('lookup_lists').select('*').eq('is_active', true).eq('company_id', lookupCompanyId!).order('category, value'),
+        supabase.from('lookup_lists').select('*').eq('is_active', true).is('company_id', null).order('category, value'),
+        supabase.from('company_hidden_defaults').select('record_id').eq('company_id', lookupCompanyId!).eq('table_name', 'lookup_lists'),
+      ]);
+      if (companyRes.error) throw companyRes.error;
+      if (systemRes.error) throw systemRes.error;
+      const hiddenIds = (hiddenRes.data || []).map(d => d.record_id);
+      const visibleSystem = (systemRes.data || []).filter(i => !hiddenIds.includes(i.id));
+      return [...visibleSystem, ...(companyRes.data || [])];
+    },
+    enabled: !!lookupCompanyId,
   });
 
   // Group lookup lists by category
