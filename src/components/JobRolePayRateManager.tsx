@@ -18,23 +18,27 @@ import {
   useDeletePositionPayRate,
   type PositionPayRate,
 } from "@/hooks/usePositionPayRates";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { toast } from "sonner";
 
-// Fetch positions from lookup_lists
+// Fetch positions from lookup_lists filtered by company
 const usePositions = () => {
+  const { companyId } = useUserCompanyId();
   return useQuery({
-    queryKey: ['lookup-lists', 'positions'],
+    queryKey: ['lookup-lists', 'positions', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('lookup_lists')
         .select('*')
         .eq('category', 'positions')
         .eq('is_active', true)
+        .eq('company_id', companyId!)
         .order('sort_order')
         .order('value');
       if (error) throw error;
       return data || [];
     },
+    enabled: !!companyId,
   });
 };
 
