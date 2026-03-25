@@ -31,18 +31,46 @@ const RequestAbsenceDialog = ({ isOpen, onClose, employeeId }: RequestAbsenceDia
     reason: '',
   });
 
-  const { data: absenceTypes = [] } = useQuery({
-    queryKey: ['absence-types-requestable', companyId],
+  // Fetch hidden defaults for this company
+  const { data: hiddenIds = [] } = useQuery({
+    queryKey: ['hidden-defaults', 'absence_types', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
+        .from('company_hidden_defaults')
+        .select('record_id')
+        .eq('company_id', companyId!)
+        .eq('table_name', 'absence_types');
+      if (error) throw error;
+      return (data || []).map(d => d.record_id);
+    },
+    enabled: isOpen && !!companyId,
+  });
+
+  const { data: absenceTypes = [] } = useQuery({
+    queryKey: ['absence-types-requestable', companyId, hiddenIds],
+    queryFn: async () => {
+      // Fetch company types
+      const { data: companyData, error: e1 } = await supabase
         .from('absence_types')
         .select('*')
         .eq('company_id', companyId!)
         .eq('is_active', true)
         .eq('is_requestable', true)
         .order('sort_order');
-      if (error) throw error;
-      return data;
+      if (e1) throw e1;
+
+      // Fetch system defaults
+      const { data: systemData, error: e2 } = await supabase
+        .from('absence_types')
+        .select('*')
+        .is('company_id', null)
+        .eq('is_active', true)
+        .eq('is_requestable', true)
+        .order('sort_order');
+      if (e2) throw e2;
+
+      const visibleSystem = (systemData || []).filter(t => !hiddenIds.includes(t.id));
+      return [...visibleSystem, ...(companyData || [])];
     },
     enabled: isOpen && !!companyId,
   });
