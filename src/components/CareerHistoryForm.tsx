@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserCompanyId } from "@/hooks/useUserCompanyId";
 import { toast } from "sonner";
 
 interface CareerHistoryFormData {
@@ -47,6 +48,7 @@ interface CareerHistoryFormProps {
 }
 
 const CareerHistoryForm = ({ onClose, onSuccess, employeeId, record }: CareerHistoryFormProps) => {
+  const { companyId } = useUserCompanyId();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CareerHistoryFormData>();
   const isEditMode = !!record;
