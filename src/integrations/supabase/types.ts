@@ -487,6 +487,30 @@ export type Database = {
         }
         Relationships: []
       }
+      company_hidden_defaults: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       company_modules: {
         Row: {
           company_id: string
