@@ -68,6 +68,7 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
   shiftTemplateName,
   faded = false,
   hasAbsence = false,
+  dayAbsence,
   absencePayOverride,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
