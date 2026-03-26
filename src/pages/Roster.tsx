@@ -1670,6 +1670,11 @@ const Roster = () => {
                                             {isFirst ? (
                                               <>
                                                 {dayAbsence.absence_types?.name}
+                                                {(dayAbsence.start_time || dayAbsence.end_time) && (
+                                                  <span className="ml-1 opacity-80 font-normal">
+                                                    {dayAbsence.start_time || '—'}–{dayAbsence.end_time || '—'}
+                                                  </span>
+                                                )}
                                                 {dayAbsence.status === 'pending' && (
                                                   <span className="ml-1 opacity-75">⏳</span>
                                                 )}
@@ -1693,6 +1698,7 @@ const Roster = () => {
                                                 canEdit={canEditRoster && !isFaded}
                                                 faded={isFaded}
                                                 hasAbsence={!!dayAbsence}
+                                                dayAbsence={dayAbsence || undefined}
                                                 absencePayOverride={shift.absence_pay_override}
                                                 onEdit={() => {
                                                   if (isFaded) return;
