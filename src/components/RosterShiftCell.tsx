@@ -309,30 +309,6 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
                 />
               ))}
 
-              {/* Absence overlap segment */}
-              {dayAbsence && (() => {
-                const absStartMin = dayAbsence.start_time ? timeToMinutes(dayAbsence.start_time) : windowStart;
-                const absEndMin = dayAbsence.end_time ? timeToMinutes(dayAbsence.end_time) : windowEnd;
-                // Calculate overlap with shift
-                const overlapStart = Math.max(absStartMin, scheduledStart);
-                const overlapEnd = Math.min(absEndMin, scheduledEnd);
-                if (overlapStart < overlapEnd) {
-                  const left = ((overlapStart - windowStart) / windowDuration) * 100;
-                  const width = ((overlapEnd - overlapStart) / windowDuration) * 100;
-                  return (
-                    <div
-                      className="absolute top-0 h-full rounded-full opacity-60"
-                      style={{
-                        left: `${left}%`,
-                        width: `${Math.max(width, 2)}%`,
-                        backgroundColor: dayAbsence.absence_types?.color || 'hsl(var(--destructive))',
-                        backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.3) 2px, rgba(255,255,255,0.3) 4px)',
-                      }}
-                    />
-                  );
-                }
-                return null;
-              })()}
 
               {/* No clock data and not a no-show — just show scheduled placeholder */}
               {!hasClockedData && !isNoShow && (
@@ -342,28 +318,6 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
                 />
               )}
             </div>
-
-            {/* Absence overlap label */}
-            {dayAbsence && (() => {
-              const absStartMin = dayAbsence.start_time ? timeToMinutes(dayAbsence.start_time) : 0;
-              const absEndMin = dayAbsence.end_time ? timeToMinutes(dayAbsence.end_time) : 1440;
-              const overlapStart = Math.max(absStartMin, scheduledStart);
-              const overlapEnd = Math.min(absEndMin, scheduledEnd);
-              if (overlapStart < overlapEnd) {
-                const formatMins = (m: number) => `${Math.floor(m / 60).toString().padStart(2, '0')}:${(m % 60).toString().padStart(2, '0')}`;
-                const isPartial = dayAbsence.start_time || dayAbsence.end_time;
-                return (
-                  <div
-                    className="text-[9px] font-medium mt-0.5 px-1 py-0.5 rounded truncate text-white"
-                    style={{ backgroundColor: dayAbsence.absence_types?.color || 'hsl(var(--destructive))' }}
-                  >
-                    {dayAbsence.absence_types?.name}
-                    {isPartial && ` ${formatMins(overlapStart)}–${formatMins(overlapEnd)}`}
-                  </div>
-                );
-              }
-              return null;
-            })()}
 
             {/* Clock times or no-show label */}
             {isNoShow && (
