@@ -447,13 +447,20 @@ const Roster = () => {
         const actualStart = isoToMinutes(tr.clock_in_time!);
         const actualEnd = tr.clock_out_time ? isoToMinutes(tr.clock_out_time) : null;
 
+        // Adjust for absences
+        const shiftAbsence = getAbsenceForEmployeeDate(weekAbsences, shift.employee_id, shift.date);
+        const absEndMin = shiftAbsence?.end_time ? timeToMinutes(shiftAbsence.end_time) : null;
+        const absStartMin = shiftAbsence?.start_time ? timeToMinutes(shiftAbsence.start_time) : null;
+        const effectiveStart = (absEndMin !== null && absEndMin > scheduledStart && absEndMin < scheduledEnd) ? absEndMin : scheduledStart;
+        const effectiveEnd = (absStartMin !== null && absStartMin > scheduledStart && absStartMin < scheduledEnd) ? absStartMin : scheduledEnd;
+
         let allWithinThreshold = true;
         let earlyMinutesPaid = 0;
         let lateMinutesPaid = 0;
 
         // Check early clock-in
-        if (actualStart < scheduledStart) {
-          const diff = scheduledStart - actualStart;
+        if (actualStart < effectiveStart) {
+          const diff = effectiveStart - actualStart;
           if (diff <= earlyClockInMinutes) {
             if (earlyClockInAutoAction === 'paid') earlyMinutesPaid += diff;
           } else {
@@ -462,8 +469,8 @@ const Roster = () => {
         }
 
         // Check late clock-in
-        if (actualStart > scheduledStart + 2) {
-          const diff = actualStart - scheduledStart;
+        if (actualStart > effectiveStart + 2) {
+          const diff = actualStart - effectiveStart;
           if (diff <= lateClockInMinutes) {
             if (lateClockInAutoAction === 'paid') lateMinutesPaid += diff;
           } else {
@@ -472,8 +479,8 @@ const Roster = () => {
         }
 
         // Check early clock-out
-        if (actualEnd !== null && actualEnd < scheduledEnd - 2) {
-          const diff = scheduledEnd - actualEnd;
+        if (actualEnd !== null && actualEnd < effectiveEnd - 2) {
+          const diff = effectiveEnd - actualEnd;
           if (diff <= earlyClockOutMinutes) {
             if (earlyClockOutAutoAction === 'paid') lateMinutesPaid += diff;
           } else {
@@ -482,8 +489,8 @@ const Roster = () => {
         }
 
         // Check late clock-out
-        if (actualEnd !== null && actualEnd > scheduledEnd) {
-          const diff = actualEnd - scheduledEnd;
+        if (actualEnd !== null && actualEnd > effectiveEnd) {
+          const diff = actualEnd - effectiveEnd;
           if (diff <= lateClockOutMinutes) {
             if (lateClockOutAutoAction === 'paid') earlyMinutesPaid += diff;
           } else {
