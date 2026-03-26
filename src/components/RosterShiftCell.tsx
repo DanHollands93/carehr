@@ -130,6 +130,13 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
 
   const shouldShowSegments = hasClockedData && (isDiscrepancy || hasDiscrepancyType || isClockedIn);
 
+  // Calculate absence overlap with this shift's scheduled window
+  const absenceStartMin = dayAbsence?.start_time ? timeToMinutes(dayAbsence.start_time) : (dayAbsence ? 0 : null);
+  const absenceEndMin = dayAbsence?.end_time ? timeToMinutes(dayAbsence.end_time) : (dayAbsence ? 1440 : null);
+  // Effective scheduled window adjusted for absence
+  const effectiveStart = (absenceEndMin !== null && absenceEndMin > scheduledStart && absenceEndMin < scheduledEnd) ? absenceEndMin : scheduledStart;
+  const effectiveEnd = (absenceStartMin !== null && absenceStartMin > scheduledStart && absenceStartMin < scheduledEnd) ? absenceStartMin : scheduledEnd;
+
   // Determine early/late segments for the actual bar
   const getSegments = () => {
     if (actualStart === null) return [];
@@ -140,16 +147,16 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
     if (isCompleted && !isDiscrepancy && !tr?.discrepancy_type) {
       // For completed shifts without discrepancy, show entirely as on-time
       segments.push({
-        left: ((Math.min(actualStart, scheduledStart) - windowStart) / windowDuration) * 100,
-        width: ((Math.max(aEnd, scheduledEnd) - Math.min(actualStart, scheduledStart)) / windowDuration) * 100,
+        left: ((Math.min(actualStart, effectiveStart) - windowStart) / windowDuration) * 100,
+        width: ((Math.max(aEnd, effectiveEnd) - Math.min(actualStart, effectiveStart)) / windowDuration) * 100,
         type: 'on-time',
       });
       return segments;
     }
 
-    // Early clock-in (before scheduled start)
-    if (actualStart < scheduledStart) {
-      const earlyEnd = Math.min(scheduledStart, aEnd);
+    // Early clock-in (before effective start)
+    if (actualStart < effectiveStart) {
+      const earlyEnd = Math.min(effectiveStart, aEnd);
       segments.push({
         left: ((actualStart - windowStart) / windowDuration) * 100,
         width: ((earlyEnd - actualStart) / windowDuration) * 100,
@@ -158,8 +165,8 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
     }
 
     // On-time portion
-    const onTimeStart = Math.max(actualStart, scheduledStart);
-    const onTimeEnd = Math.min(aEnd, scheduledEnd);
+    const onTimeStart = Math.max(actualStart, effectiveStart);
+    const onTimeEnd = Math.min(aEnd, effectiveEnd);
     if (onTimeStart < onTimeEnd) {
       segments.push({
         left: ((onTimeStart - windowStart) / windowDuration) * 100,
@@ -168,29 +175,29 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
       });
     }
 
-    // Late clock-in (started after scheduled start, mark gap as late)
-    if (actualStart > scheduledStart) {
+    // Late clock-in (started after effective start, mark gap as late)
+    if (actualStart > effectiveStart) {
       segments.push({
-        left: ((scheduledStart - windowStart) / windowDuration) * 100,
-        width: ((Math.min(actualStart, scheduledEnd) - scheduledStart) / windowDuration) * 100,
+        left: ((effectiveStart - windowStart) / windowDuration) * 100,
+        width: ((Math.min(actualStart, effectiveEnd) - effectiveStart) / windowDuration) * 100,
         type: 'late',
       });
     }
 
-    // Late clock-out (after scheduled end)
-    if (aEnd > scheduledEnd) {
+    // Late clock-out (after effective end)
+    if (aEnd > effectiveEnd) {
       segments.push({
-        left: ((scheduledEnd - windowStart) / windowDuration) * 100,
-        width: ((aEnd - scheduledEnd) / windowDuration) * 100,
+        left: ((effectiveEnd - windowStart) / windowDuration) * 100,
+        width: ((aEnd - effectiveEnd) / windowDuration) * 100,
         type: 'late',
       });
     }
 
-    // Early clock-out (before scheduled end)
-    if (aEnd < scheduledEnd && actualStart !== null) {
+    // Early clock-out (before effective end) — only if NOT covered by absence
+    if (aEnd < effectiveEnd && actualStart !== null) {
       segments.push({
         left: ((aEnd - windowStart) / windowDuration) * 100,
-        width: ((scheduledEnd - aEnd) / windowDuration) * 100,
+        width: ((effectiveEnd - aEnd) / windowDuration) * 100,
         type: 'early',
       });
     }
