@@ -32,6 +32,20 @@ interface ShiftWithTimeRecord {
   absence_pay_override?: string | null;
 }
 
+interface AbsenceInfo {
+  start_date: string;
+  end_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  status: string;
+  absence_types: {
+    id: string;
+    name: string;
+    color: string;
+    is_payable: boolean;
+  };
+}
+
 interface RosterShiftCellProps {
   shift: ShiftWithTimeRecord;
   onEdit: () => void;
@@ -41,6 +55,7 @@ interface RosterShiftCellProps {
   shiftTemplateName?: string;
   faded?: boolean;
   hasAbsence?: boolean;
+  dayAbsence?: AbsenceInfo;
   absencePayOverride?: string | null;
 }
 
