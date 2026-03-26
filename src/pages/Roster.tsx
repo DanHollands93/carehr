@@ -797,8 +797,20 @@ const Roster = () => {
           const clockInDate = new Date(isoDateTime);
           const clockInMinutes = clockInDate.getHours() * 60 + clockInDate.getMinutes();
           const [startH, startM] = shiftInfo.start_time.split(':').map(Number);
-          const scheduledStartMinutes = startH * 60 + startM;
-          const diffMinutes = clockInMinutes - scheduledStartMinutes;
+          let effectiveStartMinutes = startH * 60 + startM;
+
+          // If there's an absence covering the start of the shift, adjust the effective start
+          const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, shiftInfo.employee_id, shiftInfo.date);
+          if (dayAbsence && dayAbsence.end_time) {
+            const [absEndH, absEndM] = dayAbsence.end_time.split(':').map(Number);
+            const absEndMinutes = absEndH * 60 + absEndM;
+            // If absence ends after shift start but before shift end, the employee is expected at absence end time
+            if (absEndMinutes > effectiveStartMinutes) {
+              effectiveStartMinutes = absEndMinutes;
+            }
+          }
+
+          const diffMinutes = clockInMinutes - effectiveStartMinutes;
 
           if (diffMinutes < -5) {
             clockInDiscrepancy = 'early_clock_in';
@@ -867,8 +879,31 @@ const Roster = () => {
 
         if (shiftData) {
           const [endH, endM] = shiftData.end_time.split(':').map(Number);
-          const scheduledEndMinutes = endH * 60 + endM;
-          const diffMinutes = clockOutMinutes - scheduledEndMinutes;
+          let effectiveEndMinutes = endH * 60 + endM;
+
+          // If there's an absence covering the end of the shift, adjust the effective end
+          // We need the shift's employee_id and date - get from existing record
+          if (existing?.shift_start_time && existing?.shift_end_time) {
+            // Try to find absence for this shift
+            const { data: shiftFullData } = await supabase
+              .from('shifts')
+              .select('employee_id, date')
+              .eq('id', shiftId)
+              .single();
+            if (shiftFullData) {
+              const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, shiftFullData.employee_id, shiftFullData.date);
+              if (dayAbsence && dayAbsence.start_time) {
+                const [absStartH, absStartM] = dayAbsence.start_time.split(':').map(Number);
+                const absStartMinutes = absStartH * 60 + absStartM;
+                // If absence starts before shift end but after shift start, effective end is absence start
+                if (absStartMinutes < effectiveEndMinutes) {
+                  effectiveEndMinutes = absStartMinutes;
+                }
+              }
+            }
+          }
+
+          const diffMinutes = clockOutMinutes - effectiveEndMinutes;
 
           // Check for early clock-out (more than 5 min early)
           if (diffMinutes < -5) {
