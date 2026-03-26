@@ -311,6 +311,15 @@ const RosterShiftCell: React.FC<RosterShiftCellProps> = ({
 
 
               {/* No clock data and not a no-show — just show scheduled placeholder */}
+              {!hasClockedData && !isNoShow && (
+                <div
+                  className="absolute top-0 h-full bg-primary/40 rounded-full"
+                  style={{ left: `${schedBarLeft}%`, width: `${schedBarWidth}%` }}
+                />
+              )}
+            </div>
+
+            {/* Clock times or no-show label */}
             {isNoShow && (
               <div className="text-[9px] text-destructive font-medium mt-1 text-center">
                 No clock in
