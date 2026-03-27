@@ -449,6 +449,13 @@ const Roster = () => {
 
         // Adjust for absences
         const shiftAbsence = getAbsenceForEmployeeDate(weekAbsences, shift.employee_id, shift.date);
+        
+        // Full-day absence — skip discrepancy processing entirely
+        if (shiftAbsence && !shiftAbsence.start_time && !shiftAbsence.end_time) {
+          autoApplyProcessedRef.current.add(tr.id);
+          continue;
+        }
+        
         const absEndMin = shiftAbsence?.end_time ? timeToMinutes(shiftAbsence.end_time) : null;
         const absStartMin = shiftAbsence?.start_time ? timeToMinutes(shiftAbsence.start_time) : null;
         const effectiveStart = (absEndMin !== null && absEndMin > scheduledStart && absEndMin < scheduledEnd) ? absEndMin : scheduledStart;
