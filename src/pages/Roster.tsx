@@ -1476,7 +1476,7 @@ const Roster = () => {
           employeeId={shiftPopup.employeeId}
           date={shiftPopup.date}
           existingShift={shiftPopup.existingShift}
-          dayAbsence={getAbsenceForEmployeeDate(weekAbsences, shiftPopup.employeeId, shiftPopup.date) || null}
+          dayAbsence={(() => { const a = getAbsenceForEmployeeDate(weekAbsences, shiftPopup.employeeId, shiftPopup.date); return a ? { ...a, ...getEffectiveAbsenceTimes(a, shiftPopup.date) } : null; })()}
           onUpdateAbsencePayOverride={(shiftId, override) => {
             updateAbsencePayOverrideMutation.mutate({ shiftId, override });
           }}
