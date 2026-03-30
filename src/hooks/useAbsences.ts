@@ -68,3 +68,20 @@ export const getAbsenceForEmployeeDate = (
     (a.status === 'approved' || a.status === 'pending')
   );
 };
+
+// Returns effective start_time and end_time for a specific date within the absence.
+// - start_time only applies on the start_date (partial first day)
+// - end_time only applies on the end_date (partial last day)
+// - intermediate days are treated as full-day (null/null)
+export const getEffectiveAbsenceTimes = (
+  absence: AbsenceWithType,
+  date: string
+): { start_time: string | null; end_time: string | null } => {
+  const isFirstDay = date === absence.start_date;
+  const isLastDay = date === absence.end_date;
+
+  return {
+    start_time: isFirstDay ? absence.start_time : null,
+    end_time: isLastDay ? absence.end_time : null,
+  };
+};
