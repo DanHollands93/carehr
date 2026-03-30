@@ -43,7 +43,7 @@ interface HoursRecord {
   issue_type?: string;
   exception_status?: string;
   job_title?: string;
-  segment_type?: string;
+  segment_type?: 'early_overtime' | 'scheduled' | 'late_overtime' | 'absence' | string;
   segment_description?: string;
 }
 
@@ -187,9 +187,14 @@ const HoursAnalysisReport = () => {
         return (hours * 60) + minutes;
       };
 
-      const formatAbsenceLabel = (absenceName: string, isPayable: boolean) => (
-        `${absenceName}${isPayable ? '' : ' (Unpaid)'}`
-      );
+      const formatAbsenceLabel = (absenceName: string, isPayable: boolean) => {
+        const normalizedName = absenceName.toLowerCase();
+        if (normalizedName.includes('(unpaid)') || normalizedName.includes('(paid)')) {
+          return absenceName;
+        }
+
+        return `${absenceName}${isPayable ? '' : ' (Unpaid)'}`;
+      };
 
       // Helper: check if a shift is covered by an absence and determine pay based on override
       const getShiftAbsencePayStatus = (
