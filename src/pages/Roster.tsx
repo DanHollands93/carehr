@@ -825,19 +825,17 @@ const Roster = () => {
           // If there's an absence covering the start of the shift, adjust the effective start
           const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, shiftInfo.employee_id, shiftInfo.date);
           if (dayAbsence) {
-            // Full-day absence (no times) — employee not expected at all, skip discrepancy
-            if (!dayAbsence.start_time && !dayAbsence.end_time) {
-              // No clock-in discrepancy for full-day absence
+            const effectiveAbsTimes = getEffectiveAbsenceTimes(dayAbsence, shiftInfo.date);
+            // Full-day absence or intermediate day (both times null) — skip discrepancy
+            if (!effectiveAbsTimes.start_time && !effectiveAbsTimes.end_time) {
               clockInDiscrepancy = null;
-            } else if (dayAbsence.end_time) {
-              const [absEndH, absEndM] = dayAbsence.end_time.split(':').map(Number);
+            } else if (effectiveAbsTimes.end_time) {
+              const [absEndH, absEndM] = effectiveAbsTimes.end_time.split(':').map(Number);
               const absEndMinutes = absEndH * 60 + absEndM;
-              // If absence ends after shift start but before shift end, the employee is expected at absence end time
               if (absEndMinutes > effectiveStartMinutes) {
                 effectiveStartMinutes = absEndMinutes;
               }
             }
-            // If absence starts during the shift (e.g. sick from 15:00), clock-in is still at shift start — no change needed
           }
 
           const diffMinutes = clockInMinutes - effectiveStartMinutes;
@@ -920,15 +918,14 @@ const Roster = () => {
           if (shiftFullData) {
             const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, shiftFullData.employee_id, shiftFullData.date);
             if (dayAbsence) {
-              // Full-day absence — no clock-out discrepancy
-              if (!dayAbsence.start_time && !dayAbsence.end_time) {
-                // Skip discrepancy detection entirely
+              const effectiveAbsTimes = getEffectiveAbsenceTimes(dayAbsence, shiftFullData.date);
+              // Full-day absence or intermediate day — no clock-out discrepancy
+              if (!effectiveAbsTimes.start_time && !effectiveAbsTimes.end_time) {
                 discrepancyType = existing?.discrepancy_type || null;
                 newStatus = discrepancyType ? 'discrepancy' : 'completed';
-              } else if (dayAbsence.start_time) {
-                const [absStartH, absStartM] = dayAbsence.start_time.split(':').map(Number);
+              } else if (effectiveAbsTimes.start_time) {
+                const [absStartH, absStartM] = effectiveAbsTimes.start_time.split(':').map(Number);
                 const absStartMinutes = absStartH * 60 + absStartM;
-                // If absence starts before shift end but after shift start, effective end is absence start
                 if (absStartMinutes < effectiveEndMinutes) {
                   effectiveEndMinutes = absStartMinutes;
                 }
