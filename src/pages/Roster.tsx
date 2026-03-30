@@ -30,7 +30,7 @@ import { useRosterSections } from "@/hooks/useRosterSections";
 import { useAllocationLocations } from "@/hooks/useAllocationLocations";
 import { useDailyAllocations } from "@/hooks/useDailyAllocations";
 import AllocationAssignmentDialog from "@/components/AllocationAssignmentDialog";
-import { useAbsencesForDateRange, getAbsenceForEmployeeDate } from "@/hooks/useAbsences";
+import { useAbsencesForDateRange, getAbsenceForEmployeeDate, getEffectiveAbsenceTimes } from "@/hooks/useAbsences";
 
 interface Employee {
   id: string;
@@ -456,8 +456,17 @@ const Roster = () => {
           continue;
         }
         
-        const absEndMin = shiftAbsence?.end_time ? timeToMinutes(shiftAbsence.end_time) : null;
-        const absStartMin = shiftAbsence?.start_time ? timeToMinutes(shiftAbsence.start_time) : null;
+        // Get effective times for this specific date (start_time only on first day, end_time only on last day)
+        const effectiveAbsTimes = shiftAbsence ? getEffectiveAbsenceTimes(shiftAbsence, shift.date) : null;
+        
+        // If effective times are both null on an intermediate day, it's a full-day absence
+        if (shiftAbsence && !effectiveAbsTimes?.start_time && !effectiveAbsTimes?.end_time) {
+          autoApplyProcessedRef.current.add(tr.id);
+          continue;
+        }
+        
+        const absEndMin = effectiveAbsTimes?.end_time ? timeToMinutes(effectiveAbsTimes.end_time) : null;
+        const absStartMin = effectiveAbsTimes?.start_time ? timeToMinutes(effectiveAbsTimes.start_time) : null;
         const effectiveStart = (absEndMin !== null && absEndMin > scheduledStart && absEndMin < scheduledEnd) ? absEndMin : scheduledStart;
         const effectiveEnd = (absStartMin !== null && absStartMin > scheduledStart && absStartMin < scheduledEnd) ? absStartMin : scheduledEnd;
 
@@ -816,19 +825,17 @@ const Roster = () => {
           // If there's an absence covering the start of the shift, adjust the effective start
           const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, shiftInfo.employee_id, shiftInfo.date);
           if (dayAbsence) {
-            // Full-day absence (no times) — employee not expected at all, skip discrepancy
-            if (!dayAbsence.start_time && !dayAbsence.end_time) {
-              // No clock-in discrepancy for full-day absence
+            const effectiveAbsTimes = getEffectiveAbsenceTimes(dayAbsence, shiftInfo.date);
+            // Full-day absence or intermediate day (both times null) — skip discrepancy
+            if (!effectiveAbsTimes.start_time && !effectiveAbsTimes.end_time) {
               clockInDiscrepancy = null;
-            } else if (dayAbsence.end_time) {
-              const [absEndH, absEndM] = dayAbsence.end_time.split(':').map(Number);
+            } else if (effectiveAbsTimes.end_time) {
+              const [absEndH, absEndM] = effectiveAbsTimes.end_time.split(':').map(Number);
               const absEndMinutes = absEndH * 60 + absEndM;
-              // If absence ends after shift start but before shift end, the employee is expected at absence end time
               if (absEndMinutes > effectiveStartMinutes) {
                 effectiveStartMinutes = absEndMinutes;
               }
             }
-            // If absence starts during the shift (e.g. sick from 15:00), clock-in is still at shift start — no change needed
           }
 
           const diffMinutes = clockInMinutes - effectiveStartMinutes;
@@ -911,15 +918,14 @@ const Roster = () => {
           if (shiftFullData) {
             const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, shiftFullData.employee_id, shiftFullData.date);
             if (dayAbsence) {
-              // Full-day absence — no clock-out discrepancy
-              if (!dayAbsence.start_time && !dayAbsence.end_time) {
-                // Skip discrepancy detection entirely
+              const effectiveAbsTimes = getEffectiveAbsenceTimes(dayAbsence, shiftFullData.date);
+              // Full-day absence or intermediate day — no clock-out discrepancy
+              if (!effectiveAbsTimes.start_time && !effectiveAbsTimes.end_time) {
                 discrepancyType = existing?.discrepancy_type || null;
                 newStatus = discrepancyType ? 'discrepancy' : 'completed';
-              } else if (dayAbsence.start_time) {
-                const [absStartH, absStartM] = dayAbsence.start_time.split(':').map(Number);
+              } else if (effectiveAbsTimes.start_time) {
+                const [absStartH, absStartM] = effectiveAbsTimes.start_time.split(':').map(Number);
                 const absStartMinutes = absStartH * 60 + absStartM;
-                // If absence starts before shift end but after shift start, effective end is absence start
                 if (absStartMinutes < effectiveEndMinutes) {
                   effectiveEndMinutes = absStartMinutes;
                 }
@@ -1470,7 +1476,7 @@ const Roster = () => {
           employeeId={shiftPopup.employeeId}
           date={shiftPopup.date}
           existingShift={shiftPopup.existingShift}
-          dayAbsence={getAbsenceForEmployeeDate(weekAbsences, shiftPopup.employeeId, shiftPopup.date) || null}
+          dayAbsence={(() => { const a = getAbsenceForEmployeeDate(weekAbsences, shiftPopup.employeeId, shiftPopup.date); return a ? { ...a, ...getEffectiveAbsenceTimes(a, shiftPopup.date) } : null; })()}
           onUpdateAbsencePayOverride={(shiftId, override) => {
             updateAbsencePayOverrideMutation.mutate({ shiftId, override });
           }}
@@ -1757,7 +1763,7 @@ const Roster = () => {
                                                 canEdit={canEditRoster && !isFaded}
                                                 faded={isFaded}
                                                 hasAbsence={!!dayAbsence}
-                                                dayAbsence={dayAbsence || undefined}
+                                                dayAbsence={dayAbsence ? { ...dayAbsence, ...getEffectiveAbsenceTimes(dayAbsence, dateStr) } : undefined}
                                                 absencePayOverride={shift.absence_pay_override}
                                                 onEdit={() => {
                                                   if (isFaded) return;
