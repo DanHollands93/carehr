@@ -901,9 +901,16 @@ const Roster = () => {
           .single();
 
         let newStatus: string = 'completed';
-        let discrepancyType = existing?.discrepancy_type || null;
+        const preservedDiscrepancyTypes = (existing?.discrepancy_type || '')
+          .split(',')
+          .map(type => type.trim())
+          .filter(type => type && type !== 'reattached' && type !== 'early_clock_out' && type !== 'late_clock_out');
+        let discrepancyType: string | null = preservedDiscrepancyTypes.length > 0
+          ? preservedDiscrepancyTypes.join(',')
+          : null;
         const clockOutDate = new Date(isoDateTime);
         const clockOutMinutes = clockOutDate.getHours() * 60 + clockOutDate.getMinutes();
+        let dayAbsenceId: string | null = null;
 
         if (shiftData) {
           const [endH, endM] = shiftData.end_time.split(':').map(Number);
@@ -918,10 +925,11 @@ const Roster = () => {
           if (shiftFullData) {
             const dayAbsence = getAbsenceForEmployeeDate(weekAbsences, shiftFullData.employee_id, shiftFullData.date);
             if (dayAbsence) {
+              dayAbsenceId = dayAbsence.id;
               const effectiveAbsTimes = getEffectiveAbsenceTimes(dayAbsence, shiftFullData.date);
               // Full-day absence or intermediate day — no clock-out discrepancy
               if (!effectiveAbsTimes.start_time && !effectiveAbsTimes.end_time) {
-                discrepancyType = existing?.discrepancy_type || null;
+                discrepancyType = preservedDiscrepancyTypes.length > 0 ? preservedDiscrepancyTypes.join(',') : null;
                 newStatus = discrepancyType ? 'discrepancy' : 'completed';
               } else if (effectiveAbsTimes.start_time) {
                 const [absStartH, absStartM] = effectiveAbsTimes.start_time.split(':').map(Number);
@@ -949,6 +957,10 @@ const Roster = () => {
               ? `${discrepancyType},late_clock_out`
               : 'late_clock_out';
           }
+
+          if (!discrepancyType) {
+            newStatus = 'completed';
+          }
         }
 
         const { error } = await supabase
@@ -957,6 +969,7 @@ const Roster = () => {
             clock_out_time: isoDateTime,
             status: newStatus,
             discrepancy_type: discrepancyType,
+            absence_id: dayAbsenceId,
             notes: combinedNotes,
             updated_at: new Date().toISOString(),
           })

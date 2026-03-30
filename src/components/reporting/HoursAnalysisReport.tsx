@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { getEffectiveAbsenceTimes } from "@/hooks/useAbsences";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import { CalendarIcon, Download, Printer, Settings, BarChart3, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,14 @@ interface HoursRecord {
   job_title?: string;
   segment_type?: string;
   segment_description?: string;
+}
+
+interface AbsenceCoverage {
+  isAbsence: boolean;
+  absenceName: string;
+  isPayable: boolean;
+  overlapMinutes: number;
+  isFullShift: boolean;
 }
 
 interface ColumnConfig {
@@ -173,15 +182,43 @@ const HoursAnalysisReport = () => {
         .lte('start_date', endDate)
         .gte('end_date', startDate);
 
+      const timeToMinutes = (time: string) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        return (hours * 60) + minutes;
+      };
+
+      const formatAbsenceLabel = (absenceName: string, isPayable: boolean) => (
+        `${absenceName}${isPayable ? '' : ' (Unpaid)'}`
+      );
+
       // Helper: check if a shift is covered by an absence and determine pay based on override
-      const getShiftAbsencePayStatus = (empId: string, shiftDate: string, shiftAbsencePayOverride?: string | null): { isAbsence: boolean; absenceName: string; isPayable: boolean } => {
-        if (!absencesData) return { isAbsence: false, absenceName: '', isPayable: true };
+      const getShiftAbsencePayStatus = (
+        empId: string,
+        shiftDate: string,
+        shiftStart: string,
+        shiftEnd: string,
+        shiftAbsencePayOverride?: string | null,
+      ): AbsenceCoverage => {
+        if (!absencesData) return { isAbsence: false, absenceName: '', isPayable: true, overlapMinutes: 0, isFullShift: false };
         const match = absencesData.find(a =>
           a.employee_id === empId &&
           a.start_date <= shiftDate &&
           a.end_date >= shiftDate
         );
-        if (!match) return { isAbsence: false, absenceName: '', isPayable: true };
+        if (!match) return { isAbsence: false, absenceName: '', isPayable: true, overlapMinutes: 0, isFullShift: false };
+
+        const effectiveAbsenceTimes = getEffectiveAbsenceTimes(match as any, shiftDate);
+        const shiftStartMinutes = timeToMinutes(shiftStart);
+        const shiftEndMinutes = timeToMinutes(shiftEnd);
+        const absenceStartMinutes = effectiveAbsenceTimes.start_time ? timeToMinutes(effectiveAbsenceTimes.start_time) : 0;
+        const absenceEndMinutes = effectiveAbsenceTimes.end_time ? timeToMinutes(effectiveAbsenceTimes.end_time) : 1440;
+        const overlapStart = Math.max(shiftStartMinutes, absenceStartMinutes);
+        const overlapEnd = Math.min(shiftEndMinutes, absenceEndMinutes);
+
+        if (overlapEnd <= overlapStart) {
+          return { isAbsence: false, absenceName: '', isPayable: true, overlapMinutes: 0, isFullShift: false };
+        }
+
         const absenceType = match.absence_types as any;
         
         // Per-shift override takes priority over absence type default
@@ -198,6 +235,8 @@ const HoursAnalysisReport = () => {
           isAbsence: true,
           absenceName: absenceType?.name || 'Absence',
           isPayable,
+          overlapMinutes: overlapEnd - overlapStart,
+          isFullShift: (overlapEnd - overlapStart) >= (shiftEndMinutes - shiftStartMinutes),
         };
       };
       
@@ -274,7 +313,35 @@ const HoursAnalysisReport = () => {
         const jobTitle = shift.position || employeeCareer?.job_title || 'Unknown';
 
         // Check if this shift is during an approved absence (use per-shift override)
-        const absenceInfo = getShiftAbsencePayStatus(employee.id, shift.date, shift.absence_pay_override);
+        const absenceInfo = getShiftAbsencePayStatus(employee.id, shift.date, shift.start_time, shift.end_time, shift.absence_pay_override);
+        const absenceHours = Math.round((absenceInfo.overlapMinutes / 60) * 100) / 100;
+        const nonAbsenceScheduledHours = Math.max(0, Math.round(((scheduledMinutes - absenceInfo.overlapMinutes) / 60) * 100) / 100);
+        const absenceLabel = absenceInfo.isAbsence ? formatAbsenceLabel(absenceInfo.absenceName, absenceInfo.isPayable) : '';
+
+        const pushAbsenceRecord = () => {
+          if (!absenceInfo.isAbsence || absenceInfo.overlapMinutes <= 0) return;
+
+          const paidAbsenceHours = absenceInfo.isPayable ? absenceHours : 0;
+          processedData.push({
+            employee_id: employee.id,
+            employee_name: `${employee.first_name} ${employee.last_name}`,
+            position: shift.position || employee.department || 'Unknown',
+            job_title: jobTitle,
+            date: shift.date,
+            shift_start: shift.start_time,
+            shift_end: shift.end_time,
+            clock_in: null,
+            clock_out: null,
+            scheduled_hours: absenceHours,
+            paid_hours: paidAbsenceHours,
+            pay_rate: payRate,
+            total_pay: paidAbsenceHours * payRate,
+            has_issue: false,
+            issue_type: absenceLabel,
+            segment_type: 'absence',
+            segment_description: absenceLabel,
+          });
+        };
         
         let hasIssue = false;
         let issueType = '';
@@ -282,6 +349,7 @@ const HoursAnalysisReport = () => {
         
         if (timeRecord) {
           exceptionStatus = timeRecord.approval_status || 'pending';
+          const exceptionCleared = exceptionStatus === 'approved' || exceptionStatus === 'reviewed';
           
           // Check if shift has ended and no clock times - only then mark as discrepancy
           const now = new Date();
@@ -293,7 +361,7 @@ const HoursAnalysisReport = () => {
           } else if (timeRecord.clock_in_time && !timeRecord.clock_out_time && now > shiftEndTime) {
             hasIssue = true;
             issueType = 'Missing clock out';
-          } else if (timeRecord.discrepancy_type && exceptionStatus !== 'approved') {
+          } else if (timeRecord.discrepancy_type && !exceptionCleared) {
             hasIssue = true;
             issueType = timeRecord.discrepancy_type;
           }
@@ -303,8 +371,7 @@ const HoursAnalysisReport = () => {
             for (const segment of timeRecord.time_segments as any[]) {
               const segmentHours = Math.round(((segment.minutes_worked || 0) / 60) * 100) / 100;
               const paidHours = Math.round(((segment.minutes_paid || 0) / 60) * 100) / 100;
-              const effectivePaidHours = (absenceInfo.isAbsence && !absenceInfo.isPayable) ? 0 : paidHours;
-              const totalPay = effectivePaidHours * payRate;
+              const totalPay = paidHours * payRate;
               
               let segmentDescription = '';
               switch (segment.segment_type) {
@@ -332,16 +399,18 @@ const HoursAnalysisReport = () => {
                 clock_in: timeRecord.clock_in_time || null,
                 clock_out: timeRecord.clock_out_time || null,
                 scheduled_hours: segment.segment_type === 'scheduled' ? segmentHours : 0,
-                paid_hours: effectivePaidHours,
+                paid_hours: paidHours,
                 pay_rate: payRate,
                 total_pay: totalPay,
                 has_issue: hasIssue && segment.segment_type === 'scheduled',
-                issue_type: absenceInfo.isAbsence ? `Absence: ${absenceInfo.absenceName}${!absenceInfo.isPayable ? ' (Unpaid)' : ''}` : issueType,
+                issue_type: issueType,
                 exception_status: exceptionStatus,
                 segment_type: segment.segment_type,
-                segment_description: absenceInfo.isAbsence ? `${absenceInfo.absenceName}${!absenceInfo.isPayable ? ' — Unpaid' : ' — Paid'}` : segmentDescription
+                segment_description: segmentDescription
               });
             }
+
+            pushAbsenceRecord();
           } else {
             // No segments - create basic record
             let paidHours = 0;
@@ -362,9 +431,45 @@ const HoursAnalysisReport = () => {
               }
             }
             
-            const effectivePaidHours = (absenceInfo.isAbsence && !absenceInfo.isPayable) ? 0 : paidHours;
-            const totalPay = effectivePaidHours * payRate;
-            
+            const totalPay = paidHours * payRate;
+
+            if (!(absenceInfo.isFullShift && !timeRecord.clock_in_time && !timeRecord.clock_out_time)) {
+              processedData.push({
+                employee_id: employee.id,
+                employee_name: `${employee.first_name} ${employee.last_name}`,
+                position: shift.position || employee.department || 'Unknown',
+                job_title: jobTitle,
+                date: shift.date,
+                shift_start: shift.start_time,
+                shift_end: shift.end_time,
+                clock_in: timeRecord.clock_in_time || null,
+                clock_out: timeRecord.clock_out_time || null,
+                scheduled_hours: absenceInfo.isAbsence ? nonAbsenceScheduledHours : scheduledHours,
+                paid_hours: paidHours,
+                pay_rate: payRate,
+                total_pay: totalPay,
+                has_issue: hasIssue,
+                issue_type: issueType,
+                exception_status: exceptionStatus,
+                segment_description: absenceInfo.isAbsence ? 'Worked time' : 'Full shift'
+              });
+            }
+
+            pushAbsenceRecord();
+          }
+        } else {
+          // No time record - check if shift has ended
+          const now = new Date();
+          const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
+          
+          if (now > shiftEndTime) {
+            hasIssue = true;
+            issueType = 'Did not clock in';
+          } else {
+            issueType = 'Scheduled';
+          }
+
+          if (!absenceInfo.isFullShift) {
             processedData.push({
               employee_id: employee.id,
               employee_name: `${employee.first_name} ${employee.last_name}`,
@@ -373,52 +478,20 @@ const HoursAnalysisReport = () => {
               date: shift.date,
               shift_start: shift.start_time,
               shift_end: shift.end_time,
-              clock_in: timeRecord.clock_in_time || null,
-              clock_out: timeRecord.clock_out_time || null,
-              scheduled_hours: scheduledHours,
-              paid_hours: effectivePaidHours,
+              clock_in: null,
+              clock_out: null,
+              scheduled_hours: absenceInfo.isAbsence ? nonAbsenceScheduledHours : scheduledHours,
+              paid_hours: 0,
               pay_rate: payRate,
-              total_pay: totalPay,
-              has_issue: hasIssue || absenceInfo.isAbsence,
-              issue_type: absenceInfo.isAbsence ? `Absence: ${absenceInfo.absenceName}${!absenceInfo.isPayable ? ' (Unpaid)' : ''}` : issueType,
-              exception_status: exceptionStatus,
-              segment_description: absenceInfo.isAbsence ? `${absenceInfo.absenceName}${!absenceInfo.isPayable ? ' — Unpaid' : ' — Paid'}` : 'Full shift'
+              total_pay: 0,
+              has_issue: hasIssue,
+              issue_type: issueType,
+              exception_status: 'pending',
+              segment_description: 'No time record'
             });
           }
-        } else {
-          // No time record - check if shift has ended
-          const now = new Date();
-          const shiftEndTime = parseISO(`${shift.date}T${shift.end_time}`);
-          
-          if (absenceInfo.isAbsence) {
-            hasIssue = true;
-            issueType = `Absence: ${absenceInfo.absenceName}`;
-          } else if (now > shiftEndTime) {
-            hasIssue = true;
-            issueType = 'Did not clock in';
-          } else {
-            issueType = 'Scheduled';
-          }
-          
-          processedData.push({
-            employee_id: employee.id,
-            employee_name: `${employee.first_name} ${employee.last_name}`,
-            position: shift.position || employee.department || 'Unknown',
-            job_title: jobTitle,
-            date: shift.date,
-            shift_start: shift.start_time,
-            shift_end: shift.end_time,
-            clock_in: null,
-            clock_out: null,
-            scheduled_hours: scheduledHours,
-            paid_hours: (absenceInfo.isAbsence && absenceInfo.isPayable) ? scheduledHours : 0,
-            pay_rate: payRate,
-            total_pay: (absenceInfo.isAbsence && absenceInfo.isPayable) ? scheduledHours * payRate : 0,
-            has_issue: hasIssue,
-            issue_type: issueType,
-            exception_status: absenceInfo.isAbsence ? 'approved' : 'pending',
-            segment_description: absenceInfo.isAbsence ? `${absenceInfo.absenceName}${absenceInfo.isPayable ? ' — Paid' : ' — Unpaid'}` : 'No time record'
-          });
+
+          pushAbsenceRecord();
         }
       }
       
@@ -504,7 +577,7 @@ const HoursAnalysisReport = () => {
   const getIssueDisplay = (record: HoursRecord) => {
     if (!record.has_issue && record.exception_status !== 'approved') return null;
     
-    if (record.exception_status === 'approved') {
+    if (record.exception_status === 'approved' || record.exception_status === 'reviewed') {
       return (
         <Badge variant="default" className="bg-green-100 text-green-800">
           <AlertTriangle className="w-3 h-3 mr-1" />
