@@ -456,8 +456,17 @@ const Roster = () => {
           continue;
         }
         
-        const absEndMin = shiftAbsence?.end_time ? timeToMinutes(shiftAbsence.end_time) : null;
-        const absStartMin = shiftAbsence?.start_time ? timeToMinutes(shiftAbsence.start_time) : null;
+        // Get effective times for this specific date (start_time only on first day, end_time only on last day)
+        const effectiveAbsTimes = shiftAbsence ? getEffectiveAbsenceTimes(shiftAbsence, shift.date) : null;
+        
+        // If effective times are both null on an intermediate day, it's a full-day absence
+        if (shiftAbsence && !effectiveAbsTimes?.start_time && !effectiveAbsTimes?.end_time) {
+          autoApplyProcessedRef.current.add(tr.id);
+          continue;
+        }
+        
+        const absEndMin = effectiveAbsTimes?.end_time ? timeToMinutes(effectiveAbsTimes.end_time) : null;
+        const absStartMin = effectiveAbsTimes?.start_time ? timeToMinutes(effectiveAbsTimes.start_time) : null;
         const effectiveStart = (absEndMin !== null && absEndMin > scheduledStart && absEndMin < scheduledEnd) ? absEndMin : scheduledStart;
         const effectiveEnd = (absStartMin !== null && absStartMin > scheduledStart && absStartMin < scheduledEnd) ? absStartMin : scheduledEnd;
 
