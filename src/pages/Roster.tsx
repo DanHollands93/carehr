@@ -1763,7 +1763,7 @@ const Roster = () => {
                                                 canEdit={canEditRoster && !isFaded}
                                                 faded={isFaded}
                                                 hasAbsence={!!dayAbsence}
-                                                dayAbsence={dayAbsence || undefined}
+                                                dayAbsence={dayAbsence ? { ...dayAbsence, ...getEffectiveAbsenceTimes(dayAbsence, dateStr) } : undefined}
                                                 absencePayOverride={shift.absence_pay_override}
                                                 onEdit={() => {
                                                   if (isFaded) return;
