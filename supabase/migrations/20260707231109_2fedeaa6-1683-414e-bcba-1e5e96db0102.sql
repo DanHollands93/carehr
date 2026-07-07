@@ -1,0 +1,1 @@
+CREATE POLICY "Users can view their own employee record" ON public.employees FOR SELECT USING (id = public.current_user_employee_id());
