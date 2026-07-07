@@ -49,98 +49,36 @@ export const usePermissions = () => {
 
     console.log('Loading permissions for user:', effectiveUserId);
 
-    // Load permissions from role assignments (permission groups)
-    const { data: roleData, error: roleError } = await supabase
-      .from('user_role_assignments')
-      .select(`
-        id,
-        user_id,
-        permission_group_id,
-        location,
-        permission_groups!inner(
-          id,
-          name,
-          permission_group_permissions(
-            permission_id,
-            location,
-            permissions!inner(
-              id,
-              name,
-              description,
-              category
-            )
-          )
-        )
-      `)
-      .eq('user_id', effectiveUserId)
-      .eq('is_active', true);
+    // Use the SECURITY DEFINER RPC to compute effective permissions.
+    // This bypasses RLS on permission_groups / permissions / permission_group_permissions,
+    // which otherwise can silently hide a basic user's role-based permissions when
+    // the nested !inner joins get filtered out.
+    const { data, error } = await supabase.rpc('get_effective_user_permissions', {
+      p_user_id: effectiveUserId,
+    });
 
-    if (roleError) {
-      console.error('Error loading role permissions:', roleError);
+    if (error) {
+      console.error('Error loading effective permissions:', error);
+      setPermissions([]);
+      setLoading(false);
+      return;
     }
 
-    // Also load direct user permission overrides
-    const { data: directData, error: directError } = await supabase
-      .from('user_permissions')
-      .select(`
-        id,
-        user_id,
-        permission_id,
-        location,
-        override_type,
-        permissions!inner(
-          id,
-          name,
-          description,
-          category
-        )
-      `)
-      .eq('user_id', effectiveUserId);
+    const allPermissions: UserPermission[] = (data || []).map((row: any, idx: number) => ({
+      id: `eff-${idx}-${row.permission_name}-${row.location ?? 'null'}`,
+      user_id: effectiveUserId,
+      permission_id: row.permission_name, // name used as stable id downstream
+      location: row.location ?? null,
+      permission: {
+        id: row.permission_name,
+        name: row.permission_name,
+        description: '',
+        category: row.permission_category,
+      },
+    }));
 
-    if (directError) {
-      console.error('Error loading direct permissions:', directError);
-    }
+    console.log('Effective permission names:', allPermissions.map(p => p.permission.name));
 
-    // Transform role-based permissions
-    const rolePermissions: UserPermission[] = [];
-    if (roleData) {
-      roleData.forEach((roleAssignment: any) => {
-        const permissionGroup = roleAssignment.permission_groups;
-        if (permissionGroup && permissionGroup.permission_group_permissions) {
-          permissionGroup.permission_group_permissions.forEach((pgp: any) => {
-            if (pgp.permissions) {
-              rolePermissions.push({
-                id: `role-${roleAssignment.id}-${pgp.permission_id}`,
-                user_id: effectiveUserId,
-                permission_id: pgp.permission_id,
-                location: pgp.location || roleAssignment.location,
-                permission: pgp.permissions
-              });
-            }
-          });
-        }
-      });
-    }
-
-    // Transform direct permissions
-    const directPermissions: UserPermission[] = (directData || [])
-      .filter(item => item.override_type === 'grant') // Only include grants
-      .map(item => ({
-        id: item.id,
-        user_id: item.user_id,
-        permission_id: item.permission_id,
-        location: item.location,
-        permission: Array.isArray(item.permissions) ? item.permissions[0] : item.permissions
-      }));
-
-    // Combine all permissions
-    const allPermissions = [...rolePermissions, ...directPermissions];
-    
-    console.log('Loaded role permissions:', rolePermissions);
-    console.log('Loaded direct permissions:', directPermissions);
-    console.log('All permissions:', allPermissions);
-    console.log('Permission names:', allPermissions.map(p => p.permission.name));
-    
     setPermissions(allPermissions);
     setLoading(false);
   };
